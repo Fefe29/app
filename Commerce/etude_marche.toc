@@ -1,0 +1,13 @@
+\babel@toc {french}{}\relax 
+\contentsline {section}{\numberline {1}Définition du périmètre}{2}{section.1}%
+\contentsline {section}{\numberline {2}Taille de marché -- ordres de grandeur}{2}{section.2}%
+\contentsline {section}{\numberline {3}Segmentation client \& besoins}{2}{section.3}%
+\contentsline {section}{\numberline {4}Concurrence \& différenciation}{2}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Tableau comparatif}{2}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Espaces de différenciation}{3}{subsection.4.2}%
+\contentsline {section}{\numberline {5}Modèles économiques}{3}{section.5}%
+\contentsline {section}{\numberline {6}Go-to-market}{3}{section.6}%
+\contentsline {section}{\numberline {7}Barrières \& conformité}{4}{section.7}%
+\contentsline {section}{\numberline {8}Roadmap produit (18 mois)}{4}{section.8}%
+\contentsline {section}{\numberline {9}KPIs \& tests de prix}{4}{section.9}%
+\contentsline {section}{\numberline {10}Risques \& parades}{4}{section.10}%

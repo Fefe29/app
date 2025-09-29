@@ -1,0 +1,154 @@
+@startuml
+skinparam packageStyle rectangle
+
+' ==== Types auxiliaires ====
+class Grib <<external>>
+class RawMsg <<datatype>>
+class PartialUpdate <<datatype>>
+class LaylineResult <<datatype>>
+class WindRef <<datatype>>
+class AlarmEvent <<datatype>>
+class DataSourceCfg <<datatype>>
+class UnitsPref <<datatype>>
+class ThemePref <<datatype>>
+
+package "Presentation (Flutter)" {
+  class DashboardPage
+  class ChartsPage
+  class AlarmsPage
+  class SettingsPage
+  class DashboardVM {
+    +start()
+    +stop()
+    +current: BoatSnapshot
+    +subscribe()
+  }
+  class ChartsVM
+  class AlarmsVM { +setAnchorPos(lat,lon); +toggleAlarm() }
+  class SettingsVM { +load(); +save(Settings) }
+  DashboardPage --> DashboardVM
+  ChartsPage --> ChartsVM
+  AlarmsPage --> AlarmsVM
+  SettingsPage --> SettingsVM
+}
+
+package "Domain" {
+  class BoatSnapshot {
+    ts: DateTime
+    nav: NavState
+    env: EnvState
+    sys: SysState
+  }
+  class NavState {
+    sog; cog; twa; tws; awa; aws; heading; depth; waterTemp
+    pos: GeoPos
+  }
+  class EnvState { pressure; airTemp; waveHeight }
+  class SysState { batteryV; batteryA }
+  class GeoPos { lat; lon }
+
+  class PolarModel {
+    +predictSpeed(twa,tws,displ,trim): double
+    +updateWithSample(nav: NavState)
+  }
+  class LaylineDetector {
+    +compute(target: GeoPos, wind: WindRef, polar: PolarModel): LaylineResult
+  }
+  class WeatherService {
+    +loadLocal(file): Grib
+    +fetch(area, run): Grib
+  }
+  class AlarmService {
+    +setAnchor(pos: GeoPos, circleM: double)
+    +check(snap: BoatSnapshot): List<AlarmEvent>
+  }
+  class Units {
+    +knToMs(kn): double
+    +degNorm(d): double
+  }
+  class DataBus {
+    +publish(snap: BoatSnapshot)
+    +subscribe(listener): void
+  }
+
+  ' Dépendances internes
+  AlarmService ..> BoatSnapshot
+  LaylineDetector ..> PolarModel
+  LaylineDetector ..> GeoPos
+  WeatherService ..> Grib
+
+  ' Cross-layer uses
+  DashboardVM ..> DataBus
+  ChartsVM ..> DataBus
+  AlarmsVM ..> AlarmService
+  SettingsVM ..> SettingsRepo
+}
+
+package "Data" {
+  interface DataSource {
+    +connect()
+    +disconnect()
+    +stream(): Stream<RawMsg>
+  }
+  class NMEA0183Source { host; port }
+  class NMEA2000Source { canInterface; filters }
+  class SignalKSource { endpoint; token }
+  class UDPSource { port }
+  class TCPSource { host; port }
+  DataSource <|.. NMEA0183Source
+  DataSource <|.. NMEA2000Source
+  DataSource <|.. SignalKSource
+  DataSource <|.. UDPSource
+  DataSource <|.. TCPSource
+
+  interface Parser {
+    +tryParse(msg: RawMsg): PartialUpdate
+  }
+  class NMEA0183Parser
+  class NMEA2000Parser
+  class SignalKParser
+  Parser <|.. NMEA0183Parser
+  Parser <|.. NMEA2000Parser
+  Parser <|.. SignalKParser
+
+  class FusionEngine {
+    +ingest(update: PartialUpdate)
+    +emitSnapshot(): BoatSnapshot
+  }
+  interface Repository {
+    +save(snap: BoatSnapshot)
+    +latest(): BoatSnapshot
+  }
+  class SnapshotRepo
+  class SettingsRepo {
+    +load(): Settings
+    +save(Settings)
+  }
+  Repository <|.. SnapshotRepo
+
+  class Settings {
+    sources: List<DataSourceCfg>
+    units: UnitsPref
+    theme: ThemePref
+  }
+
+  ' Flux de parsing
+  NMEA0183Source ..> NMEA0183Parser
+  NMEA2000Source ..> NMEA2000Parser
+  SignalKSource ..> SignalKParser
+  UDPSource ..> NMEA0183Parser
+  TCPSource ..> NMEA0183Parser
+
+  NMEA0183Parser ..> FusionEngine
+  NMEA2000Parser ..> FusionEngine
+  SignalKParser ..> FusionEngine
+
+  FusionEngine --> DataBus
+  FusionEngine --> Repository
+}
+
+' Multiplicités (facultatif)
+DataBus "1" o-- "0..*" DashboardVM
+DataBus "1" o-- "0..*" ChartsVM
+
+@enduml

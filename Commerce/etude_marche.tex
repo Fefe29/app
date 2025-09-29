@@ -1,0 +1,135 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\geometry{margin=2.5cm}
+
+\title{Étude de marché -- Logiciels maritimes (plaisance \& régate)}
+\author{Projet Féfé}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Définition du périmètre}
+\begin{itemize}
+  \item Plaisance \& course (apps de navigation, routage/régate, météo).
+  \item Intégration bord (NMEA 0183/2000, Signal K, Wi-Fi/TCP/UDP).
+  \item Services connectés (cartes, GRIB, AIS internet, analytics).
+  \item B2B léger (écoles de voile, clubs, petites flottes locatives).
+\end{itemize}
+Zone géographique : France (focus), Europe (extension naturelle).
+
+\section{Taille de marché -- ordres de grandeur}
+\begin{itemize}
+  \item France : 
+    \begin{itemize}
+      \item TAM : 40--90 M€/an.
+      \item SAM : 12--25 M€/an.
+      \item SOM (3 ans) : 0,12--0,75 M€/an.
+    \end{itemize}
+  \item Europe : 
+    \begin{itemize}
+      \item SAM : 50--120 M€/an.
+      \item SOM cible : 0,5--2,5 M€/an.
+    \end{itemize}
+\end{itemize}
+
+\section{Segmentation client \& besoins}
+\textbf{Personas :}
+\begin{itemize}
+  \item Skippers régatiers : laylines, départs, polaires précises.
+  \item Croisière performante : sécurité (alarme mouillage), météo offline.
+  \item Clubs/écoles : suivi multi-bateaux, export traces.
+  \item OEM/équipementiers : intégration dans MFD ou tablettes embarquées.
+\end{itemize}
+
+\section{Concurrence \& différenciation}
+\subsection{Tableau comparatif}
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{|p{3cm}|p{4cm}|p{2.5cm}|p{2cm}|p{3cm}|}
+\hline
+\textbf{Produit/App} & \textbf{Fonctionnalités clés} & \textbf{OS supportés} & \textbf{Prix indicatif} & \textbf{Intégrations}\\
+\hline
+Navionics Boating & Cartes, routage basique, météo, AIS internet & iOS, Android & 15--30€/an + cartes & GPS, AIS via app \\
+\hline
+TimeZero (TZ iBoat) & Routage météo, cartes vectorielles, marée & iOS uniquement & 49€/an + modules & NMEA Wi-Fi, Furuno \\
+\hline
+SailGrib WR & Routage météo avancé, GRIB, polaires custom & Android & 35€ + achats intégrés & NMEA Wi-Fi, fichiers GPX \\
+\hline
+qtVlm & Routage, polaires, régate (ligne, laylines) & Win/Mac/Linux, Android & Gratuit / don & NMEA 0183/2000, Signal K \\
+\hline
+Weather4D Routing & Routage 4D, GRIB haute résolution, régate & iOS & 33€/an + cartes & NMEA Wi-Fi, Signal K \\
+\hline
+Adrena (Pro/First) & Régate pro, laylines, départ, polaires, analytics & Windows & 1000--4000€ licence & NMEA 0183/2000, capteurs propriétaires \\
+\hline
+Expedition & Logiciel course haut niveau, météo, laylines, départ, polaires dynamiques & Windows & 1500€+ & NMEA, B\&G, Garmin, etc. \\
+\hline
+Sailmon App & Tracking cloud, analytics, instruments virtuels & iOS, Android & Gratuit (cloud payant) & GPS, capteurs Sailmon \\
+\hline
+iRegatta & Instruments, départ, laylines, NMEA dashboard & iOS, Android & 30--50€ & NMEA Wi-Fi, Signal K \\
+\hline
+Signal K + Apps & Middleware open-source, dashboards custom & Win/Mac/Linux, mobile via plugins & Gratuit & NMEA 0183/2000, MQTT, REST API \\
+\hline
+\end{longtable}
+
+\subsection{Espaces de différenciation}
+\begin{itemize}
+  \item Expérience unifiée (instruments + régate + météo + alarme).
+  \item Polaires auto-apprenantes (IA) sur traces réelles.
+  \item Compatibilité large NMEA/Signal K, plug-and-play.
+  \item Mode offline robuste (météo + cartes + alarme).
+  \item Pack ``Race + Coach'' pour clubs et écoles.
+\end{itemize}
+
+\section{Modèles économiques}
+\begin{itemize}
+  \item Freemium \textrightarrow Pro : 4,99--9,99 €/mois.
+  \item Add-on Régate : 6--15 €/mois.
+  \item Clubs/écoles : 25--99 €/mois/bateau.
+  \item OEM/licences : 3--10 €/device/mois.
+\end{itemize}
+
+\section{Go-to-market}
+Cibles : clubs de régate, écoles de voile, shipchandlers techniques, communautés open-source (Signal K/OpenCPN).  
+Canaux : Stores Android, bundles avec passerelles NMEA Wi-Fi, bêta fermée avec 10--20 bateaux.
+
+\section{Barrières \& conformité}
+\begin{itemize}
+  \item Interop : possible via Signal K (open).
+  \item Certifications CE/EMC si hardware ajouté.
+  \item RGPD pour cloud/partage de traces.
+  \item Fiabilité des alarmes (responsabilité).
+\end{itemize}
+
+\section{Roadmap produit (18 mois)}
+\begin{itemize}
+  \item 0--3 mois : POC Android, dashboard NMEA/Signal K, alarme, GRIB offline.
+  \item 3--6 mois : Race mode, layouts custom.
+  \item 6--12 mois : Polaires IA v1, analytics cloud, MVP Club.
+  \item 12--18 mois : Intégrations OEM, portage iOS/Windows, version Watch.
+\end{itemize}
+
+\section{KPIs \& tests de prix}
+\begin{itemize}
+  \item Cibles bêta : 200 régatiers, 10 clubs, 20 croiseurs.
+  \item KPIs : activation, rétention, capteurs connectés, MRR.
+  \item Expériences prix : freemium vs achat unique (29--49€) + add-ons.
+\end{itemize}
+
+\section{Risques \& parades}
+\begin{itemize}
+  \item Hétérogénéité capteurs $\rightarrow$ calibration robuste.
+  \item Concurrence MFD $\rightarrow$ stratégie companion.
+  \item Support terrain $\rightarrow$ ambassadeurs clubs/shipchandlers.
+\end{itemize}
+
+\end{document}
