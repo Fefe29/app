@@ -40,7 +40,7 @@ class _HomeShellState extends State<HomeShell> {
     final idx = _indexFromLocation(widget.location); // <-- utiliser la prop
 
     return Scaffold(
-      appBar: AppBar(title: const Text('NMEA Dashboard')),
+      appBar: AppBar(title: const Text('Kornog')),
       body: SafeArea(child: widget.child),
       bottomNavigationBar: NavigationBar(
         selectedIndex: idx,

@@ -1,6 +1,6 @@
 {
-    "name": "nmea_dashboard",
-    "short_name": "nmea_dashboard",
+    "name": "Kornog",
+    "short_name": "Kornog",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

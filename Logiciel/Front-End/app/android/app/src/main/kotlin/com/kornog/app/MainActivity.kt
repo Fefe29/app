@@ -1,4 +1,4 @@
-package com.example.nmea_dashboard
+package com.kornog.app
 
 import io.flutter.embedding.android.FlutterActivity
 

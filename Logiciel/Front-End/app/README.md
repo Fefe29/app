@@ -1,4 +1,4 @@
-# nmea_dashboard
+# Kornog
 
 A new Flutter project.
 

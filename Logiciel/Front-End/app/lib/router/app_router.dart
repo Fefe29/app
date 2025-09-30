@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../screens/home_shell.dart';
 import '../features/settings/settings_page.dart';
+import '../features/dashboard/dashboard_page.dart'; // <- nouvelle import
 
 /// Fournit la configuration de navigation à l’application.
 /// On utilise un ShellRoute pour afficher la barre de navigation globale.
@@ -18,7 +19,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/',
             name: 'dashboard',
-            builder: (_, __) => const _PlaceholderPage(label: 'Dashboard'),
+            builder: (_, __) => const DashboardPage(), // <- on montre le vrai dashboard
           ),
           GoRoute(
             path: '/charts',

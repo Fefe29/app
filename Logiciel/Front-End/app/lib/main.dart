@@ -4,18 +4,18 @@ import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
 void main() {
-  runApp(const ProviderScope(child: NmeaApp()));
+  runApp(const ProviderScope(child: App()));
 }
 
-class NmeaApp extends ConsumerWidget {
-  const NmeaApp({super.key});
+class App extends ConsumerWidget {
+  const App({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final theme = ref.watch(appThemeProvider);
     return MaterialApp.router(
-      title: 'NMEA Dashboard',
+      title: 'App',
       theme: theme.light,
       darkTheme: theme.dark,
       themeMode: ThemeMode.system,
