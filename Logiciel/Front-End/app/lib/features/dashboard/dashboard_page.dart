@@ -37,7 +37,7 @@ class DashboardPage extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Erreur: $e')),
       data: (selectedKeys) {
-        final keys = selectedKeys.toList()..sort();
+        final keys = selectedKeys.toList();
         return Stack(
           children: [
             LayoutBuilder(
