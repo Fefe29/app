@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../app/app_shell.dart';
 import '../features/settings/presentation/pages/settings_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../features/charts/presentation/pages/chart_page.dart';
 import '../features/analysis/presentation/pages/analysis_page.dart'; // Page Analysis
 import '../features/alarms/presentation/pages/alarms_page.dart';
 
@@ -26,7 +27,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/charts',
             name: 'charts',
-            builder: (_, __) => const _PlaceholderPage(label: 'Charts'),
+            builder: (_, __) => const ChartsPage(),
           ),
           GoRoute(
             path: '/alarms',

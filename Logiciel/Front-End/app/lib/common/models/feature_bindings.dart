@@ -3,9 +3,9 @@
 // ------------------------------
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'features/dashboard/dashboard_page.dart';
-import 'features/charts/charts_page.dart';
-import 'features/alarms/alarms_page.dart';
+import '../../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../../features/charts/presentation/pages/chart_page.dart';
+import '../../features/alarms/presentation/pages/alarms_page.dart';
 
 
 final routesProvider = Provider<List<GoRoute>>((ref) => [
