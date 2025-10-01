@@ -1,8 +1,8 @@
 // ------------------------------
 import 'dart:async';
 import 'dart:math';
-import 'telemetry_bus.dart';
-import 'telemetry_models.dart';
+import 'package:kornog/data/datasources/telemetry/telemetry_bus.dart';
+import 'package:kornog/domain/entities/telemetry.dart';
 
 
 class FakeTelemetryBus implements TelemetryBus {

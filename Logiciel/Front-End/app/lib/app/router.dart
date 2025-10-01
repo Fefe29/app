@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../screens/home_shell.dart';
-import '../features/settings/settings_page.dart';
-import '../features/dashboard/dashboard_page.dart';
-import '../screens/analysis/analysis_page.dart'; // 👈 import de ta page Analysis
+import '../app/app_shell.dart';
+import '../features/settings/presentation/pages/settings_page.dart';
+import '../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../features/analysis/presentation/pages/analysis_page.dart'; // Page Analysis
+import '../features/alarms/presentation/pages/alarms_page.dart';
 
 /// Fournit la configuration de navigation à l’application.
 /// On utilise un ShellRoute pour afficher la barre de navigation globale.
@@ -30,7 +31,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/alarms',
             name: 'alarms',
-            builder: (_, __) => const _PlaceholderPage(label: 'Alarms'),
+            builder: (_, __) => const AlarmsPage(),
           ),
           GoRoute(
             path: '/analysis', // 👈 route vers ta page

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../dashboard/selected_metrics.dart';
+import 'package:kornog/providers.dart';
 
 class MetricsSelectorSheet extends ConsumerWidget {
   const MetricsSelectorSheet({super.key});

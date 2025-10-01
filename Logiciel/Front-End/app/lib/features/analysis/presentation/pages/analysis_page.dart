@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../features/analysis/analysis_filters.dart';
+import '../../providers/analysis_filters.dart';
 
 class AnalysisPage extends ConsumerWidget {
   const AnalysisPage({super.key});

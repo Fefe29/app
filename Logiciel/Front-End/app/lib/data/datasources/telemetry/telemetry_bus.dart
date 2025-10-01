@@ -2,7 +2,7 @@
 // File: lib/telemetry/telemetry_bus.dart (interface)
 // ------------------------------
 import 'dart:async';
-import 'telemetry_models.dart';
+import 'package:kornog/domain/entities/telemetry.dart';
 
 
 abstract class TelemetryBus {

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'analysis/widgets/analysis_filter_drawer.dart'; // 👈 import du drawer
+// Import corrigé : utiliser l'import package (l'ancien chemin cherchait lib/app/features/... inexistant)
+import 'package:kornog/features/analysis/presentation/widgets/analysis_filter_drawer.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   final Widget child;

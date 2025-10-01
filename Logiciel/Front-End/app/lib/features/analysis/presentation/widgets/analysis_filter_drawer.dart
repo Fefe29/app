@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../features/analysis/analysis_filters.dart';
+// Import corrigé vers le provider (fichier déplacé dans providers/analysis_filters.dart)
+import '../../providers/analysis_filters.dart';
 
 class AnalysisFilterDrawer extends ConsumerWidget {
   const AnalysisFilterDrawer({super.key});

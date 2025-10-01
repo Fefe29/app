@@ -1,7 +1,7 @@
 // lib/features/dashboard/widgets/metric_tile.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../providers.dart';
+import 'package:kornog/providers.dart';
 
 class MetricTile extends ConsumerStatefulWidget {
   final String metricKey;

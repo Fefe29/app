@@ -1,28 +1,8 @@
-// ------------------------------
-// File: lib/providers.dart
-// ------------------------------
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'telemetry/telemetry_bus.dart';
-import 'telemetry/fake_telemetry_bus.dart';
-import 'telemetry/telemetry_models.dart';
+// Barrel file to re-export application-wide Riverpod providers
+// So feature code can simply: import 'package:kornog/providers.dart';
 
-
-final telemetryBusProvider = Provider<TelemetryBus>((ref) {
-final bus = FakeTelemetryBus();
-ref.onDispose(() => bus.dispose());
-return bus;
-});
-
-
-/// Stream of full snapshots
-final snapshotStreamProvider = StreamProvider.autoDispose((ref) {
-final bus = ref.watch(telemetryBusProvider);
-return bus.snapshots();
-});
-
-
-/// Helper to watch a single metric key
-final metricProvider = StreamProvider.family.autoDispose<Measurement, String>((ref, key) {
-final bus = ref.watch(telemetryBusProvider);
-return bus.watch(key);
-});
+export 'common/providers/app_providers.dart';
+export 'features/dashboard/providers/selected_metrics.dart';
+export 'features/alarms/providers/regatta_timer_provider.dart';
+export 'features/alarms/providers/sleep_timer_provider.dart';
+export 'features/alarms/providers/anchor_alarm_provider.dart';

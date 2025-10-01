@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../../providers.dart';
+import 'package:kornog/providers.dart';
 
 
 class ChartsPage extends ConsumerWidget {
