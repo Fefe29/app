@@ -38,7 +38,7 @@ class _HeaderStatus extends ConsumerWidget {
 	final dynamic table;
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
-		final wind = ref.watch(unifiedWindProvider);
+		final wind = ref.watch(windSampleProvider);
 		return Container(
 			padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
 			alignment: Alignment.centerLeft,

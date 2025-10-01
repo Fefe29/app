@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/services/wind_trend_analyzer.dart';
-import 'wind_simulation_provider.dart';
 import 'package:kornog/common/providers/app_providers.dart';
 
 class _WindTrendSensitivity extends Notifier<double> {
@@ -25,6 +24,6 @@ final _windTrendAnalyzerProvider = Provider<WindTrendAnalyzer>((ref) {
 /// Fournit un snapshot recalculé à 1 Hz (car dépend du provider vent qui se met à jour).
 final windTrendSnapshotProvider = Provider<WindTrendSnapshot>((ref) {
   final analyzer = ref.watch(_windTrendAnalyzerProvider);
-  final windSample = ref.watch(unifiedWindProvider);
+  final windSample = ref.watch(windSampleProvider);
   return analyzer.ingest(windSample);
 });

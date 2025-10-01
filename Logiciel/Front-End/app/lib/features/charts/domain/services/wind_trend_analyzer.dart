@@ -1,7 +1,7 @@
 import 'dart:collection';
 import 'dart:math' as math;
 
-import '../../providers/wind_simulation_provider.dart';
+import 'package:kornog/common/providers/app_providers.dart' show WindSample;
 
 /// Classification de la tendance globale du vent.
 enum WindTrendDirection { veeringRight, backingLeft, neutral, irregular }

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/models/polar_table.dart';
 import '../domain/services/polar_parser.dart';
 import '../domain/services/vmc_calculator.dart';
-import 'wind_simulation_provider.dart';
 import 'package:kornog/common/providers/app_providers.dart';
 
 /// Table de polaires chargée (Phase 1: aucune source -> null). Plus tard on lira un asset ou un fichier.
@@ -23,13 +22,13 @@ final polarTableProvider = FutureProvider<PolarTable?>((ref) async {
 /// Force du vent courante (TWS) extraite du snapshot télémétrie si disponible.
 /// Pour l'instant on renvoie une valeur fictive jusqu'à branchement réel.
 final currentWindSpeedProvider = Provider<double?>((ref) {
-  final sample = ref.watch(unifiedWindProvider);
+  final sample = ref.watch(windSampleProvider);
   return sample.speed;
 });
 
 /// Angle du vent courant (TWA) – placeholder.
 final currentWindAngleProvider = Provider<double?>((ref) {
-  final sample = ref.watch(unifiedWindProvider);
+  final sample = ref.watch(windSampleProvider);
   return sample.directionDeg;
 });
 

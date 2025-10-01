@@ -1,6 +1,6 @@
 import 'dart:collection';
 
-import '../../providers/wind_simulation_provider.dart';
+import 'package:kornog/common/providers/app_providers.dart' show WindSample;
 
 /// Représente la recommandation d'amure courante.
 class TackRecommendation {

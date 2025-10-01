@@ -16,7 +16,7 @@ class CourseCanvas extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
   final course = ref.watch(courseProvider);
   final route = ref.watch(routePlanProvider);
-  final wind = ref.watch(unifiedWindProvider);
+  final wind = ref.watch(windSampleProvider);
   final vmcUp = ref.watch(vmcUpwindProvider); // Pour laylines (angle optimal de près)
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
       return const Center(child: Text('Aucune bouée / ligne'));
@@ -237,7 +237,7 @@ class _CoursePainter extends CustomPainter {
     canvas.drawPath(headPath, headPaint);
     canvas.drawPath(headPath, shaft);
 
-    final label = 'Vent→ ${toDir.toStringAsFixed(0)}° (${windDirDeg.toStringAsFixed(0)}° from)  ${windSpeed.toStringAsFixed(1)} nds';
+    final label = 'Vent→  from ${windDirDeg.toStringAsFixed(0)}°  ${windSpeed.toStringAsFixed(1)} nds';
     _drawText(canvas, label, base + const Offset(-210, 8), fontSize: 12, color: Colors.indigo.shade700);
   }
 

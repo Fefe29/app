@@ -30,7 +30,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
   Widget build(BuildContext context) {
     super.build(context);
 
-    final asyncM = ref.watch(metricProvider(widget.metricKey));
+  final asyncM = ref.watch(metricProvider(widget.metricKey));
     final cs = Theme.of(context).colorScheme;
 
     if (asyncM.hasValue) {
