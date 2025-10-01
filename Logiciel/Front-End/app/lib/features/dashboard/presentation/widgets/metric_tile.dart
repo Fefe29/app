@@ -15,6 +15,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
     with AutomaticKeepAliveClientMixin {
   String? _lastValue;
   String? _lastUnit;
+  double? _lastNumeric; // pour filtrer les micro-variations et éviter les rebuilds visibles
   late final String _category = widget.metricKey.contains('.')
       ? widget.metricKey.split('.').first
       : 'misc';
@@ -34,8 +35,13 @@ class _MetricTileState extends ConsumerState<MetricTile>
 
     if (asyncM.hasValue) {
       final m = asyncM.value!;
-      _lastValue = _fmt(m.value);
-      _lastUnit  = m.unit.symbol;
+      final v = m.value.toDouble();
+      // Seuil: on ignore les variations très petites (< 0.02) pour réduire le clignotement
+      if (_lastNumeric == null || (v - (_lastNumeric ?? v)).abs() > 0.02) {
+        _lastNumeric = v;
+        _lastValue = _fmt(v);
+      }
+      _lastUnit = m.unit.symbol;
     }
     // On affiche la dernière valeur connue (ou '--'), JAMAIS un loader agressif
     final valueText = _lastValue ?? '--';
@@ -64,66 +70,49 @@ class _MetricTileState extends ConsumerState<MetricTile>
                   ),
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Catégorie (type)
-                      Text(
-                        _category.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1,
-                          color: cs.onSurface.withOpacity(.72),
-                        ),
+                      // Catégorie (type) + nom regroupés
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _category.toUpperCase(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.1,
+                                color: cs.onSurface.withOpacity(.80),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      // Nom de la donnée
+                      const SizedBox(height: 2),
                       Text(
                         _name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          letterSpacing: .3,
+                          letterSpacing: .4,
                           color: cs.onSurface.withOpacity(.85),
                         ),
                       ),
-                      const Spacer(),
-                      // Valeur + unité (alignées sur la ligne de base via Text.rich)
-                      AnimatedOpacity(
-                        opacity: valueText == '--' ? 0.6 : 1,
-                        duration: const Duration(milliseconds: 250),
-                        child: Text.rich(
-                          TextSpan(
-                            text: valueText,
-                            style: const TextStyle(
-                              fontSize: 50,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -1.2,
+                      // Valeur centrée
+                      Expanded(
+                        child: Center(
+                          child: Opacity(
+                            opacity: valueText == '--' ? 0.55 : 1,
+                            child: _StableValue(
+                              value: valueText,
+                              unit: unitText,
+                              colorScheme: cs,
                             ),
-                            children: [
-                              if (unitText.isNotEmpty)
-                                WidgetSpan(
-                                  alignment: PlaceholderAlignment.baseline,
-                                  baseline: TextBaseline.alphabetic,
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(left: 6, bottom: 4),
-                                    child: Text(
-                                      unitText,
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w500,
-                                        color: cs.onSurfaceVariant,
-                                        letterSpacing: .6,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
                           ),
-                          softWrap: false,
-                          overflow: TextOverflow.fade,
                         ),
                       ),
                     ],
@@ -154,3 +143,61 @@ Color _categoryColor(String cat, ColorScheme cs) {
 }
 
 // (Ancienne classe _Badge retirée car design refondu)
+
+class _StableValue extends StatelessWidget {
+  final String value;
+  final String unit;
+  final ColorScheme colorScheme;
+  const _StableValue({
+    required this.value,
+    required this.unit,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Largeur mini pour éviter le shift lorsque la valeur raccourcit / s'allonge.
+    return LayoutBuilder(
+      builder: (ctx, c) {
+        return ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 140),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Text.rich(
+              TextSpan(
+                text: value,
+                style: const TextStyle(
+                  fontSize: 54,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -1.4,
+                ),
+                children: [
+                  if (unit.isNotEmpty)
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.baseline,
+                      baseline: TextBaseline.alphabetic,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 8, bottom: 6),
+                        child: Text(
+                          unit,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w500,
+                            color: colorScheme.onSurfaceVariant,
+                            letterSpacing: .7,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              softWrap: false,
+              overflow: TextOverflow.fade,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
