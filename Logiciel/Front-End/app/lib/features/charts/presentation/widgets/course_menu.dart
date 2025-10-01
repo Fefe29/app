@@ -27,6 +27,15 @@ class CourseMenuButton extends ConsumerWidget {
           case _CourseAction.editExisting:
             await _openEditSelector(context, ref, course);
             break;
+          case _CourseAction.setFinishLine:
+            await _openFinishLineDialog(context, ref, existing: course.finishLine);
+            break;
+          case _CourseAction.editFinishLine:
+            await _openFinishLineDialog(context, ref, existing: course.finishLine, isEdit: true);
+            break;
+          case _CourseAction.removeFinishLine:
+            ref.read(courseProvider.notifier).removeFinishLine();
+            break;
         }
       },
       itemBuilder: (c) => [
@@ -36,10 +45,60 @@ class CourseMenuButton extends ConsumerWidget {
         const PopupMenuDivider(),
         PopupMenuItem(
           enabled: course.buoys.isNotEmpty,
-            value: _CourseAction.editExisting,
-            child: const Text('Modifier bouée existante')
+          value: _CourseAction.editExisting,
+          child: const Text('Modifier bouée existante'),
         ),
+        const PopupMenuDivider(),
+        if (course.finishLine == null)
+          const PopupMenuItem(value: _CourseAction.setFinishLine, child: Text('Définir ligne arrivée'))
+        else ...[
+          const PopupMenuItem(value: _CourseAction.editFinishLine, child: Text('Modifier ligne arrivée')),
+          const PopupMenuItem(value: _CourseAction.removeFinishLine, child: Text('Supprimer ligne arrivée')),
+        ]
       ],
+    );
+  }
+
+  Future<void> _openFinishLineDialog(BuildContext context, WidgetRef ref, {LineSegment? existing, bool isEdit = false}) async {
+    final x1 = TextEditingController(text: existing?.p1x.toString() ?? '0');
+    final y1 = TextEditingController(text: existing?.p1y.toString() ?? '0');
+    final x2 = TextEditingController(text: existing?.p2x.toString() ?? '50');
+    final y2 = TextEditingController(text: existing?.p2y.toString() ?? '0');
+    final formKey = GlobalKey<FormState>();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEdit ? 'Modifier ligne arrivée' : 'Définir ligne arrivée'),
+        content: Form(
+          key: formKey,
+          child: SizedBox(
+            width: 340,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(children: [Expanded(child: _numField(label: 'X1', controller: x1)), const SizedBox(width: 8), Expanded(child: _numField(label: 'Y1', controller: y1))]),
+                const SizedBox(height: 8),
+                Row(children: [Expanded(child: _numField(label: 'X2', controller: x2)), const SizedBox(width: 8), Expanded(child: _numField(label: 'Y2', controller: y2))]),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
+          FilledButton(
+            onPressed: () {
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              final nx1 = double.parse(x1.text.replaceAll(',', '.'));
+              final ny1 = double.parse(y1.text.replaceAll(',', '.'));
+              final nx2 = double.parse(x2.text.replaceAll(',', '.'));
+              final ny2 = double.parse(y2.text.replaceAll(',', '.'));
+              ref.read(courseProvider.notifier).setFinishLine(nx1, ny1, nx2, ny2);
+              Navigator.of(ctx).pop();
+            },
+            child: Text(isEdit ? 'Enregistrer' : 'Définir'),
+          )
+        ],
+      ),
     );
   }
 
@@ -165,4 +224,4 @@ class CourseMenuButton extends ConsumerWidget {
   }
 }
 
-enum _CourseAction { addRegular, addCommittee, addTarget, editExisting }
+enum _CourseAction { addRegular, addCommittee, addTarget, editExisting, setFinishLine, editFinishLine, removeFinishLine }

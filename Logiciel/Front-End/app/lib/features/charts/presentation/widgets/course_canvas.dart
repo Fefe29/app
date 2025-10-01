@@ -5,7 +5,7 @@ import '../../../charts/providers/course_providers.dart';
 import '../../domain/models/course.dart';
 import '../../../charts/providers/route_plan_provider.dart';
 import '../../../charts/domain/services/routing_calculator.dart';
-import '../../../charts/providers/wind_simulation_provider.dart';
+import 'package:kornog/common/providers/app_providers.dart';
 import '../../../charts/providers/polar_providers.dart';
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.

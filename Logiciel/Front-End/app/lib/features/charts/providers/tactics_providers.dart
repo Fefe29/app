@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/services/ado_refus_strategy.dart';
 import 'wind_simulation_provider.dart';
+import 'package:kornog/common/providers/app_providers.dart';
 
 final adoRefusStrategyProvider = Provider<AdoRefusStrategy>((ref) {
   return AdoRefusStrategy(periodSeconds: 5, thresholdDeg: 2); // paramètres par défaut

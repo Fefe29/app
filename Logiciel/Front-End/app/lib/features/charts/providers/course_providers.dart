@@ -48,6 +48,12 @@ class CourseNotifier extends Notifier<CourseState> {
     state = state.copyWith(finishLine: LineSegment(p1x: x1, p1y: y1, p2x: x2, p2y: y2, type: LineType.finish));
   }
 
+  void removeFinishLine() {
+    if (state.finishLine != null) {
+      state = state.copyWith(removeFinish: true);
+    }
+  }
+
   void clear() {
     _nextId = 1;
     state = CourseState.initial();

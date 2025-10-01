@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:kornog/common/providers/app_providers.dart';
 
 class WindSample {
   WindSample({required this.directionDeg, required this.speed});
@@ -86,34 +85,3 @@ class _WindSimNotifier extends Notifier<WindSample> {
 }
 
 final windSimulationProvider = NotifierProvider<_WindSimNotifier, WindSample>(_WindSimNotifier.new);
-
-// ---------------------------------------------------------------------------
-// Unified wind provider: if real (or fake telemetry) provides wind.twd & wind.tws
-// we map those; otherwise we fallback to the internal simulator above.
-// This lets the dashboard and the charts share a single consistent wind source.
-// ---------------------------------------------------------------------------
-
-final unifiedWindProvider = Provider<WindSample>((ref) {
-  // Try snapshot stream latest value
-  final snapAsync = ref.watch(snapshotStreamProvider);
-  return snapAsync.maybeWhen(
-    data: (snap) {
-      final twd = snap.metrics['wind.twd']?.value; // true wind direction (FROM)
-      final tws = snap.metrics['wind.tws']?.value; // true wind speed
-      if (twd != null && tws != null) {
-        return WindSample(directionDeg: twd % 360, speed: tws);
-      }
-      // fallback: derive twd from cog + twa if available: twd = (cog - twa) modulo 360
-      final cog = snap.metrics['nav.cog']?.value; // course over ground
-      final twa = snap.metrics['wind.twa']?.value; // signed angle (bâbord négatif / tribord positif)
-      if (cog != null && twa != null) {
-        final derivedTwd = (cog - twa) % 360;
-        final tws2 = tws ?? snap.metrics['wind.aws']?.value ?? 8.0;
-        return WindSample(directionDeg: derivedTwd, speed: tws2);
-      }
-      // final fallback: use simulator
-      return ref.watch(windSimulationProvider);
-    },
-    orElse: () => ref.watch(windSimulationProvider),
-  );
-});

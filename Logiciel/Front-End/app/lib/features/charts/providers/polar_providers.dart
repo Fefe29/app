@@ -5,6 +5,7 @@ import '../domain/models/polar_table.dart';
 import '../domain/services/polar_parser.dart';
 import '../domain/services/vmc_calculator.dart';
 import 'wind_simulation_provider.dart';
+import 'package:kornog/common/providers/app_providers.dart';
 
 /// Table de polaires chargée (Phase 1: aucune source -> null). Plus tard on lira un asset ou un fichier.
 final polarTableProvider = FutureProvider<PolarTable?>((ref) async {

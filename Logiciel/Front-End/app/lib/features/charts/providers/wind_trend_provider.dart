@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/services/wind_trend_analyzer.dart';
 import 'wind_simulation_provider.dart';
+import 'package:kornog/common/providers/app_providers.dart';
 
 class _WindTrendSensitivity extends Notifier<double> {
   @override

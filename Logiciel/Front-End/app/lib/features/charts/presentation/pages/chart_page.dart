@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
+import 'package:kornog/common/providers/app_providers.dart';
 import '../widgets/course_canvas.dart';
 import '../widgets/course_menu.dart';
 
