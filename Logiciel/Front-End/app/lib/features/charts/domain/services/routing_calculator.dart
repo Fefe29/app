@@ -94,6 +94,7 @@ class RoutingCalculator {
       final distFirst = math.sqrt(vx * vx + vy * vy);
 
       bool addedStrategic = false;
+      print('ROUTING DEBUG - WindTrend: ${windTrend?.trend}, Reliable: ${windTrend?.isReliable}, DistFirst: $distFirst');
       if (windTrend != null && windTrend.isReliable && distFirst > 1e-3) {
         // Pour MVP : appliquer logique stratégique dès qu'une rotation fiable est détectée.
         if (windTrend.trend == WindTrendDirection.veeringRight || windTrend.trend == WindTrendDirection.backingLeft) {
@@ -143,17 +144,15 @@ class RoutingCalculator {
       }
 
       if (!addedStrategic) {
-        // Fallback route directe
-        legs.add(RouteLeg(
-          startX: startMidX,
-          startY: startMidY,
-          endX: first.x,
-          endY: first.y,
-          type: RouteLegType.start,
-          label: 'Start->B${first.id}',
-        ));
+        // Fallback route directe - UTILISER le système de routing avec tacks
+        print('ROUTING DEBUG - Creating Start->B1 segment: ($startMidX,$startMidY) -> (${first.x},${first.y})');
+        final seg = _routeLegWithTacksIfNeeded(startMidX, startMidY, first.x, first.y, label: 'Start->B${first.id}');
+        print('ROUTING DEBUG - Start->B1 segments created: ${seg.length}');
+        legs.addAll(seg);
         curX = first.x;
         curY = first.y;
+      } else {
+        print('ROUTING DEBUG - Strategic segment used instead of direct Start->B1');
       }
     }
 
@@ -212,38 +211,40 @@ class RoutingCalculator {
     if (dist < 1e-6) {
       return [];
     }
-    // Heading géographique (0=N, 90=E) cohérent avec usage écran: inverser Y si repère différent?
-    // Nous supposons ici que Y croît vers le haut dans les données logique (cf projection). Heading calcul:
-    // Coordonnées logiques: X droite (Est), Y haut (Nord). Bearing géographique via util.
-    final headingDeg = bearingFromVector(dx, dy, screenYAxisDown: false);
+    // Heading géographique (0=N, 90=E) - coordonnées logiques Y vers le haut
+    // Pour un bearing géographique standard : atan2(dx, dy) où dy est vers le Nord
+    final headingRad = math.atan2(dx, dy);
+    double headingDeg = (headingRad * 180 / math.pi) % 360;
+    if (headingDeg < 0) headingDeg += 360;
     
-    // Debug spécial pour segment départ → B1  
-    print('ROUTING DEBUG - From: ($sx,$sy) To: ($ex,$ey), Vector: ($dx,$dy), Heading: $headingDeg°');
+    // Debug pour tous les segments
+    final segmentLabel = label.contains('Start') ? '[START→B1]' : '[SEGMENT]';
+    print('ROUTING DEBUG $segmentLabel - From: ($sx,$sy) To: ($ex,$ey), Vector: ($dx,$dy), Heading: $headingDeg°');
     // Calcul du TWA théorique si on naviguait directement sur ce cap
     // TWA = angle entre direction du vent et cap requis 
     // TWA = windDir - heading (positif = vent de tribord, négatif = vent de bâbord)
     final theoreticalTWA = signedDelta(headingDeg, windDirDeg!); 
-    final minUp = optimalUpwindAngle! - 3; // marge pour navigation au près
+    final optimalAngle = optimalUpwindAngle!; // angle VMG optimal, pas de marge artificielle
     
     // Debug routing decision
     final twaNature = theoreticalTWA.abs() < 45 ? "PRÈS" : theoreticalTWA.abs() < 135 ? "TRAVERS" : "PORTANT";
-    print('ROUTING DEBUG - RequiredHeading: ${headingDeg.toStringAsFixed(1)}°, WindDir: ${windDirDeg!.toStringAsFixed(1)}°, TheoreticalTWA: ${theoreticalTWA.toStringAsFixed(1)}° ($twaNature), MinAngle: ${minUp.toStringAsFixed(1)}°');
+    print('ROUTING DEBUG - RequiredHeading: ${headingDeg.toStringAsFixed(1)}°, WindDir: ${windDirDeg!.toStringAsFixed(1)}°, TheoreticalTWA: ${theoreticalTWA.toStringAsFixed(1)}° ($twaNature), OptimalAngle: ${optimalAngle.toStringAsFixed(1)}°');
     
     // Décision de route directe vs manœuvres basée sur le TWA théorique:
-    // - Au près (|TWA| < minUp): faire des bords
+    // - Au près (|TWA| < optimalAngle): faire des bords pour VMG optimal
     // - Au portant (|TWA| > 150°): faire des empannages si nécessaire 
-    // - Au travers (minUp <= |TWA| <= 150°): route directe
+    // - Au travers (optimalAngle <= |TWA| <= 150°): route directe
     
     final absTWA = theoreticalTWA.abs();
     
-    if (absTWA >= minUp && absTWA <= 150) {
+    if (absTWA >= optimalAngle && absTWA <= 150) {
       print('ROUTING - Route directe possible (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° dans zone de navigation directe)');
       return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label)];
     }
     
     // Gérer les cas spéciaux : près et portant
-    if (absTWA < minUp) {
-      print('ROUTING - Besoin de tirer des bords au près (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° < ${minUp.toStringAsFixed(1)}°)');
+    if (absTWA < optimalAngle) {
+      print('ROUTING - Besoin de tirer des bords au près (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° < ${optimalAngle.toStringAsFixed(1)}°)');
       return _createTackingLegs(sx, sy, ex, ey, windDirDeg!, optimalUpwindAngle!, dist, label, finish);
     } else if (absTWA > 150) {
       print('ROUTING - Besoin d\'empanner au portant (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° > 150°)');
@@ -284,7 +285,9 @@ class RoutingCalculator {
     // Vérifier si le second segment peut fermer directement
     final dx2 = ex - wp1x;
     final dy2 = ey - wp1y;
-    final heading2 = bearingFromVector(dx2, dy2, screenYAxisDown: false);
+    final heading2Rad = math.atan2(dx2, dy2 * -1);
+    double heading2 = (heading2Rad * 180 / math.pi) % 360;
+    if (heading2 < 0) heading2 += 360;
     final twa2 = signedDelta(windDir, heading2).abs();
     
     if (twa2 < optimalAngle - 5 && dist > 15) {
