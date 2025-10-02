@@ -1,3 +1,5 @@
+/// Drawer for configuring analysis filters.
+/// See ARCHITECTURE_DOCS.md (section: analysis_filter_drawer.dart).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Import corrigé vers le provider (fichier déplacé dans providers/analysis_filters.dart)

@@ -1,3 +1,5 @@
+/// Analysis filters provider definitions.
+/// See ARCHITECTURE_DOCS.md (section: analysis_filters.dart).
 // lib/features/analysis/analysis_filters.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

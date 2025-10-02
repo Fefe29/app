@@ -1,3 +1,5 @@
+/// TelemetryBus abstraction.
+/// See ARCHITECTURE_DOCS.md (section: lib/data/datasources/telemetry/telemetry_bus.dart).
 // ------------------------------
 // File: lib/telemetry/telemetry_bus.dart (interface)
 // ------------------------------

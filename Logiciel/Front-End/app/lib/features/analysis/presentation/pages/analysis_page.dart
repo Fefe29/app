@@ -1,3 +1,5 @@
+/// Analysis main page.
+/// See ARCHITECTURE_DOCS.md (section: analysis_page.dart).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/analysis_filters.dart';

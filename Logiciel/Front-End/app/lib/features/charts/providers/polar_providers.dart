@@ -1,3 +1,5 @@
+/// Polar-related providers.
+/// See ARCHITECTURE_DOCS.md (section: polar_providers.dart).
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -27,9 +29,16 @@ final currentWindSpeedProvider = Provider<double?>((ref) {
 });
 
 /// Angle du vent courant (TWA) – placeholder.
+// Signed True Wind Angle (TWA) provider: uses emitted 'wind.twa' metric (-180..180)
 final currentWindAngleProvider = Provider<double?>((ref) {
-  final sample = ref.watch(windSampleProvider);
-  return sample.directionDeg;
+  final twaAsync = ref.watch(metricProvider('wind.twa'));
+  return twaAsync.maybeWhen(data: (m) => m.value, orElse: () => null);
+});
+
+// Optional: True Wind Direction (TWD) absolute 0..360, if consumers need it explicitly.
+final trueWindDirectionProvider = Provider<double?>((ref) {
+  final twdAsync = ref.watch(metricProvider('wind.twd'));
+  return twdAsync.maybeWhen(data: (m) => m.value, orElse: () => null);
 });
 
 final _vmcCalculatorProvider = Provider<VmcCalculator>((_) => VmcCalculator());

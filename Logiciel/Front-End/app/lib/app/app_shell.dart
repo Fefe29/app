@@ -1,3 +1,5 @@
+/// AppShell: scaffolds global navigation & surrounding chrome.
+/// See ARCHITECTURE_DOCS.md (section: lib/app/app_shell.dart).
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

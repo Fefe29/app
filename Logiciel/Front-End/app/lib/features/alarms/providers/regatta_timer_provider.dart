@@ -1,3 +1,5 @@
+/// Regatta start timer providers.
+/// See ARCHITECTURE_DOCS.md (section: regatta_timer_provider.dart).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Procédure de départ de régate.

@@ -1,3 +1,5 @@
+/// Telemetry domain entities (Measurement, Snapshot, Unit).
+/// See ARCHITECTURE_DOCS.md (section: lib/domain/entities/telemetry.dart).
 // ------------------------------
 // File: lib/telemetry/telemetry_models.dart
 // ------------------------------

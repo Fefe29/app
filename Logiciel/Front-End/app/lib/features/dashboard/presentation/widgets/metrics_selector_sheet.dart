@@ -1,3 +1,5 @@
+/// Metric selection bottom sheet.
+/// See ARCHITECTURE_DOCS.md (section: metrics_selector_sheet.dart).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';

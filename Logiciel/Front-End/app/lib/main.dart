@@ -1,3 +1,5 @@
+/// File: lib/main.dart
+/// Entry point. See ARCHITECTURE_DOCS.md (section: lib/main.dart) for details.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/router.dart';

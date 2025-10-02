@@ -1,3 +1,5 @@
+/// Dashboard page layout.
+/// See ARCHITECTURE_DOCS.md (section: dashboard_page.dart).
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

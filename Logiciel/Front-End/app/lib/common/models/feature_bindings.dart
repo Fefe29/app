@@ -1,3 +1,5 @@
+/// Feature binding models & toggles.
+/// See ARCHITECTURE_DOCS.md (section: lib/common/models/feature_bindings.dart).
 // ------------------------------
 // File: lib/feature_bindings.dart (wire pages to routes)
 // ------------------------------

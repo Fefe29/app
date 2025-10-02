@@ -1,3 +1,5 @@
+/// Anchor alarm providers.
+/// See ARCHITECTURE_DOCS.md (section: anchor_alarm_provider.dart).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' show sqrt, cos, pi;
 

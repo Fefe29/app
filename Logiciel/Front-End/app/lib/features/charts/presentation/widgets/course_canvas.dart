@@ -1,3 +1,5 @@
+/// Custom painter widget for course & wind depiction.
+/// See ARCHITECTURE_DOCS.md (section: course_canvas.dart).
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -243,17 +245,33 @@ class _CoursePainter extends CustomPainter {
 
   void _drawLaylines(Canvas canvas, Size size) {
     if (upwindOptimalAngle == null) return;
-    // Origine : si ligne de départ -> milieu, sinon première bouée régulière, sinon centre bounding box.
+    // Origine : première bouée régulière (bouée au vent pour les laylines), sinon centre bounding box
     double ox;
     double oy;
-    if (state.startLine != null) {
-      ox = (state.startLine!.p1x + state.startLine!.p2x) / 2;
-      oy = (state.startLine!.p1y + state.startLine!.p2y) / 2;
+    
+    // Chercher la première bouée régulière (par ordre de passage)
+    final regularBuoys = state.buoys.where((b) => b.role == BuoyRole.regular).toList();
+    if (regularBuoys.isNotEmpty) {
+      // Trier par passageOrder puis par id
+      regularBuoys.sort((a, b) {
+        final ao = a.passageOrder;
+        final bo = b.passageOrder;
+        if (ao != null && bo != null) {
+          final c = ao.compareTo(bo);
+          if (c != 0) return c;
+        } else if (ao != null) {
+          return -1;
+        } else if (bo != null) {
+          return 1;
+        }
+        return a.id.compareTo(b.id);
+      });
+      
+      final firstBuoy = regularBuoys.first;
+      ox = firstBuoy.x;
+      oy = firstBuoy.y;
     } else if (state.buoys.isNotEmpty) {
-      final first = state.buoys.firstWhere(
-        (b) => b.role == BuoyRole.regular,
-        orElse: () => state.buoys.first,
-      );
+      final first = state.buoys.first;
       ox = first.x;
       oy = first.y;
     } else {
@@ -263,19 +281,19 @@ class _CoursePainter extends CustomPainter {
     }
 
   // windDirDeg représente la DIRECTION D'OU PROVIENT le vent (FROM). Pour remonter au vent,
-  // on veut orienter l'étrave vers cette direction avec un angle de part et d'autre (tacks).
-  // Donc caps possibles = windDirDeg +/- upwindOptimalAngle.
-  final heading1 = (windDirDeg - upwindOptimalAngle!) % 360.0; // tack bâbord
-  final heading2 = (windDirDeg + upwindOptimalAngle!) % 360.0; // tack tribord
+  // les laylines montrent la DIRECTION DE NAVIGATION du bateau (cap + 180° par rapport au vent).
+  // Caps de navigation au près = (windDirDeg + 180°) +/- upwindOptimalAngle.
+  final heading1 = (windDirDeg + 180.0 - upwindOptimalAngle!) % 360.0; // tack bâbord 
+  final heading2 = (windDirDeg + 180.0 + upwindOptimalAngle!) % 360.0; // tack tribord
 
     final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.minY);
     final length = maxSpan * 1.2; // un peu plus grand que le terrain
 
     void drawLay(double headingDeg, Color color) {
       final rad = headingDeg * math.pi / 180.0;
-      // Convertir heading (0=N) en vecteur écran (0° => haut) : x=sin, y=-cos
+      // Convertir heading (0=N) en vecteur coordonnées logiques (Y vers le haut) : x=sin, y=cos
       final vx = math.sin(rad);
-      final vy = -math.cos(rad);
+      final vy = math.cos(rad);
       final ex = ox + vx * length;
       final ey = oy + vy * length;
       final p1 = _project(ox, oy, size);

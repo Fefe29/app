@@ -1,3 +1,5 @@
+/// Tactical evaluation providers.
+/// See ARCHITECTURE_DOCS.md (section: tactics_providers.dart).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/services/ado_refus_strategy.dart';

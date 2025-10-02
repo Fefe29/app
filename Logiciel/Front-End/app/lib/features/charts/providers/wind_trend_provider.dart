@@ -1,3 +1,7 @@
+/// Wind Trend Provider
+/// ---------------------------------------------
+/// Aggregates recent wind measurements for trend visualization (lifting/header analysis etc.).
+/// See ARCHITECTURE_DOCS.md (section: wind_trend_provider.dart) for detailed documentation.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/services/wind_trend_analyzer.dart';

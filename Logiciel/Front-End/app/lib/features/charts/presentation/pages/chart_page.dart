@@ -1,3 +1,5 @@
+/// Chart page: integrates wind, course, polars.
+/// See ARCHITECTURE_DOCS.md (section: chart_page.dart).
 // ------------------------------
 // File: lib/features/charts/presentation/pages/chart_page.dart
 // ------------------------------

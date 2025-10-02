@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:kornog/common/utils/angle_utils.dart';
 
 import '../../domain/models/course.dart';
 import 'wind_trend_analyzer.dart';
@@ -38,10 +39,12 @@ class RoutePlan {
 class RoutingCalculator {
   double? windDirDeg; // FROM direction en degrés (injecté optionnellement)
   double? optimalUpwindAngle; // angle TWA optimum (ex: 40°)
+  double? currentTwaSigned; // TWA signé courant (-180..180) provenant télémétrie
 
-  RoutingCalculator({this.windDirDeg, this.optimalUpwindAngle});
+  RoutingCalculator({this.windDirDeg, this.optimalUpwindAngle, this.currentTwaSigned});
 
   RoutePlan compute(CourseState course, {WindTrendSnapshot? windTrend}) {
+    print('COMPUTE ROUTING - Début du calcul de route');
     final legs = <RouteLeg>[];
 
     // Récupération bouées (exclure comité/target pour séquence principale, target gérée après)
@@ -169,15 +172,9 @@ class RoutingCalculator {
       curY = b.y;
     }
 
-    // Ajout bouée target si distincte (et pas déjà dernière position)
-    if (target != null) {
-      if (curX != null && (curX != target.x || curY != target.y)) {
-        final seg = _routeLegWithTacksIfNeeded(curX!, curY!, target.x, target.y, label: '->Vis');
-        legs.addAll(seg);
-        curX = target.x;
-        curY = target.y;
-      }
-    }
+    // Le viseur (target) ne fait pas partie de la séquence de course
+    // Il sert uniquement pour la ligne de départ
+    // Nous ne l'ajoutons donc pas dans le routage
 
     // Arrivée
     if (course.finishLine != null && curX != null && curY != null) {
@@ -209,75 +206,145 @@ class RoutingCalculator {
     if (windDirDeg == null || optimalUpwindAngle == null) {
       return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label)];
     }
-    final dx = ex - sx;
-    final dy = ey - sy;
-    final dist = math.sqrt(dx * dx + dy * dy);
+  final dx = ex - sx;
+  final dy = ey - sy;
+  final dist = math.sqrt(dx * dx + dy * dy);
     if (dist < 1e-6) {
       return [];
     }
     // Heading géographique (0=N, 90=E) cohérent avec usage écran: inverser Y si repère différent?
     // Nous supposons ici que Y croît vers le haut dans les données logique (cf projection). Heading calcul:
-    final headingRad = math.atan2(dx, dy * -1); // approximation dépendant convention; ajuster si besoin.
-    double headingDeg = (headingRad * 180 / math.pi) % 360;
-    if (headingDeg < 0) headingDeg += 360;
-    // TWA signé: différence entre heading et vent FROM
-    final diff = _angleDiff(headingDeg, windDirDeg!); // en degrés [-180,180]
-    final twaAbs = diff.abs();
-    final minUp = optimalUpwindAngle! - 3; // marge 3°
-    if (twaAbs >= minUp) {
-      // segment navigable directement
+    // Coordonnées logiques: X droite (Est), Y haut (Nord). Bearing géographique via util.
+    final headingDeg = bearingFromVector(dx, dy, screenYAxisDown: false);
+    
+    // Debug spécial pour segment départ → B1  
+    print('ROUTING DEBUG - From: ($sx,$sy) To: ($ex,$ey), Vector: ($dx,$dy), Heading: $headingDeg°');
+    // Calcul du TWA théorique si on naviguait directement sur ce cap
+    // TWA = angle entre direction du vent et cap requis 
+    // TWA = windDir - heading (positif = vent de tribord, négatif = vent de bâbord)
+    final theoreticalTWA = signedDelta(headingDeg, windDirDeg!); 
+    final minUp = optimalUpwindAngle! - 3; // marge pour navigation au près
+    
+    // Debug routing decision
+    final twaNature = theoreticalTWA.abs() < 45 ? "PRÈS" : theoreticalTWA.abs() < 135 ? "TRAVERS" : "PORTANT";
+    print('ROUTING DEBUG - RequiredHeading: ${headingDeg.toStringAsFixed(1)}°, WindDir: ${windDirDeg!.toStringAsFixed(1)}°, TheoreticalTWA: ${theoreticalTWA.toStringAsFixed(1)}° ($twaNature), MinAngle: ${minUp.toStringAsFixed(1)}°');
+    
+    // Décision de route directe vs manœuvres basée sur le TWA théorique:
+    // - Au près (|TWA| < minUp): faire des bords
+    // - Au portant (|TWA| > 150°): faire des empannages si nécessaire 
+    // - Au travers (minUp <= |TWA| <= 150°): route directe
+    
+    final absTWA = theoreticalTWA.abs();
+    
+    if (absTWA >= minUp && absTWA <= 150) {
+      print('ROUTING - Route directe possible (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° dans zone de navigation directe)');
       return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label)];
     }
-    // Besoin de 2 bords. Choisir d'abord bord qui réduit l'écart latéral.
-    // Calculer vecteurs laylines (windDir ± optimalUpwindAngle)
-    final h1 = (windDirDeg! - optimalUpwindAngle!) % 360;
-    final h2 = (windDirDeg! + optimalUpwindAngle!) % 360;
-    // Convertir en vecteurs unitaires (x=sin, y=-cos)
-    math.Point<double> _vec(double deg) {
-      final r = deg * math.pi / 180;
-      return math.Point(math.sin(r), -math.cos(r));
+    
+    // Gérer les cas spéciaux : près et portant
+    if (absTWA < minUp) {
+      print('ROUTING - Besoin de tirer des bords au près (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° < ${minUp.toStringAsFixed(1)}°)');
+      return _createTackingLegs(sx, sy, ex, ey, windDirDeg!, optimalUpwindAngle!, dist, label, finish);
+    } else if (absTWA > 150) {
+      print('ROUTING - Besoin d\'empanner au portant (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° > 150°)');
+      return _createJibingLegs(sx, sy, ex, ey, windDirDeg!, optimalUpwindAngle!, dist, label, finish);
     }
-    final v1 = _vec(h1);
-    final v2 = _vec(h2);
-  final targetVec = math.Point(dx, dy);
-    // Choix: vecteur avec projection scalaire la plus grande sur target (pour avancer vers la cible)
-  double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
-  double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
-    // Longueur raisonnable du premier bord: limiter à 60% de la distance ou jusqu'à alignement latéral.
-  final firstVec = proj1 >= proj2 ? v1 : v2;
-  final secondVec = proj1 >= proj2 ? v2 : v1; // secondVec non utilisé pour MVP mais conservé future optimisation
-    // Distance première jambe: heuristique - aller jusqu'à ce que la projection latérale sur l'autre bord permette de fermer.
-    final leg1Dist = dist * 0.55; // heuristique simple
-  final wp1x = sx + firstVec.x * leg1Dist;
-  final wp1y = sy + firstVec.y * leg1Dist;
-    // Vérifier si la deuxième jambe encore face au vent -> si oui ajuster (simple: allonge un peu)
-    double dx2 = ex - wp1x;
-    double dy2 = ey - wp1y;
-    final heading2Rad = math.atan2(dx2, dy2 * -1);
-    double heading2Deg = (heading2Rad * 180 / math.pi) % 360;
-    if (heading2Deg < 0) heading2Deg += 360;
-    final twa2 = _angleDiff(heading2Deg, windDirDeg!).abs();
-    if (twa2 < minUp && dist > 20) {
-      // Allonger première jambe
-      final extra = dist * 0.15;
-  final wp1x2 = sx + firstVec.x * (leg1Dist + extra);
-  final wp1y2 = sy + firstVec.y * (leg1Dist + extra);
-      dx2 = ex - wp1x2;
-      dy2 = ey - wp1y2;
-      // remplacer waypoint
+    
+    // Ne devrait pas arriver avec la logique mise à jour
+    print('ROUTING - Cas non géré, route directe par défaut');
+    return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label)];
+  }
+
+  /// Crée des segments pour tirer des bords au près
+  List<RouteLeg> _createTackingLegs(double sx, double sy, double ex, double ey, 
+      double windDir, double optimalAngle, double dist, String label, bool finish) {
+    
+    // Caps au près optimaux
+    final h1 = norm360(windDir + optimalAngle); // tribord (vent sur tribord)
+    final h2 = norm360(windDir - optimalAngle); // bâbord (vent sur bâbord)
+    final v1 = vectorFromBearing(h1, screenYAxisDown: false); // tribord
+    final v2 = vectorFromBearing(h2, screenYAxisDown: false); // bâbord
+    
+    final dx = ex - sx;
+    final dy = ey - sy;
+    final targetVec = math.Point(dx, dy);
+    
+    // Choix du meilleur bord initial (projection maximale vers la cible)
+    double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
+    double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
+    
+    final firstVec = proj1 >= proj2 ? v1 : v2;
+    final firstSide = proj1 >= proj2 ? "tribord" : "bâbord";
+    
+    // Distance du premier bord (heuristique : 50-60% de la distance totale)
+    final leg1Dist = dist * 0.6;
+    final wp1x = sx + firstVec.x * leg1Dist;
+    final wp1y = sy + firstVec.y * leg1Dist;
+    
+    // Vérifier si le second segment peut fermer directement
+    final dx2 = ex - wp1x;
+    final dy2 = ey - wp1y;
+    final heading2 = bearingFromVector(dx2, dy2, screenYAxisDown: false);
+    final twa2 = signedDelta(windDir, heading2).abs();
+    
+    if (twa2 < optimalAngle - 5 && dist > 15) {
+      // Allonger le premier bord
+      final extraDist = dist * 0.25;
+      final wp1x2 = sx + firstVec.x * (leg1Dist + extraDist);
+      final wp1y2 = sy + firstVec.y * (leg1Dist + extraDist);
+      
       return [
-        RouteLeg(startX: sx, startY: sy, endX: wp1x2, endY: wp1y2, type: RouteLegType.leg, label: 'Tack1'),
-        RouteLeg(startX: wp1x2, startY: wp1y2, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label),
+        RouteLeg(startX: sx, startY: sy, endX: wp1x2, endY: wp1y2, 
+                type: RouteLegType.leg, label: 'Bord $firstSide'),
+        RouteLeg(startX: wp1x2, startY: wp1y2, endX: ex, endY: ey, 
+                type: finish ? RouteLegType.finish : RouteLegType.leg, label: label),
       ];
     }
+    
     return [
-      RouteLeg(startX: sx, startY: sy, endX: wp1x, endY: wp1y, type: RouteLegType.leg, label: 'Tack1'),
-      RouteLeg(startX: wp1x, startY: wp1y, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label),
+      RouteLeg(startX: sx, startY: sy, endX: wp1x, endY: wp1y, 
+              type: RouteLegType.leg, label: 'Bord $firstSide'),
+      RouteLeg(startX: wp1x, startY: wp1y, endX: ex, endY: ey, 
+              type: finish ? RouteLegType.finish : RouteLegType.leg, label: label),
     ];
   }
 
-  double _angleDiff(double a, double b) {
-    double d = (a - b + 540) % 360 - 180; // [-180,180]
-    return d;
+  /// Crée des segments pour empanner au portant
+  List<RouteLeg> _createJibingLegs(double sx, double sy, double ex, double ey, 
+      double windDir, double optimalAngle, double dist, String label, bool finish) {
+    
+    // Au portant, angle optimal typiquement 140-160° TWA
+    final optimalDownwindAngle = 150.0;
+    
+    // Caps au portant optimaux  
+    final h1 = norm360(windDir + optimalDownwindAngle); // tribord portant
+    final h2 = norm360(windDir - optimalDownwindAngle); // bâbord portant
+    final v1 = vectorFromBearing(h1, screenYAxisDown: false);
+    final v2 = vectorFromBearing(h2, screenYAxisDown: false);
+    
+    final dx = ex - sx;
+    final dy = ey - sy;
+    final targetVec = math.Point(dx, dy);
+    
+    // Choix du meilleur côté initial
+    double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
+    double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
+    
+    final firstVec = proj1 >= proj2 ? v1 : v2;
+    final firstSide = proj1 >= proj2 ? "tribord" : "bâbord";
+    
+    // Distance du premier portant (plus conservateur qu'au près)
+    final leg1Dist = dist * 0.4;
+    final wp1x = sx + firstVec.x * leg1Dist;
+    final wp1y = sy + firstVec.y * leg1Dist;
+    
+    return [
+      RouteLeg(startX: sx, startY: sy, endX: wp1x, endY: wp1y, 
+              type: RouteLegType.leg, label: 'Portant $firstSide'),
+      RouteLeg(startX: wp1x, startY: wp1y, endX: ex, endY: ey, 
+              type: finish ? RouteLegType.finish : RouteLegType.leg, label: label),
+    ];
   }
+
+  double _angleDiff(double a, double b) => ((a - b + 540) % 360) - 180; // legacy (kept for backward compat callers)
 }

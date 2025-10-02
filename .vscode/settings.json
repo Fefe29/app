@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "/home/fefe/home/Kornog/Logiciel/nmea_udp_viewer/linux"
+    "cmake.sourceDirectory": "/home/fefe/home/Kornog/Logiciel/nmea_udp_viewer/linux",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

@@ -1,6 +1,9 @@
+/// Simulated telemetry bus (wind/nav/env). 3-mode TWA model.
+/// See ARCHITECTURE_DOCS.md (section: lib/data/datasources/telemetry/fake_telemetry_bus.dart).
 // ------------------------------
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:kornog/common/utils/angle_utils.dart';
 import 'package:kornog/data/datasources/telemetry/telemetry_bus.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
 
@@ -17,7 +20,7 @@ class FakeTelemetryBus implements TelemetryBus {
 	final _rng = math.Random();
 
 	// ---------------- Wind Simulator (direction & force) ----------------
-	double _baseTwd = 45; // point de départ
+	double _baseTwd = 315; // point de départ
 	double _elapsedMin = 0;
 	final double _rotRateDegPerMin = 2.0; // vitesse de rotation lente
 	final double _baseTws = 12.0;
@@ -62,9 +65,13 @@ class FakeTelemetryBus implements TelemetryBus {
 		if (twd < 0) twd += 360;
 
 		final tws = _baseTws + _gaussian(stdDev: 0.2, clampAbs: 0.5);
-		final twa = ((twd - hdg + 540) % 360) - 180; // signé
+		// TWA signé: heading - TWD (positif si vent vient tribord). On utilise utilitaire.
+		final twa = signedDelta(twd, hdg);
 		final aws = tws + _rng.nextDouble() * 0.8 - 0.4;
 		final awa = (twa + _rng.nextDouble() * 4 - 2).clamp(-180, 180).toDouble();
+		
+		// Debug des valeurs de vent
+		print('DEBUG - TWD: ${twd.toStringAsFixed(1)}°, HDG: ${hdg.toStringAsFixed(1)}°, TWA: ${twa.toStringAsFixed(1)}°');
 
 		final Map<String, Measurement> m = {};
 		_emit('nav.sog', Measurement(value: sog, unit: Unit.knot, ts: now), m);
@@ -91,6 +98,8 @@ class FakeTelemetryBus implements TelemetryBus {
 		var v = mean + z0 * stdDev;
 		if (v > clampAbs) v = clampAbs; if (v < -clampAbs) v = -clampAbs; return v;
 	}
+
+
 
 
 @override

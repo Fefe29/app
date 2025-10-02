@@ -1,3 +1,5 @@
+/// Sleep timer (watch cycle) providers.
+/// See ARCHITECTURE_DOCS.md (section: sleep_timer_provider.dart).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class SleepTimerState {

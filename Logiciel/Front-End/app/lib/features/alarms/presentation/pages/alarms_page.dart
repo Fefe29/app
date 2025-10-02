@@ -1,3 +1,5 @@
+/// Alarms management UI page.
+/// See ARCHITECTURE_DOCS.md (section: alarms_page.dart).
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'dart:async';
@@ -5,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/regatta_timer_provider.dart';
 import '../../providers/sleep_timer_provider.dart';
 import '../../providers/anchor_alarm_provider.dart';
+import '../../providers/other_alarms_provider.dart';
+import 'package:kornog/common/providers/app_providers.dart';
 
 class AlarmsPage extends ConsumerStatefulWidget {
 	const AlarmsPage({super.key});
@@ -23,6 +27,7 @@ class _AlarmsPageState extends ConsumerState<AlarmsPage> with SingleTickerProvid
 			Tab(text: 'Régate'),
 			Tab(text: 'Sommeil'),
 			Tab(text: 'Mouillage'),
+			Tab(text: 'Autre'),
 		];
 		_tab = TabController(length: _tabs.length, vsync: this);
 	}
@@ -52,6 +57,7 @@ class _AlarmsPageState extends ConsumerState<AlarmsPage> with SingleTickerProvid
 							_RegattaTab(),
 							_SleepTab(),
 							_AnchorTab(),
+							_OtherAlarmsTab(),
 						],
 					),
 				),
@@ -237,6 +243,129 @@ class _AnchorTab extends ConsumerWidget {
 							padding: const EdgeInsets.only(top: 12),
 							child: Text('Ancre: lat=${st.anchorLat}, lon=${st.anchorLon}'),
 						),
+				],
+			),
+		);
+	}
+}
+
+// --- Autre (depth + wind) ---
+class _OtherAlarmsTab extends ConsumerWidget {
+	const _OtherAlarmsTab();
+	@override
+	Widget build(BuildContext context, WidgetRef ref) {
+		final st = ref.watch(otherAlarmsProvider);
+		final n = ref.read(otherAlarmsProvider.notifier);
+		Color warn(bool trig) => trig ? Colors.red : Theme.of(context).colorScheme.primary;
+		return Padding(
+			padding: const EdgeInsets.all(16),
+			child: ListView(
+				children: [
+					Text('Profondeur', style: Theme.of(context).textTheme.titleMedium),
+					SwitchListTile(
+						title: const Text('Alarme profondeur faible'),
+						value: st.depth.enabled,
+						onChanged: (v) => n.toggleDepth(v),
+						subtitle: st.depth.triggered ? const Text('⚠️ Trop faible', style: TextStyle(color: Colors.red)) : null,
+					),
+					Row(children: [
+						Expanded(
+							child: Slider(
+								value: st.depth.minDepthMeters.clamp(1, 100),
+								min: 1,
+								max: 50,
+								divisions: 49,
+								onChanged: st.depth.enabled ? (v) => n.setMinDepth(v) : null,
+							),
+						),
+						SizedBox(width: 60, child: Text('${st.depth.minDepthMeters.toStringAsFixed(1)} m')),
+						if (st.depth.triggered)
+							IconButton(
+								tooltip: 'Réinitialiser',
+								icon: const Icon(Icons.refresh),
+								onPressed: n.resetDepthAlarm,
+							),
+					]),
+					const Divider(height: 32),
+					Text('Wind Shift', style: Theme.of(context).textTheme.titleMedium),
+					SwitchListTile(
+						title: const Text('Alarme shift'),
+						value: st.windShift.enabled,
+						onChanged: (v) => n.toggleWindShift(v),
+						subtitle: st.windShift.triggered
+							? Text('⚠️ Shift Δ=${st.windShift.currentDiffAbs?.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.red))
+							: (st.windShift.currentDiffAbs != null ? Text('Δ=${st.windShift.currentDiffAbs!.toStringAsFixed(1)}°') : null),
+					),
+					Row(children: [
+						Expanded(
+							child: Slider(
+								value: st.windShift.thresholdDeg.clamp(2, 90),
+								min: 2,
+								max: 60,
+								divisions: 58,
+								onChanged: st.windShift.enabled ? (v) => n.setWindShiftThreshold(v) : null,
+							),
+						),
+						SizedBox(width: 60, child: Text('${st.windShift.thresholdDeg.toStringAsFixed(0)}°')),
+						IconButton(
+							tooltip: 'Recalibrer',
+							icon: const Icon(Icons.center_focus_strong),
+							onPressed: st.windShift.enabled ? () {
+								final dir = ref.read(metricProvider('wind.twd')).maybeWhen(data: (m) => m.value, orElse: () => null);
+								if (dir != null) n.recalibrateShift(dir);
+							} : null,
+						),
+						if (st.windShift.triggered)
+							IconButton(
+								tooltip: 'Reset',
+								icon: const Icon(Icons.refresh),
+								onPressed: n.resetShift,
+							),
+					]),
+					const Divider(height: 32),
+					Text('Wind Drop / Raise', style: Theme.of(context).textTheme.titleMedium),
+					// Drop
+					SwitchListTile(
+						title: const Text('Alarme vent faible (Drop)'),
+						value: st.windDrop.enabled,
+						onChanged: (v) => n.toggleWindDrop(v),
+						subtitle: st.windDrop.triggered ? const Text('⚠️ Trop faible', style: TextStyle(color: Colors.red)) : null,
+					),
+					Row(children: [
+						Expanded(
+							child: Slider(
+								value: st.windDrop.threshold.clamp(0, 40),
+								min: 0,
+								max: 30,
+								divisions: 30,
+								onChanged: st.windDrop.enabled ? (v) => n.setWindDropThreshold(v) : null,
+							),
+						),
+						SizedBox(width: 60, child: Text('${st.windDrop.threshold.toStringAsFixed(1)} kn')),
+						if (st.windDrop.triggered)
+							IconButton(icon: const Icon(Icons.refresh), onPressed: n.resetWindDrop),
+					]),
+					// Raise
+					SwitchListTile(
+						title: const Text('Alarme vent fort (Raise)'),
+						value: st.windRaise.enabled,
+						onChanged: (v) => n.toggleWindRaise(v),
+						subtitle: st.windRaise.triggered ? const Text('⚠️ Trop fort', style: TextStyle(color: Colors.red)) : null,
+					),
+					Row(children: [
+						Expanded(
+							child: Slider(
+								value: st.windRaise.threshold.clamp(0, 60),
+								min: 5,
+								max: 50,
+								divisions: 45,
+								onChanged: st.windRaise.enabled ? (v) => n.setWindRaiseThreshold(v) : null,
+							),
+						),
+						SizedBox(width: 60, child: Text('${st.windRaise.threshold.toStringAsFixed(1)} kn')),
+						if (st.windRaise.triggered)
+							IconButton(icon: const Icon(Icons.refresh), onPressed: n.resetWindRaise),
+					]),
 				],
 			),
 		);

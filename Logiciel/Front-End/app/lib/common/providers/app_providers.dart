@@ -1,3 +1,5 @@
+/// Global providers (telemetry bus, wind sample, simulation mode).
+/// See ARCHITECTURE_DOCS.md (section: lib/common/providers/app_providers.dart).
 // ------------------------------
 // File: lib/providers.dart
 // ------------------------------

@@ -1,3 +1,5 @@
+/// Settings page (units/theme/etc.).
+/// See ARCHITECTURE_DOCS.md (section: settings_page.dart).
 // ------------------------------
 // File: lib/features/settings/settings_page.dart
 // ------------------------------
