@@ -40,7 +40,10 @@ final _routingCalculatorProvider = Provider<RoutingCalculator>((ref) {
   // Si on a une polaire chargée, on la privilégie, sinon on utilise le calcul VMG
   final upwind = vmc?.angleDeg ?? optimalFromWind;
   
-  print('VMG OPTIMIZATION - TWS: ${wind.speed.toStringAsFixed(1)}nds → Optimal angle: ${optimalFromWind.toStringAsFixed(1)}°, Final: ${upwind.toStringAsFixed(1)}°');
+  print('VMG OPTIMIZATION - TWS: ${wind.speed.toStringAsFixed(1)}nds → Optimal angle: ${optimalFromWind.toStringAsFixed(1)}°, VMC from polar: ${vmc?.angleDeg?.toStringAsFixed(1) ?? "NULL"}, Final: ${upwind.toStringAsFixed(1)}°');
+  if (vmc != null) {
+    print('VMG POLAR - Angle: ${vmc.angleDeg}°, Speed: ${vmc.speed.toStringAsFixed(1)}nds, VMG: ${vmc.vmg.toStringAsFixed(1)}nds');
+  }
   
   return RoutingCalculator(
     windDirDeg: wind.directionDeg,
