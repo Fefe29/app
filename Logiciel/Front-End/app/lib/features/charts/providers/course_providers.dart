@@ -90,8 +90,8 @@ class CourseNotifier extends Notifier<CourseState> {
         // Bouée 2 à (-20, 50) - deuxième bouée du parcours
         Buoy(id: 4, x: -20, y: 50, passageOrder: 2, role: BuoyRole.regular),
         
-        // Bouée 3 à (-20, 0) - troisième bouée du parcours
-        Buoy(id: 5, x: -20, y: 0, passageOrder: 3, role: BuoyRole.regular),
+        // Bouée 3 à (-5, 10) - troisième bouée du parcours
+        Buoy(id: 5, x: -5, y: 10, passageOrder: 3, role: BuoyRole.regular),
       ],
       // Ligne de départ entre viseur (20, 0) et comité (30, 0)
       startLine: LineSegment(

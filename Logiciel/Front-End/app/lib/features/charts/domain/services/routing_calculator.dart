@@ -200,6 +200,11 @@ class RoutingCalculator {
     return d;
   }
 
+  /// Génère un label avec l'angle de navigation
+  String _createAngleLabel(double headingDeg, String segmentType) {
+    return '$segmentType ${headingDeg.toStringAsFixed(0)}°';
+  }
+
   List<RouteLeg> _routeLegWithTacksIfNeeded(double sx, double sy, double ex, double ey, {required String label, bool finish = false}) {
     // Pas de vent ou d'angle => segment direct
     if (windDirDeg == null || optimalUpwindAngle == null) {
@@ -217,14 +222,18 @@ class RoutingCalculator {
     double headingDeg = (headingRad * 180 / math.pi) % 360;
     if (headingDeg < 0) headingDeg += 360;
     
-    // Debug pour tous les segments
-    final segmentLabel = label.contains('Start') ? '[START→B1]' : '[SEGMENT]';
-    print('ROUTING DEBUG $segmentLabel - From: ($sx,$sy) To: ($ex,$ey), Vector: ($dx,$dy), Heading: $headingDeg°');
     // Calcul du TWA théorique si on naviguait directement sur ce cap
     // TWA = angle entre direction du vent et cap requis 
     // TWA = windDir - heading (positif = vent de tribord, négatif = vent de bâbord)
     final theoreticalTWA = signedDelta(headingDeg, windDirDeg!); 
     final optimalAngle = optimalUpwindAngle!; // angle VMG optimal, pas de marge artificielle
+
+    // Générer le label avec l'angle
+    final angleLabel = _createAngleLabel(headingDeg, 'Cap');
+    
+    // Debug pour tous les segments
+    final segmentLabel = label.contains('Start') ? '[START→B1]' : '[SEGMENT]';
+    print('ROUTING DEBUG $segmentLabel - From: ($sx,$sy) To: ($ex,$ey), Vector: ($dx,$dy), Heading: $headingDeg°');
     
     // Debug routing decision
     final twaNature = theoreticalTWA.abs() < 45 ? "PRÈS" : theoreticalTWA.abs() < 135 ? "TRAVERS" : "PORTANT";
@@ -239,7 +248,7 @@ class RoutingCalculator {
     
     if (absTWA >= optimalAngle && absTWA <= 150) {
       print('ROUTING - Route directe possible (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° dans zone de navigation directe)');
-      return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label)];
+      return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: angleLabel)];
     }
     
     // Gérer les cas spéciaux : près et portant
@@ -253,7 +262,7 @@ class RoutingCalculator {
     
     // Ne devrait pas arriver avec la logique mise à jour
     print('ROUTING - Cas non géré, route directe par défaut');
-    return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label)];
+    return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: angleLabel)];
   }
 
   /// Crée des segments pour tirer des bords au près
@@ -275,6 +284,7 @@ class RoutingCalculator {
     double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
     
     final firstVec = proj1 >= proj2 ? v1 : v2;
+    final firstHeading = proj1 >= proj2 ? h1 : h2;
     final firstSide = proj1 >= proj2 ? "tribord" : "bâbord";
     
     // Distance du premier bord (heuristique : 50-60% de la distance totale)
@@ -298,17 +308,17 @@ class RoutingCalculator {
       
       return [
         RouteLeg(startX: sx, startY: sy, endX: wp1x2, endY: wp1y2, 
-                type: RouteLegType.leg, label: 'Bord $firstSide'),
+                type: RouteLegType.leg, label: _createAngleLabel(firstHeading, 'Près')),
         RouteLeg(startX: wp1x2, startY: wp1y2, endX: ex, endY: ey, 
-                type: finish ? RouteLegType.finish : RouteLegType.leg, label: label),
+                type: finish ? RouteLegType.finish : RouteLegType.leg, label: _createAngleLabel(heading2, 'Près')),
       ];
     }
     
     return [
       RouteLeg(startX: sx, startY: sy, endX: wp1x, endY: wp1y, 
-              type: RouteLegType.leg, label: 'Bord $firstSide'),
+              type: RouteLegType.leg, label: _createAngleLabel(firstHeading, 'Près')),
       RouteLeg(startX: wp1x, startY: wp1y, endX: ex, endY: ey, 
-              type: finish ? RouteLegType.finish : RouteLegType.leg, label: label),
+              type: finish ? RouteLegType.finish : RouteLegType.leg, label: _createAngleLabel(heading2, 'Près')),
     ];
   }
 
@@ -334,6 +344,7 @@ class RoutingCalculator {
     double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
     
     final firstVec = proj1 >= proj2 ? v1 : v2;
+    final firstHeading = proj1 >= proj2 ? h1 : h2;
     final firstSide = proj1 >= proj2 ? "tribord" : "bâbord";
     
     // Distance du premier portant (plus conservateur qu'au près)
@@ -341,11 +352,18 @@ class RoutingCalculator {
     final wp1x = sx + firstVec.x * leg1Dist;
     final wp1y = sy + firstVec.y * leg1Dist;
     
+    // Calculer l'angle du second segment
+    final dx2 = ex - wp1x;
+    final dy2 = ey - wp1y;
+    final heading2Rad = math.atan2(dx2, dy2);
+    double heading2 = (heading2Rad * 180 / math.pi) % 360;
+    if (heading2 < 0) heading2 += 360;
+    
     return [
       RouteLeg(startX: sx, startY: sy, endX: wp1x, endY: wp1y, 
-              type: RouteLegType.leg, label: 'Portant $firstSide'),
+              type: RouteLegType.leg, label: _createAngleLabel(firstHeading, 'Portant')),
       RouteLeg(startX: wp1x, startY: wp1y, endX: ex, endY: ey, 
-              type: finish ? RouteLegType.finish : RouteLegType.leg, label: label),
+              type: finish ? RouteLegType.finish : RouteLegType.leg, label: _createAngleLabel(heading2, 'Portant')),
     ];
   }
 

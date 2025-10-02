@@ -289,7 +289,7 @@ class _CoursePainter extends CustomPainter {
     final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.minY);
     final length = maxSpan * 1.2; // un peu plus grand que le terrain
 
-    void drawLay(double headingDeg, Color color) {
+    void drawLay(double headingDeg, Color color, String side) {
       final rad = headingDeg * math.pi / 180.0;
       // Convertir heading (0=N) en vecteur coordonnées logiques (Y vers le haut) : x=sin, y=cos
       final vx = math.sin(rad);
@@ -314,19 +314,21 @@ class _CoursePainter extends CustomPainter {
         canvas.drawLine(s, e, paint);
         dist += dash + gap;
       }
+      
+      // Afficher l'angle de la layline
+      final midPoint = p1 + dir * (total * 0.6); // Position à 60% de la ligne
+      final displayAngle = (headingDeg + 180) % 360;
+      _drawText(
+        canvas,
+        '${displayAngle.toStringAsFixed(0)}° $side',
+        midPoint + const Offset(5, -10),
+        fontSize: 10,
+        color: color.withOpacity(0.9),
+      );
     }
 
-    drawLay(heading1, Colors.lightGreenAccent.shade400);
-    drawLay(heading2, Colors.lightGreenAccent.shade700);
-
-    final originScreen = _project(ox, oy, size);
-    _drawText(
-      canvas,
-      'Laylines (${upwindOptimalAngle!.toStringAsFixed(0)}°)',
-      originScreen + const Offset(8, -18),
-      fontSize: 11,
-      color: Colors.green.shade800,
-    );
+    drawLay(heading1, Colors.lightGreenAccent.shade400, 'Bb');  // Bâbord
+    drawLay(heading2, Colors.lightGreenAccent.shade700, 'Tb');  // Tribord
   }
 
   String _shortLabel(RouteLeg leg) {
