@@ -6,9 +6,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
-import 'package:kornog/common/providers/app_providers.dart';
 import '../widgets/course_canvas.dart';
 import '../widgets/course_menu.dart';
+import '../../providers/wind_trend_provider.dart';
 
 
 class ChartsPage extends ConsumerWidget {
@@ -41,6 +41,13 @@ class _HeaderStatus extends ConsumerWidget {
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
 		final wind = ref.watch(windSampleProvider);
+		final course = ref.watch(courseProvider);
+		final windTrend = ref.watch(windTrendSnapshotProvider);
+		
+		// Conditions pour activer le bouton de routage
+		// Maintenant on permet le routage même avec des données non fiables
+		final canRoute = course.buoys.isNotEmpty;
+		
 		return Container(
 			padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
 			alignment: Alignment.centerLeft,
@@ -53,6 +60,28 @@ class _HeaderStatus extends ConsumerWidget {
 					Text(table == null ? 'Aucune polaire' : 'Polaires: ${table.angleCount} angles'),
 					const SizedBox(width: 16),
 					Text('Vent: ${wind.directionDeg.toStringAsFixed(0)}° / ${wind.speed.toStringAsFixed(1)} nds'),
+					const SizedBox(width: 16),
+					ElevatedButton.icon(
+						onPressed: canRoute ? () {
+							print('CHART_PAGE - Bouton Nouveau routage appuyé');
+							ref.read(routePlanProvider.notifier).reroute();
+						} : null,
+						icon: Icon(
+							Icons.route, 
+							size: 16,
+							color: windTrend.isReliable ? null : Colors.orange,
+						),
+						label: Text(
+							windTrend.isReliable 
+								? 'Nouveau routage' 
+								: 'Routage (données limitées)',
+						),
+						style: ElevatedButton.styleFrom(
+							foregroundColor: canRoute 
+								? (windTrend.isReliable ? null : Colors.orange)
+								: Colors.grey,
+						),
+					),
 					const Spacer(),
 					TextButton.icon(
 						onPressed: () {

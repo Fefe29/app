@@ -6,7 +6,9 @@ import '../domain/services/routing_calculator.dart';
 import 'course_providers.dart';
 import 'polar_providers.dart';
 import 'package:kornog/common/providers/app_providers.dart';
-import 'polar_providers.dart';
+import 'wind_trend_provider.dart';
+import '../domain/services/wind_trend_analyzer.dart';
+import 'dart:async';
 
 /// Calcule l'angle de remontée optimal selon la force du vent
 /// Plus le vent est fort, plus on peut serrer le vent (VMG optimal)
@@ -52,22 +54,103 @@ final _routingCalculatorProvider = Provider<RoutingCalculator>((ref) {
   );
 });
 
-final routePlanProvider = Provider<RoutePlan>((ref) {
-  final course = ref.watch(courseProvider);
-  final calc = ref.watch(_routingCalculatorProvider);
-  
-  print('ROUTE_PROVIDER - Recalcul du routage déclenché');
-  print('ROUTE_PROVIDER - Wind: ${calc.windDirDeg}°, Optimal upwind: ${calc.optimalUpwindAngle}°');
-  print('ROUTE_PROVIDER - Course: ${course.buoys.length} bouées, startLine: ${course.startLine != null}');
-  
-  // TODO: réintroduire une analyse de tendance plus tard (supprimée avec wind_trend_provider)
-  final result = calc.compute(course, windTrend: null);
-  
-  print('ROUTE_PROVIDER - Routage calculé: ${result.legs.length} segments');
-  for (var i = 0; i < result.legs.length; i++) {
-    final leg = result.legs[i];
-    print('ROUTE_PROVIDER - Leg $i: (${leg.startX.toStringAsFixed(1)}, ${leg.startY.toStringAsFixed(1)}) → (${leg.endX.toStringAsFixed(1)}, ${leg.endY.toStringAsFixed(1)}) [${leg.label}]');
+
+class RoutePlanNotifier extends Notifier<RoutePlan> {
+  Timer? _timer;
+  bool _hasRouted = false;
+  WindTrendSnapshot? _lastTrend;
+
+  @override
+  RoutePlan build() {
+    // Initial state: empty route
+    // Listen to wind trend and course
+    ref.listen<WindTrendSnapshot>(windTrendSnapshotProvider, (prev, next) {
+      _lastTrend = next;
+      _maybeTriggerInitialRouting();
+    });
+    ref.listen(courseProvider, (prev, next) {
+      // Si l'utilisateur change le parcours, on autorise un nouveau routage
+      _hasRouted = false;
+      state = RoutePlan([]);
+      _maybeTriggerInitialRouting();
+    });
+    // On ne recalcule pas automatiquement sur changement de vent
+    return RoutePlan([]);
   }
-  
-  return result;
-});
+
+  void _maybeTriggerInitialRouting() {
+    if (_hasRouted) return;
+    final trend = _lastTrend;
+    final course = ref.read(courseProvider);
+    
+    // Conditions minimales : avoir des données et des bouées
+    if (trend == null || course.buoys.isEmpty) return;
+    
+    // Pour le routage automatique, on garde une exigence de fiabilité
+    // mais on réduit le délai à 10s au lieu de 20s
+    if (!trend.isReliable) return;
+    if (trend.actualDataDurationSeconds < 10) {
+      // Attendre 10s de données fiables pour le routage automatique
+      _timer?.cancel();
+      final toWait = 10.0 - trend.actualDataDurationSeconds;
+      if (toWait > 0) {
+        _timer = Timer(Duration(milliseconds: (toWait * 1000).round()), () {
+          _maybeTriggerInitialRouting();
+        });
+      }
+      return;
+    }
+    // Assez de données fiables, on calcule la route une seule fois
+    print('ROUTE_PROVIDER - Routage automatique initial après ${trend.actualDataDurationSeconds}s de données');
+    _computeRoute(trend);
+    _hasRouted = true;
+  }
+
+  void reroute() {
+    // Permet à l'utilisateur de forcer un nouveau routage
+    print('ROUTE_PROVIDER - Début reroute manuel');
+    final trend = ref.read(windTrendSnapshotProvider);
+    final course = ref.read(courseProvider);
+    
+    print('ROUTE_PROVIDER - Trend: reliable=${trend.isReliable}, duration=${trend.actualDataDurationSeconds}s');
+    print('ROUTE_PROVIDER - Course: ${course.buoys.length} bouées, startLine=${course.startLine != null}, finishLine=${course.finishLine != null}');
+    
+    // Vérification simplifiée : seulement les bouées sont nécessaires
+    if (course.buoys.isEmpty) {
+      print('ROUTE_PROVIDER - Échec reroute: aucune bouée définie');
+      return;
+    }
+    
+    // On accepte maintenant même des données non fiables pour le routage manuel
+    if (!trend.isReliable) {
+      print('ROUTE_PROVIDER - ATTENTION: Routage avec données vent non fiables');
+    }
+    if (trend.actualDataDurationSeconds < 20) {
+      print('ROUTE_PROVIDER - ATTENTION: Routage avec durée données insuffisante (${trend.actualDataDurationSeconds}s < 20s)');
+    }
+    
+    print('ROUTE_PROVIDER - Calcul de la route...');
+    _computeRoute(trend);
+    _hasRouted = true;
+    print('ROUTE_PROVIDER - Reroute terminé');
+  }
+
+  void _computeRoute(WindTrendSnapshot trend) {
+    final course = ref.read(courseProvider);
+    final calc = ref.read(_routingCalculatorProvider);
+    final result = calc.compute(course, windTrend: trend);
+    state = result;
+    // Log pour debug
+    print('ROUTE_PROVIDER - Routage calculé: ${result.legs.length} segments');
+    for (var i = 0; i < result.legs.length; i++) {
+      final leg = result.legs[i];
+      print('ROUTE_PROVIDER - Leg $i: (${leg.startX.toStringAsFixed(1)}, ${leg.startY.toStringAsFixed(1)}) → (${leg.endX.toStringAsFixed(1)}, ${leg.endY.toStringAsFixed(1)}) [${leg.label}]');
+    }
+  }
+
+  void dispose() {
+    _timer?.cancel();
+  }
+}
+
+final routePlanProvider = NotifierProvider<RoutePlanNotifier, RoutePlan>(RoutePlanNotifier.new);
