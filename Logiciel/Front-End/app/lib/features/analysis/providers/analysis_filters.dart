@@ -6,12 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 @immutable
 class AnalysisFilters {
+  final bool twd;
   final bool tws;
   final bool twa;
   final bool boatSpeed;
   final bool polars;
 
   const AnalysisFilters({
+    this.twd = true,
     this.tws = true,
     this.twa = true,
     this.boatSpeed = true,
@@ -19,12 +21,14 @@ class AnalysisFilters {
   });
 
   AnalysisFilters copyWith({
+    bool? twd,
     bool? tws,
     bool? twa,
     bool? boatSpeed,
     bool? polars,
   }) {
     return AnalysisFilters(
+      twd: twd ?? this.twd,
       tws: tws ?? this.tws,
       twa: twa ?? this.twa,
       boatSpeed: boatSpeed ?? this.boatSpeed,
@@ -39,12 +43,14 @@ class AnalysisFiltersNotifier extends Notifier<AnalysisFilters> {
 
   // setters rapides
   void set({
+    bool? twd,
     bool? tws,
     bool? twa,
     bool? boatSpeed,
     bool? polars,
   }) {
     state = state.copyWith(
+      twd: twd,
       tws: tws,
       twa: twa,
       boatSpeed: boatSpeed,
@@ -53,6 +59,7 @@ class AnalysisFiltersNotifier extends Notifier<AnalysisFilters> {
   }
 
   // toggles pratiques
+  void toggleTwd() => state = state.copyWith(twd: !state.twd);
   void toggleTws() => state = state.copyWith(tws: !state.tws);
   void toggleTwa() => state = state.copyWith(twa: !state.twa);
   void toggleBoatSpeed() => state = state.copyWith(boatSpeed: !state.boatSpeed);

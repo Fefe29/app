@@ -13,12 +13,23 @@ class _WindTrendSensitivity extends Notifier<double> {
   void set(double v) => state = v.clamp(0.0, 1.0);
 }
 
+class _WindAnalysisWindow extends Notifier<int> {
+  @override
+  int build() => 1200; // 20 minutes par défaut (en secondes)
+  void setMinutes(int minutes) => state = (minutes * 60).clamp(60, 3600); // 1min à 1h
+  void setSeconds(int seconds) => state = seconds.clamp(60, 3600);
+}
+
 final windTrendSensitivityProvider = NotifierProvider<_WindTrendSensitivity, double>(_WindTrendSensitivity.new);
+final windAnalysisWindowProvider = NotifierProvider<_WindAnalysisWindow, int>(_WindAnalysisWindow.new);
 
 final _windTrendAnalyzerProvider = Provider<WindTrendAnalyzer>((ref) {
   final sens = ref.watch(windTrendSensitivityProvider);
+  final analysisWindow = ref.watch(windAnalysisWindowProvider);
+  
   return WindTrendAnalyzer(
-    windowSeconds: 90,
+    windowSeconds: 3600, // Garder 1h de données max
+    analysisWindowSeconds: analysisWindow, // Fenêtre d'analyse configurable
     minSlopeDegPerMinBase: 4,
     oscillationThresholdDegBase: 18,
     sensitivity: sens,

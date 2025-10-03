@@ -21,44 +21,200 @@ class AnalysisFilterDrawer extends ConsumerWidget {
           padding: const EdgeInsets.all(12),
           children: [
             ListTile(
-              leading: const Icon(Icons.tune),
-              title: const Text('Select plots'),
-              subtitle: const Text('Choose data to display'),
+              leading: const Icon(Icons.analytics),
+              title: const Text('Données d\'Analyse'),
+              subtitle: const Text('Sélectionnez les métriques à afficher'),
             ),
             const Divider(),
-            SwitchListTile(
-              value: filters.tws,
-              onChanged: (v) => update(filters.copyWith(tws: v)),
-              title: const Text('True Wind Speed (TWS)'),
+            
+            // Section Vent
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.air, size: 20, color: Colors.blue),
+                  SizedBox(width: 8),
+                  Text(
+                    'Métriques de Vent',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
             ),
+            
+            SwitchListTile(
+              value: filters.twd,
+              onChanged: (v) => update(filters.copyWith(twd: v)),
+              title: Row(
+                children: [
+                  Icon(Icons.explore, size: 20, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  const Text('Direction du Vent (TWD)'),
+                ],
+              ),
+              subtitle: const Text('Direction absolue du vent vraie • 0-360°'),
+            ),
+            
             SwitchListTile(
               value: filters.twa,
               onChanged: (v) => update(filters.copyWith(twa: v)),
-              title: const Text('True Wind Angle (TWA)'),
+              title: Row(
+                children: [
+                  Icon(Icons.navigation, size: 20, color: Colors.red),
+                  const SizedBox(width: 8),
+                  const Text('Angle au Vent (TWA)'),
+                ],
+              ),
+              subtitle: const Text('Angle relatif au bateau • -180 à +180°'),
+            ),
+            
+            SwitchListTile(
+              value: filters.tws,
+              onChanged: (v) => update(filters.copyWith(tws: v)),
+              title: Row(
+                children: [
+                  Icon(Icons.air, size: 20, color: Colors.green),
+                  const SizedBox(width: 8),
+                  const Text('Vitesse du Vent (TWS)'),
+                ],
+              ),
+              subtitle: const Text('Vitesse du vent vraie • nœuds'),
+            ),
+            
+            const Divider(),
+            
+            // Section Autres métriques
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  Icon(Icons.show_chart, size: 20, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Text(
+                    'Autres Métriques',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
             ),
             SwitchListTile(
               value: filters.boatSpeed,
               onChanged: (v) => update(filters.copyWith(boatSpeed: v)),
-              title: const Text('Boat speed'),
+              title: Row(
+                children: [
+                  Icon(Icons.speed, size: 20, color: Colors.purple),
+                  const SizedBox(width: 8),
+                  const Text('Vitesse du Bateau'),
+                ],
+              ),
+              subtitle: const Text('Vitesse sol et vitesse surface • nœuds'),
             ),
             SwitchListTile(
               value: filters.polars,
               onChanged: (v) => update(filters.copyWith(polars: v)),
-              title: const Text('Polars'),
+              title: Row(
+                children: [
+                  Icon(Icons.radar, size: 20, color: Colors.teal),
+                  const SizedBox(width: 8),
+                  const Text('Polaires'),
+                ],
+              ),
+              subtitle: const Text('Courbes de performance du bateau'),
             ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Running computations…')),
-                );
-              },
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('Run computations'),
+            const SizedBox(height: 16),
+            
+            // Résumé des sélections
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                      SizedBox(width: 6),
+                      Text(
+                        'Métriques sélectionnées:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _getSelectedMetricsSummary(filters),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        update(const AnalysisFilters()); // Tout décocher
+                      },
+                      icon: const Icon(Icons.clear_all),
+                      label: const Text('Tout effacer'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      icon: const Icon(Icons.check),
+                      label: const Text('Appliquer'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _getSelectedMetricsSummary(AnalysisFilters filters) {
+    final selected = <String>[];
+    if (filters.twd) selected.add('TWD (Direction)');
+    if (filters.twa) selected.add('TWA (Angle)');
+    if (filters.tws) selected.add('TWS (Vitesse)');
+    if (filters.boatSpeed) selected.add('Vitesse bateau');
+    if (filters.polars) selected.add('Polaires');
+    
+    if (selected.isEmpty) {
+      return 'Aucune métrique sélectionnée';
+    }
+    
+    if (selected.length == 1) {
+      return selected.first;
+    }
+    
+    return '${selected.length} métriques: ${selected.take(2).join(', ')}${selected.length > 2 ? '...' : ''}';
   }
 }

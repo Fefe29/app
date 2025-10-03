@@ -265,7 +265,7 @@ class RoutingCalculator {
     return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: angleLabel)];
   }
 
-  /// Crée des segments pour tirer des bords au près
+  /// Crée des segments pour tirer des bords au près avec stratégie VMG optimale (2 bords maximum)
   List<RouteLeg> _createTackingLegs(double sx, double sy, double ex, double ey, 
       double windDir, double optimalAngle, double dist, String label, bool finish) {
     
@@ -275,51 +275,88 @@ class RoutingCalculator {
     final v1 = vectorFromBearing(h1, screenYAxisDown: false); // tribord
     final v2 = vectorFromBearing(h2, screenYAxisDown: false); // bâbord
     
+    // Vecteur vers la cible
     final dx = ex - sx;
     final dy = ey - sy;
     final targetVec = math.Point(dx, dy);
     
-    // Choix du meilleur bord initial (projection maximale vers la cible)
+    // Déterminer le bord initial optimal (meilleure projection vers la cible)
     double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
     double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
     
     final firstVec = proj1 >= proj2 ? v1 : v2;
     final firstHeading = proj1 >= proj2 ? h1 : h2;
-    final firstSide = proj1 >= proj2 ? "tribord" : "bâbord";
+    final secondVec = proj1 >= proj2 ? v2 : v1;
+    final secondHeading = proj1 >= proj2 ? h2 : h1;
+    final firstTack = proj1 >= proj2 ? "Tribord" : "Bâbord";
+    final secondTack = proj1 >= proj2 ? "Bâbord" : "Tribord";
     
-    // Distance du premier bord (heuristique : 50-60% de la distance totale)
-    final leg1Dist = dist * 0.6;
-    final wp1x = sx + firstVec.x * leg1Dist;
-    final wp1y = sy + firstVec.y * leg1Dist;
+    print('TACKING DEBUG - Start: ($sx,$sy) Target: ($ex,$ey)');
+    print('TACKING DEBUG - Initial tack: $firstTack (${firstHeading.toStringAsFixed(1)}°)');
     
-    // Vérifier si le second segment peut fermer directement
+    // Stratégie VMG optimale : calculer le point de virement optimal
+    // On cherche le point où virer de bord pour arriver à la bouée sur l'autre amure
+    
+    // Méthode géométrique : intersection des deux laylines depuis les extrémités
+    // Layline 1 : depuis start sur premier bord
+    // Layline 2 : vers target sur second bord
+    
+    // Calculer la distance optimale du premier bord
+    // On utilise la projection du vecteur cible sur les deux laylines pour optimiser
+    final projectionOnFirst = proj1 >= proj2 ? proj1 : proj2;
+    final projectionOnSecond = proj1 >= proj2 ? proj2 : proj1;
+    
+    // Distance du premier bord : environ 60-70% de la projection maximale
+    final optimalFirstLegDist = math.max(dist * 0.5, projectionOnFirst * 0.65);
+    
+    // Point de virement optimal
+    final wp1x = sx + firstVec.x * optimalFirstLegDist;
+    final wp1y = sy + firstVec.y * optimalFirstLegDist;
+    
+    print('TACKING DEBUG - First leg: ($sx,$sy) -> ($wp1x,$wp1y) dist=${optimalFirstLegDist.toStringAsFixed(1)} ($firstTack)');
+    
+    // Vérifier si on peut fermer directement depuis ce point
     final dx2 = ex - wp1x;
     final dy2 = ey - wp1y;
-    final heading2Rad = math.atan2(dx2, dy2 * -1);
-    double heading2 = (heading2Rad * 180 / math.pi) % 360;
-    if (heading2 < 0) heading2 += 360;
-    final twa2 = signedDelta(windDir, heading2).abs();
+    final distToTarget = math.sqrt(dx2 * dx2 + dy2 * dy2);
+    final headingToTarget = math.atan2(dx2, dy2) * 180 / math.pi;
+    final normalizedHeadingToTarget = headingToTarget < 0 ? headingToTarget + 360 : headingToTarget;
+    final twaToTarget = signedDelta(windDir, normalizedHeadingToTarget).abs();
     
-    if (twa2 < optimalAngle - 5 && dist > 15) {
-      // Allonger le premier bord
-      final extraDist = dist * 0.25;
-      final wp1x2 = sx + firstVec.x * (leg1Dist + extraDist);
-      final wp1y2 = sy + firstVec.y * (leg1Dist + extraDist);
-      
-      return [
-        RouteLeg(startX: sx, startY: sy, endX: wp1x2, endY: wp1y2, 
-                type: RouteLegType.leg, label: _createAngleLabel(firstHeading, 'Près')),
-        RouteLeg(startX: wp1x2, startY: wp1y2, endX: ex, endY: ey, 
-                type: finish ? RouteLegType.finish : RouteLegType.leg, label: _createAngleLabel(heading2, 'Près')),
-      ];
+    print('TACKING DEBUG - From tack point to target: heading=${normalizedHeadingToTarget.toStringAsFixed(1)}°, TWA=${twaToTarget.toStringAsFixed(1)}°');
+    
+    final legs = <RouteLeg>[];
+    
+    // Premier bord
+    legs.add(RouteLeg(
+      startX: sx, startY: sy, endX: wp1x, endY: wp1y,
+      type: RouteLegType.leg,
+      label: _createAngleLabel(firstHeading, 'Près')
+    ));
+    
+    // Second segment : soit au près soit direct
+    if (twaToTarget >= optimalAngle + 5) {
+      // Route directe possible
+      final segmentType = twaToTarget > 150 ? 'Portant' : 'Cap';
+      legs.add(RouteLeg(
+        startX: wp1x, startY: wp1y, endX: ex, endY: ey,
+        type: finish ? RouteLegType.finish : RouteLegType.leg,
+        label: _createAngleLabel(normalizedHeadingToTarget, segmentType)
+      ));
+      print('TACKING DEBUG - Second leg: direct to target (${segmentType} ${normalizedHeadingToTarget.toStringAsFixed(1)}°)');
+      print('TACKING DEBUG - Second leg: direct to target (${segmentType} ${normalizedHeadingToTarget.toStringAsFixed(1)}°)');
+    } else {
+      // Second bord au près nécessaire
+      legs.add(RouteLeg(
+        startX: wp1x, startY: wp1y, endX: ex, endY: ey,
+        type: finish ? RouteLegType.finish : RouteLegType.leg,
+        label: _createAngleLabel(secondHeading, 'Près')
+      ));
+      print('TACKING DEBUG - Second leg: tacking to target ($secondTack ${secondHeading.toStringAsFixed(1)}°)');
     }
     
-    return [
-      RouteLeg(startX: sx, startY: sy, endX: wp1x, endY: wp1y, 
-              type: RouteLegType.leg, label: _createAngleLabel(firstHeading, 'Près')),
-      RouteLeg(startX: wp1x, startY: wp1y, endX: ex, endY: ey, 
-              type: finish ? RouteLegType.finish : RouteLegType.leg, label: _createAngleLabel(heading2, 'Près')),
-    ];
+    print('TACKING DEBUG - Generated ${legs.length} legs (optimized VMG strategy)');
+    return legs;
   }
 
   /// Crée des segments pour empanner au portant

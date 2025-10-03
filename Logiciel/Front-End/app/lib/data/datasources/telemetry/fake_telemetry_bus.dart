@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import 'package:kornog/common/utils/angle_utils.dart';
 import 'package:kornog/data/datasources/telemetry/telemetry_bus.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
+import 'package:kornog/config/wind_test_config.dart';
 
 
 /// Transposition d'un simulateur de vent inspiré de `Girouette_anemo_simu.py`.
@@ -19,15 +20,15 @@ class FakeTelemetryBus implements TelemetryBus {
 	Timer? _timer;
 	final _rng = math.Random();
 
-	// ---------------- Wind Simulator (direction & force) ----------------
-	double _baseTwd = 315; // point de départ
+	// ---------------- Wind Simulator (utilise WindTestConfig) ----------------
+	double _baseTwd = WindTestConfig.baseDirection;
 	double _elapsedMin = 0;
-	final double _rotRateDegPerMin = 2.0; // vitesse de rotation lente
-	final double _baseTws = 12.0;
+	final double _rotRateDegPerMin = WindTestConfig.rotationRate;
+	final double _baseTws = WindTestConfig.baseSpeed;
 
 	FakeTelemetryBus({this.mode = TwaSimMode.irregular}) {
 		_start = DateTime.now();
-		_timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+		_timer = Timer.periodic(Duration(milliseconds: WindTestConfig.updateIntervalMs), (_) => _tick());
 	}
 
 	late DateTime _start;
@@ -46,20 +47,21 @@ class FakeTelemetryBus implements TelemetryBus {
 		final sog = 6 + _rng.nextDouble() * 1.5;
 		final cog = (hdg + _rng.nextDouble() * 4 - 2) % 360;
 
-		// Direction vent selon mode
+		// Direction vent selon configuration et mode automatique
 		double twd;
-		switch (mode) {
+		TwaSimMode activeMode = _getActiveMode();
+		
+		switch (activeMode) {
 			case TwaSimMode.irregular:
-				final noise = _gaussian(stdDev: 4, clampAbs: 10);
+				final noise = _gaussian(stdDev: WindTestConfig.noiseMagnitude, clampAbs: WindTestConfig.oscillationAmplitude);
 				twd = (_baseTwd + noise) % 360;
 				break;
 			case TwaSimMode.rotatingLeft:
-				final base = _baseTwd - _rotRateDegPerMin * _elapsedMin;
-				twd = (base + _gaussian(stdDev: 2, clampAbs: 6)) % 360;
-				break;
 			case TwaSimMode.rotatingRight:
-				final base = _baseTwd + _rotRateDegPerMin * _elapsedMin;
-				twd = (base + _gaussian(stdDev: 2, clampAbs: 6)) % 360;
+				// Utilisation directe du rotationRate de la config (peut être positif ou négatif)
+				final base = _baseTwd + WindTestConfig.rotationRate * _elapsedMin;
+				final noise = _gaussian(stdDev: WindTestConfig.noiseMagnitude, clampAbs: WindTestConfig.oscillationAmplitude / 2);
+				twd = (base + noise) % 360;
 				break;
 		}
 		if (twd < 0) twd += 360;
@@ -89,6 +91,26 @@ class FakeTelemetryBus implements TelemetryBus {
 
 		final snap = TelemetrySnapshot(ts: now, metrics: m);
 		_snap$.add(snap);
+	}
+
+	/// Détermine le mode actuel selon la configuration WindTestConfig
+	TwaSimMode _getActiveMode() {
+		// Si le mode externe est défini, on l'utilise
+		if (mode != TwaSimMode.irregular) return mode;
+		
+		// Sinon on se base sur la configuration de test
+		switch (WindTestConfig.mode) {
+			case 'stable':
+			case 'irregular':
+			case 'chaotic':
+				return TwaSimMode.irregular;
+			case 'backing_left':
+				return TwaSimMode.rotatingLeft;
+			case 'veering_right':
+				return TwaSimMode.rotatingRight;
+			default:
+				return TwaSimMode.irregular;
+		}
 	}
 
 	double _gaussian({double mean = 0, double stdDev = 1, double clampAbs = double.infinity}) {

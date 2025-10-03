@@ -9,6 +9,8 @@ import '../../../charts/providers/route_plan_provider.dart';
 import '../../../charts/domain/services/routing_calculator.dart';
 import 'package:kornog/common/providers/app_providers.dart';
 import '../../../charts/providers/polar_providers.dart';
+import '../../../charts/providers/wind_trend_provider.dart';
+import '../../../charts/domain/services/wind_trend_analyzer.dart';
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
 class CourseCanvas extends ConsumerWidget {
@@ -20,6 +22,7 @@ class CourseCanvas extends ConsumerWidget {
   final route = ref.watch(routePlanProvider);
   final wind = ref.watch(windSampleProvider);
   final vmcUp = ref.watch(vmcUpwindProvider); // Pour laylines (angle optimal de près)
+  final windTrend = ref.watch(windTrendSnapshotProvider); // Analyse des tendances de vent
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
       return const Center(child: Text('Aucune bouée / ligne'));
     }
@@ -34,6 +37,7 @@ class CourseCanvas extends ConsumerWidget {
               wind.directionDeg,
               wind.speed,
               vmcUp?.angleDeg,
+              windTrend,
             ),
           ),
         );
@@ -49,12 +53,14 @@ class _CoursePainter extends CustomPainter {
     this.windDirDeg,
     this.windSpeed,
     this.upwindOptimalAngle,
+    this.windTrend,
   );
   final CourseState state;
   final RoutePlan route;
   final double windDirDeg; // 0 = Nord (haut), 90 = Est (droite)
   final double windSpeed; // nds
   final double? upwindOptimalAngle; // angle (°) par rapport au vent pour meilleure VMG près
+  final WindTrendSnapshot windTrend; // Analyse des tendances de vent
 
   static const double margin = 24.0; // logical px margin inside canvas
   static const double buoyRadius = 8.0;
@@ -127,6 +133,7 @@ class _CoursePainter extends CustomPainter {
     _drawBuoys(canvas, size);
     _drawWind(canvas, size);
     _drawLaylines(canvas, size);
+    _drawWindTrendInfo(canvas, size);
     _drawBoundsInfo(canvas, size);
   }
 
@@ -381,6 +388,96 @@ class _CoursePainter extends CustomPainter {
     }
   }
 
+  void _drawWindTrendInfo(Canvas canvas, Size size) {
+    // Affichage dans le coin supérieur gauche
+    const margin = 12.0;
+    const lineHeight = 16.0;
+    
+    // Couleur et style selon la tendance détectée
+    Color trendColor;
+    String trendIcon;
+    String trendLabel;
+    
+    switch (windTrend.trend) {
+      case WindTrendDirection.veeringRight:
+        trendColor = Colors.green.shade700;
+        trendIcon = '↗';
+        trendLabel = 'BASCULE DROITE';
+        break;
+      case WindTrendDirection.backingLeft:
+        trendColor = Colors.orange.shade700;
+        trendIcon = '↙';
+        trendLabel = 'BASCULE GAUCHE';
+        break;
+      case WindTrendDirection.irregular:
+        trendColor = Colors.red.shade600;
+        trendIcon = '≋';
+        trendLabel = 'IRRÉGULIER';
+        break;
+      case WindTrendDirection.neutral:
+        trendColor = Colors.blue.shade600;
+        trendIcon = '→';
+        trendLabel = 'STABLE';
+        break;
+    }
+    
+    // Fond semi-transparent
+    final background = Paint()
+      ..color = Colors.black.withOpacity(0.7)
+      ..style = PaintingStyle.fill;
+    
+    const boxWidth = 180.0;
+    const boxHeight = 70.0;
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(margin, margin, boxWidth, boxHeight),
+      const Radius.circular(6),
+    );
+    canvas.drawRRect(rect, background);
+    
+    // Titre
+    _drawText(
+      canvas, 
+      '📊 ANALYSE VENT',
+      const Offset(margin + 8, margin + 8),
+      fontSize: 11,
+      color: Colors.white70,
+    );
+    
+    // Tendance principale avec icône
+    _drawText(
+      canvas,
+      '$trendIcon $trendLabel',
+      const Offset(margin + 8, margin + 8 + lineHeight),
+      fontSize: 13,
+      color: trendColor,
+    );
+    
+    // Pente et fiabilité
+    final slopeText = windTrend.linearSlopeDegPerMin >= 0 
+        ? '+${windTrend.linearSlopeDegPerMin.toStringAsFixed(1)}°/min'
+        : '${windTrend.linearSlopeDegPerMin.toStringAsFixed(1)}°/min';
+    
+    _drawText(
+      canvas,
+      'Pente: $slopeText',
+      const Offset(margin + 8, margin + 8 + lineHeight * 2),
+      fontSize: 10,
+      color: Colors.white70,
+    );
+    
+    // Fiabilité
+    final reliability = windTrend.isReliable ? '✓ Fiable' : '⚠ Peu fiable';
+    final reliabilityColor = windTrend.isReliable ? Colors.green.shade400 : Colors.orange.shade400;
+    
+    _drawText(
+      canvas,
+      '$reliability (${windTrend.supportPoints}pts)',
+      const Offset(margin + 8, margin + 8 + lineHeight * 3),
+      fontSize: 10,
+      color: reliabilityColor,
+    );
+  }
+
   void _drawBoundsInfo(Canvas canvas, Size size) {
     final txt = 'X:[${_bounds.minX.toStringAsFixed(1)} ; ${_bounds.maxX.toStringAsFixed(1)}]  '
         'Y:[${_bounds.minY.toStringAsFixed(1)} ; ${_bounds.maxY.toStringAsFixed(1)}]';
@@ -402,7 +499,8 @@ class _CoursePainter extends CustomPainter {
         oldDelegate.route != route ||
         oldDelegate.windDirDeg != windDirDeg ||
         oldDelegate.windSpeed != windSpeed ||
-        oldDelegate.upwindOptimalAngle != upwindOptimalAngle;
+        oldDelegate.upwindOptimalAngle != upwindOptimalAngle ||
+        oldDelegate.windTrend != windTrend;
   }
 }
 
