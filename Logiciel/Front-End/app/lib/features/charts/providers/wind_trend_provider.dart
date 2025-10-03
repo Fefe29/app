@@ -23,22 +23,68 @@ class _WindAnalysisWindow extends Notifier<int> {
 final windTrendSensitivityProvider = NotifierProvider<_WindTrendSensitivity, double>(_WindTrendSensitivity.new);
 final windAnalysisWindowProvider = NotifierProvider<_WindAnalysisWindow, int>(_WindAnalysisWindow.new);
 
-final _windTrendAnalyzerProvider = Provider<WindTrendAnalyzer>((ref) {
-  final sens = ref.watch(windTrendSensitivityProvider);
-  final analysisWindow = ref.watch(windAnalysisWindowProvider);
+class _WindTrendAnalyzerNotifier extends Notifier<WindTrendAnalyzer?> {
+  @override
+  WindTrendAnalyzer? build() {
+    // Écouter les changements de paramètres
+    ref.listen(windTrendSensitivityProvider, (previous, next) {
+      _updateParameters();
+    });
+    
+    ref.listen(windAnalysisWindowProvider, (previous, next) {
+      _updateParameters();
+    });
+    
+    // Créer l'analyseur initial
+    return _createInitialAnalyzer();
+  }
   
-  return WindTrendAnalyzer(
-    windowSeconds: 3600, // Garder 1h de données max
-    analysisWindowSeconds: analysisWindow, // Fenêtre d'analyse configurable
-    minSlopeDegPerMinBase: 4,
-    oscillationThresholdDegBase: 18,
-    sensitivity: sens,
-  );
-});
+  WindTrendAnalyzer _createInitialAnalyzer() {
+    final sens = ref.read(windTrendSensitivityProvider);
+    final analysisWindow = ref.read(windAnalysisWindowProvider);
+    
+    return WindTrendAnalyzer(
+      windowSeconds: 3600, // Garder 1h de données max
+      analysisWindowSeconds: analysisWindow,
+      minSlopeDegPerMinBase: 4,
+      oscillationThresholdDegBase: 18,
+      sensitivity: sens,
+    );
+  }
+  
+  void _updateParameters() {
+    final current = state;
+    if (current == null) return;
+    
+    final sens = ref.read(windTrendSensitivityProvider);
+    final analysisWindow = ref.read(windAnalysisWindowProvider);
+    
+    // Mettre à jour avec préservation de l'historique
+    state = current.updateParameters(
+      analysisWindowSeconds: analysisWindow,
+      sensitivity: sens,
+    );
+  }
+}
+
+final _windTrendAnalyzerProvider = NotifierProvider<_WindTrendAnalyzerNotifier, WindTrendAnalyzer?>(_WindTrendAnalyzerNotifier.new);
 
 /// Fournit un snapshot recalculé à 1 Hz (car dépend du provider vent qui se met à jour).
 final windTrendSnapshotProvider = Provider<WindTrendSnapshot>((ref) {
   final analyzer = ref.watch(_windTrendAnalyzerProvider);
   final windSample = ref.watch(windSampleProvider);
+  
+  // Si l'analyseur n'est pas encore initialisé, retourner un snapshot neutre
+  if (analyzer == null) {
+    return WindTrendSnapshot(
+      trend: WindTrendDirection.neutral,
+      linearSlopeDegPerMin: 0,
+      supportPoints: 0,
+      windowSeconds: ref.read(windAnalysisWindowProvider),
+      sensitivity: ref.read(windTrendSensitivityProvider),
+      actualDataDurationSeconds: 0,
+    );
+  }
+  
   return analyzer.ingest(windSample);
 });

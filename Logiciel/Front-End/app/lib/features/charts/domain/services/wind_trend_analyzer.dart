@@ -13,13 +13,29 @@ class WindTrendSnapshot {
     required this.supportPoints,
     required this.windowSeconds,
     required this.sensitivity,
+    required this.actualDataDurationSeconds, // durée réelle des données collectées
   });
   final WindTrendDirection trend;
   final double linearSlopeDegPerMin; // pente régression linéaire (deg/min)
   final int supportPoints; // nb d'échantillons utilisés
-  final int windowSeconds; // taille de la fenêtre
+  final int windowSeconds; // taille de la fenêtre demandée
   final double sensitivity; // paramètre de filtrage (0..1)
-  bool get isReliable => supportPoints > 8; // heuristique simple
+  final int actualDataDurationSeconds; // durée réelle des données disponibles
+  
+  /// Fiabilité basée sur la durée effective vs durée demandée
+  /// Vert si on a 100% de la durée demandée + minimum de points
+  bool get isReliable {
+    final requiredDuration = windowSeconds; // 100% de la durée demandée
+    final hasEnoughDuration = actualDataDurationSeconds >= requiredDuration;
+    final hasMinimumPoints = supportPoints >= 8;
+    return hasEnoughDuration && hasMinimumPoints;
+  }
+  
+  /// Pourcentage de la durée demandée effectivement collectée
+  double get dataCompletenessPercent {
+    if (windowSeconds == 0) return 0;
+    return (actualDataDurationSeconds / windowSeconds * 100).clamp(0, 100);
+  }
 }
 
 /// Analyse la tendance (rotation progressive) vs irrégularité (oscillation) du vent.
@@ -45,8 +61,36 @@ class WindTrendAnalyzer {
 
   final Queue<_TimedDir> _samples = Queue();
   
+  /// Crée une nouvelle instance avec des paramètres mis à jour mais en préservant l'historique
+  WindTrendAnalyzer updateParameters({
+    int? analysisWindowSeconds,
+    double? sensitivity,
+  }) {
+    final newAnalyzer = WindTrendAnalyzer(
+      windowSeconds: windowSeconds,
+      analysisWindowSeconds: analysisWindowSeconds ?? this.analysisWindowSeconds,
+      minSlopeDegPerMinBase: minSlopeDegPerMinBase,
+      oscillationThresholdDegBase: oscillationThresholdDegBase,
+      sensitivity: sensitivity ?? this.sensitivity,
+    );
+    
+    // IMPORTANT : Copier l'historique existant vers la nouvelle instance
+    newAnalyzer._samples.addAll(_samples);
+    
+    print('🔄 Paramètres analyseur mis à jour: fenêtre=${newAnalyzer.effectiveAnalysisWindow}s, sensibilité=${newAnalyzer.sensitivity}, historique=${_samples.length} pts');
+    
+    return newAnalyzer;
+  }
+  
   /// Durée effective pour le calcul de la tendance
   int get effectiveAnalysisWindow => analysisWindowSeconds ?? windowSeconds;
+
+  /// Calcule la durée réelle des données disponibles (en secondes)
+  int _getActualDataDurationSeconds() {
+    if (_samples.isEmpty) return 0;
+    if (_samples.length == 1) return 0;
+    return _samples.last.time.difference(_samples.first.time).inSeconds;
+  }
 
   WindTrendSnapshot ingest(WindSample sample) {
     final now = DateTime.now();
@@ -62,6 +106,7 @@ class WindTrendAnalyzer {
         supportPoints: _samples.length,
         windowSeconds: effectiveAnalysisWindow,
         sensitivity: sensitivity,
+        actualDataDurationSeconds: _getActualDataDurationSeconds(),
       );
     }
     
@@ -74,6 +119,7 @@ class WindTrendAnalyzer {
         supportPoints: analysisSamples.length,
         windowSeconds: effectiveAnalysisWindow,
         sensitivity: sensitivity,
+        actualDataDurationSeconds: _getActualDataDurationSeconds(),
       );
     }
     
@@ -85,9 +131,11 @@ class WindTrendAnalyzer {
       xs.add(s.time.difference(firstT).inMilliseconds / 60000.0); // minutes
       ys.add(s.dir);
     }
-    final slope = _linearSlope(xs, ys); // deg/min
+    final adjustedYs = _unwrapAngles(analysisSamples.map((s) => s.dir).toList());
+    final slope = _linearSlope(xs, adjustedYs); // deg/min
     final minSlope = _adjustMinSlope();
-    final oscillation = _oscillationAmplitude(ys);
+    // CORRECTION : Calculer oscillation comme résidus par rapport à la régression
+    final oscillation = _oscillationAroundTrend(xs, adjustedYs, slope);
     final maxOsc = _adjustOscThreshold();
 
     WindTrendDirection trend;
@@ -112,6 +160,7 @@ class WindTrendAnalyzer {
       supportPoints: analysisSamples.length,
       windowSeconds: effectiveAnalysisWindow,
       sensitivity: sensitivity,
+      actualDataDurationSeconds: _getActualDataDurationSeconds(),
     );
   }
 
@@ -136,15 +185,12 @@ class WindTrendAnalyzer {
     final n = xs.length;
     if (n < 2) return 0;
     
-    // Gestion des angles circulaires : détecter les transitions 0°/360° et ajuster
-    final adjustedYs = _unwrapAngles(ys);
-    
     final meanX = xs.reduce((a, b) => a + b) / n;
-    final meanY = adjustedYs.reduce((a, b) => a + b) / n;
+    final meanY = ys.reduce((a, b) => a + b) / n;
     double num = 0, den = 0;
     for (var i = 0; i < n; i++) {
       final dx = xs[i] - meanX;
-      num += dx * (adjustedYs[i] - meanY);
+      num += dx * (ys[i] - meanY);
       den += dx * dx;
     }
     if (den.abs() < 1e-9) return 0;
@@ -166,8 +212,12 @@ class WindTrendAnalyzer {
       double delta = currentAngle - (previousUnwrapped % 360);
       
       // Normaliser delta dans [-180, 180]
-      while (delta > 180) delta -= 360;
-      while (delta < -180) delta += 360;
+      while (delta > 180) {
+        delta -= 360;
+      }
+      while (delta < -180) {
+        delta += 360;
+      }
       
       // Ajouter le delta à l'angle précédent déroulé
       result.add(previousUnwrapped + delta);
@@ -176,11 +226,31 @@ class WindTrendAnalyzer {
     return result;
   }
 
-  double _oscillationAmplitude(List<double> ys) {
-    if (ys.isEmpty) return 0;
-    final minV = ys.reduce(math.min);
-    final maxV = ys.reduce(math.max);
-    return maxV - minV; // amplitude brute
+
+
+  /// Calcule l'oscillation comme l'écart-type des résidus par rapport à la régression
+  /// Cette méthode est stable dans le temps et insensible à la dérive
+  double _oscillationAroundTrend(List<double> xs, List<double> ys, double slope) {
+    if (xs.length != ys.length || xs.length < 2) return 0;
+    
+    final n = xs.length;
+    final meanX = xs.reduce((a, b) => a + b) / n;
+    final meanY = ys.reduce((a, b) => a + b) / n;
+    
+    // Calculer les résidus par rapport à la ligne de régression
+    double sumSquaredResiduals = 0;
+    for (int i = 0; i < n; i++) {
+      final predictedY = meanY + slope * (xs[i] - meanX);
+      final residual = ys[i] - predictedY;
+      sumSquaredResiduals += residual * residual;
+    }
+    
+    // Écart-type des résidus
+    final residualVariance = sumSquaredResiduals / (n - 1);
+    final residualStdDev = math.sqrt(residualVariance);
+    
+    // Convertir en amplitude approximative (±2 écart-types = 95% des données)
+    return residualStdDev * 4.0;
   }
 
   double _adjustMinSlope() {

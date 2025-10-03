@@ -22,24 +22,33 @@ class AnalysisFilterDrawer extends ConsumerWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.analytics),
-              title: const Text('Données d\'Analyse'),
-              subtitle: const Text('Sélectionnez les métriques à afficher'),
+              title: const Text(
+                'Données d\'Analyse',
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: const Text(
+                'Sélectionnez les métriques à afficher',
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             const Divider(),
             
             // Section Vent
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Row(
                 children: [
-                  Icon(Icons.air, size: 20, color: Colors.blue),
-                  SizedBox(width: 8),
-                  Text(
-                    'Métriques de Vent',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
+                  const Icon(Icons.air, size: 20, color: Colors.blue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Métriques de Vent',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -50,56 +59,86 @@ class AnalysisFilterDrawer extends ConsumerWidget {
               value: filters.twd,
               onChanged: (v) => update(filters.copyWith(twd: v)),
               title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.explore, size: 20, color: Colors.blue),
                   const SizedBox(width: 8),
-                  const Text('Direction du Vent (TWD)'),
+                  const Expanded(
+                    child: Text(
+                      'Direction du Vent (TWD)',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-              subtitle: const Text('Direction absolue du vent vraie • 0-360°'),
+              subtitle: const Text(
+                'Direction absolue du vent vraie • 0-360°',
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             
             SwitchListTile(
               value: filters.twa,
               onChanged: (v) => update(filters.copyWith(twa: v)),
               title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.navigation, size: 20, color: Colors.red),
                   const SizedBox(width: 8),
-                  const Text('Angle au Vent (TWA)'),
+                  const Expanded(
+                    child: Text(
+                      'Angle au Vent (TWA)',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-              subtitle: const Text('Angle relatif au bateau • -180 à +180°'),
+              subtitle: const Text(
+                'Angle relatif au bateau • -180 à +180°',
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             
             SwitchListTile(
               value: filters.tws,
               onChanged: (v) => update(filters.copyWith(tws: v)),
               title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.air, size: 20, color: Colors.green),
                   const SizedBox(width: 8),
-                  const Text('Vitesse du Vent (TWS)'),
+                  const Expanded(
+                    child: Text(
+                      'Vitesse du Vent (TWS)',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-              subtitle: const Text('Vitesse du vent vraie • nœuds'),
+              subtitle: const Text(
+                'Vitesse du vent vraie • nœuds',
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             
             const Divider(),
             
             // Section Autres métriques
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Row(
                 children: [
-                  Icon(Icons.show_chart, size: 20, color: Colors.orange),
-                  SizedBox(width: 8),
-                  Text(
-                    'Autres Métriques',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange,
+                  const Icon(Icons.show_chart, size: 20, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Autres Métriques',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -109,25 +148,43 @@ class AnalysisFilterDrawer extends ConsumerWidget {
               value: filters.boatSpeed,
               onChanged: (v) => update(filters.copyWith(boatSpeed: v)),
               title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.speed, size: 20, color: Colors.purple),
                   const SizedBox(width: 8),
-                  const Text('Vitesse du Bateau'),
+                  const Expanded(
+                    child: Text(
+                      'Vitesse du Bateau',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-              subtitle: const Text('Vitesse sol et vitesse surface • nœuds'),
+              subtitle: const Text(
+                'Vitesse sol et vitesse surface • nœuds',
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             SwitchListTile(
               value: filters.polars,
               onChanged: (v) => update(filters.copyWith(polars: v)),
               title: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.radar, size: 20, color: Colors.teal),
                   const SizedBox(width: 8),
-                  const Text('Polaires'),
+                  const Expanded(
+                    child: Text(
+                      'Polaires',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-              subtitle: const Text('Courbes de performance du bateau'),
+              subtitle: const Text(
+                'Courbes de performance du bateau',
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             const SizedBox(height: 16),
             
@@ -161,6 +218,8 @@ class AnalysisFilterDrawer extends ConsumerWidget {
                   Text(
                     _getSelectedMetricsSummary(filters),
                     style: const TextStyle(fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                 ],
               ),
