@@ -342,38 +342,61 @@ class RoutingCalculator {
     final firstTack = startWithLeftTack ? "Bâbord" : "Tribord";
     final secondTack = startWithLeftTack ? "Tribord" : "Bâbord";
     
-    // Calculer les projections pour l'optimisation VMG
-    final proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
-    final proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
-    
     print('TACKING DEBUG - Start: ($sx,$sy) Target: ($ex,$ey)');
     print('TACKING DEBUG - Choix tactique: $firstTack (${firstHeading.toStringAsFixed(1)}°) - Raison: $tackReason');
     if (windTrend != null) {
       print('TACKING DEBUG - Bascule détectée: ${windTrend.trend}');
     }
     
-    // Stratégie VMG optimale : calculer le point de virement optimal
-    // On cherche le point où virer de bord pour arriver à la bouée sur l'autre amure
+    // **CALCUL GÉOMÉTRIQUE CORRECT DU POINT DE VIREMENT**
+    // Utilisation des laylines : calculer l'intersection des laylines des deux amures
     
-    // Méthode géométrique : intersection des deux laylines depuis les extrémités
-    // Layline 1 : depuis start sur premier bord
-    // Layline 2 : vers target sur second bord
+    // Layline depuis la cible sur l'amure opposée au premier bord
+    final targetLaylineVec = startWithLeftTack ? v1 : v2; // Si on commence à bâbord, la layline cible est tribord
     
-    // Calculer la distance optimale du premier bord
-    // On utilise la projection du vecteur cible sur les deux laylines pour optimiser
-    final projectionOnFirst = proj1 >= proj2 ? proj1 : proj2;
-    final projectionOnSecond = proj1 >= proj2 ? proj2 : proj1;
+    // Résolution géométrique : intersection de deux droites
+    // Droite 1 : position actuelle + t1 * firstVec (premier bord)  
+    // Droite 2 : cible - t2 * targetLaylineVec (layline cible)
+    // 
+    // sx + t1 * firstVec.x = ex - t2 * targetLaylineVec.x
+    // sy + t1 * firstVec.y = ey - t2 * targetLaylineVec.y
+    //
+    // Système 2x2 : résoudre pour t1
     
-    // Distance du premier bord : environ 60-70% de la projection maximale
-    final optimalFirstLegDist = math.max(dist * 0.5, projectionOnFirst * 0.65);
+    final det = firstVec.x * targetLaylineVec.y - firstVec.y * targetLaylineVec.x;
     
-    // Point de virement optimal
-    final wp1x = sx + firstVec.x * optimalFirstLegDist;
-    final wp1y = sy + firstVec.y * optimalFirstLegDist;
+    double wp1x, wp1y;
     
-    print('TACKING DEBUG - First leg: ($sx,$sy) -> ($wp1x,$wp1y) dist=${optimalFirstLegDist.toStringAsFixed(1)} ($firstTack)');
+    if (det.abs() < 1e-6) {
+      // Droites parallèles (cas dégénéré) - fallback sur distance proportionnelle
+      print('TACKING DEBUG - Laylines parallèles, utilisation fallback');
+      final proj = (targetVec.x * firstVec.x + targetVec.y * firstVec.y);
+      final fallbackDist = math.max(dist * 0.5, proj * 0.75);
+      wp1x = sx + firstVec.x * fallbackDist;
+      wp1y = sy + firstVec.y * fallbackDist;
+    } else {
+      // Intersection géométrique exacte
+      final dx_target = ex - sx;
+      final dy_target = ey - sy;
+      
+      final t1 = (dx_target * targetLaylineVec.y - dy_target * targetLaylineVec.x) / det;
+      
+      // Limiter t1 pour éviter des distances excessives
+      final maxT1 = dist * 1.2; // Maximum 120% de la distance directe
+      final minT1 = dist * 0.3; // Minimum 30% de la distance directe
+      final limitedT1 = t1.clamp(minT1, maxT1);
+      
+      wp1x = sx + firstVec.x * limitedT1;
+      wp1y = sy + firstVec.y * limitedT1;
+      
+      if (t1 != limitedT1) {
+        print('TACKING DEBUG - T1 limité : ${t1.toStringAsFixed(1)} -> ${limitedT1.toStringAsFixed(1)}');
+      }
+    }
     
-    // Vérifier si on peut fermer directement depuis ce point
+    print('TACKING DEBUG - First leg: ($sx,$sy) -> (${wp1x.toStringAsFixed(1)},${wp1y.toStringAsFixed(1)}) ($firstTack)');
+    
+    // Vérifier l'angle du second bord
     final dx2 = ex - wp1x;
     final dy2 = ey - wp1y;
     final distToTarget = math.sqrt(dx2 * dx2 + dy2 * dy2);
@@ -402,7 +425,6 @@ class RoutingCalculator {
         label: _createAngleLabel(normalizedHeadingToTarget, segmentType)
       ));
       print('TACKING DEBUG - Second leg: direct to target (${segmentType} ${normalizedHeadingToTarget.toStringAsFixed(1)}°)');
-      print('TACKING DEBUG - Second leg: direct to target (${segmentType} ${normalizedHeadingToTarget.toStringAsFixed(1)}°)');
     } else {
       // Second bord au près nécessaire
       legs.add(RouteLeg(
@@ -413,7 +435,7 @@ class RoutingCalculator {
       print('TACKING DEBUG - Second leg: tacking to target ($secondTack ${secondHeading.toStringAsFixed(1)}°)');
     }
     
-    print('TACKING DEBUG - Generated ${legs.length} legs (optimized VMG strategy)');
+    print('TACKING DEBUG - Generated ${legs.length} legs (layline intersection method)');
     return legs;
   }
 
