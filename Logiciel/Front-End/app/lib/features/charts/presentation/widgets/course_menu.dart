@@ -62,16 +62,6 @@ class CourseMenuButton extends ConsumerWidget {
               title: const Text('Marque de parcours'),
               onTap: () => Navigator.of(ctx).pop(_BuoyType.regular),
             ),
-            ListTile(
-              leading: const Icon(Icons.location_on),
-              title: const Text('Comité'),
-              onTap: () => Navigator.of(ctx).pop(_BuoyType.committee),
-            ),
-            ListTile(
-              leading: const Icon(Icons.visibility),
-              title: const Text('Viseur'),
-              onTap: () => Navigator.of(ctx).pop(_BuoyType.target),
-            ),
           ],
         ),
         actions: [
@@ -84,91 +74,140 @@ class CourseMenuButton extends ConsumerWidget {
     );
     
     if (action != null) {
-      final role = switch (action) {
-        _BuoyType.regular => BuoyRole.regular,
-        _BuoyType.committee => BuoyRole.committee,
-        _BuoyType.target => BuoyRole.target,
-      };
-      await _openBuoyDialog(context, ref, role: role);
+      await _openBuoyDialog(context, ref, role: BuoyRole.regular);
     }
   }
 
   Future<void> _openStartLineDialog(BuildContext context, WidgetRef ref) async {
+    // Controllers pour les champs de texte
+    final viseurXController = TextEditingController();
+    final viseurYController = TextEditingController();
+    final committeeXController = TextEditingController();
+    final committeeYController = TextEditingController();
+
+    // Si une ligne de départ existe déjà, pré-remplir avec les valeurs actuelles
     final course = ref.read(courseProvider);
-    final viseurBuoys = course.buoys.where((b) => b.role == BuoyRole.target).toList();
-    final committeeBuoys = course.buoys.where((b) => b.role == BuoyRole.committee).toList();
-    
-    if (viseurBuoys.isEmpty || committeeBuoys.isEmpty) {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Marques manquantes'),
-          content: const Text('Vous devez créer au moins une bouée viseur et une bouée comité avant de définir la ligne de départ.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
-          ],
-        ),
-      );
-      return;
+    if (course.startLine != null) {
+      viseurXController.text = course.startLine!.p1x.toStringAsFixed(1);
+      viseurYController.text = course.startLine!.p1y.toStringAsFixed(1);
+      committeeXController.text = course.startLine!.p2x.toStringAsFixed(1);
+      committeeYController.text = course.startLine!.p2y.toStringAsFixed(1);
     }
-    
-    Buoy? selectedViseur;
-    Buoy? selectedCommittee;
     
     await showDialog<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Ligne de départ'),
-          content: SizedBox(
-            width: 350,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Sélectionnez les marques pour la ligne de départ :'),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<Buoy>(
-                  decoration: const InputDecoration(
-                    labelText: 'Position du viseur',
-                    border: OutlineInputBorder(),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ligne de départ'),
+        content: SizedBox(
+          width: 350,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Renseignez les positions du viseur et du comité :'),
+              const SizedBox(height: 16),
+              
+              // Position du viseur
+              const Text('Position du viseur :', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: viseurXController,
+                      decoration: const InputDecoration(
+                        labelText: 'X (m)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
                   ),
-                  value: selectedViseur,
-                  items: viseurBuoys.map((buoy) => DropdownMenuItem(
-                    value: buoy,
-                    child: Text('Viseur (${buoy.x.toStringAsFixed(1)}, ${buoy.y.toStringAsFixed(1)})'),
-                  )).toList(),
-                  onChanged: (buoy) => setState(() => selectedViseur = buoy),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<Buoy>(
-                  decoration: const InputDecoration(
-                    labelText: 'Position du comité',
-                    border: OutlineInputBorder(),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: viseurYController,
+                      decoration: const InputDecoration(
+                        labelText: 'Y (m)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
                   ),
-                  value: selectedCommittee,
-                  items: committeeBuoys.map((buoy) => DropdownMenuItem(
-                    value: buoy,
-                    child: Text('Comité (${buoy.x.toStringAsFixed(1)}, ${buoy.y.toStringAsFixed(1)})'),
-                  )).toList(),
-                  onChanged: (buoy) => setState(() => selectedCommittee = buoy),
-                ),
-              ],
-            ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Position du comité
+              const Text('Position du comité :', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: committeeXController,
+                      decoration: const InputDecoration(
+                        labelText: 'X (m)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextFormField(
+                      controller: committeeYController,
+                      decoration: const InputDecoration(
+                        labelText: 'Y (m)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
-            FilledButton(
-              onPressed: selectedViseur != null && selectedCommittee != null ? () {
-                ref.read(courseProvider.notifier).setStartLine(
-                  selectedViseur!.x, selectedViseur!.y,
-                  selectedCommittee!.x, selectedCommittee!.y,
-                );
-                Navigator.of(ctx).pop();
-              } : null,
-              child: const Text('Définir'),
-            )
-          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              viseurXController.dispose();
+              viseurYController.dispose();
+              committeeXController.dispose();
+              committeeYController.dispose();
+              Navigator.of(ctx).pop();
+            }, 
+            child: const Text('Annuler')
+          ),
+          FilledButton(
+            onPressed: () {
+              final viseurX = double.tryParse(viseurXController.text);
+              final viseurY = double.tryParse(viseurYController.text);
+              final committeeX = double.tryParse(committeeXController.text);
+              final committeeY = double.tryParse(committeeYController.text);
+              
+              if (viseurX != null && viseurY != null && committeeX != null && committeeY != null) {
+                ref.read(courseProvider.notifier).setStartLine(
+                  viseurX, viseurY,
+                  committeeX, committeeY,
+                );
+                viseurXController.dispose();
+                viseurYController.dispose();
+                committeeXController.dispose();
+                committeeYController.dispose();
+                Navigator.of(ctx).pop();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Veuillez saisir des coordonnées valides'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Définir'),
+          )
+        ],
       ),
     );
   }
@@ -255,8 +294,8 @@ class CourseMenuButton extends ConsumerWidget {
   Future<void> _openModificationsMenu(BuildContext context, WidgetRef ref, CourseState course) async {
     final items = <_ModificationItem>[];
     
-    // Ajouter les bouées
-    for (final buoy in course.buoys) {
+    // Ajouter les bouées (exclure comité et viseur car gérées via ligne de départ)
+    for (final buoy in course.buoys.where((b) => b.role == BuoyRole.regular)) {
       items.add(_ModificationItem.buoy(buoy));
     }
     
@@ -632,8 +671,6 @@ enum _CourseAction {
 
 enum _BuoyType {
   regular,
-  committee,
-  target,
 }
 
 enum _ModificationItemType {
