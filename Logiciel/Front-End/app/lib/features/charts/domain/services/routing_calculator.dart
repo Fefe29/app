@@ -70,90 +70,31 @@ class RoutingCalculator {
           orElse: () => null,
         );
 
-    // Point de départ : milieu de la ligne de départ sinon première bouée sinon rien
+    // Point de départ : côté optimal de la ligne de départ sinon première bouée
     double? curX;
     double? curY;
     if (course.startLine != null) {
-      curX = (course.startLine!.p1x + course.startLine!.p2x) / 2;
-      curY = (course.startLine!.p1y + course.startLine!.p2y) / 2;
+      final optimalStart = _getOptimalStartPoint(course.startLine!, regular, windTrend);
+      curX = optimalStart.x;
+      curY = optimalStart.y;
     } else if (regular.isNotEmpty) {
       curX = regular.first.x;
       curY = regular.first.y;
     }
 
-    // Ajoute segment fictif début -> première bouée seulement si départ existe et qu'on a des bouées
-    // Détermination d'un éventuel segment stratégique avant d'aller à la première bouée
+    // Ajoute segment début -> première bouée seulement si départ existe et qu'on a des bouées
     if (course.startLine != null && regular.isNotEmpty) {
       final first = regular.first;
       final startMidX = curX!; // non null ici
       final startMidY = curY!;
-
-      // Calcul vecteur vers la première bouée
-      final vx = first.x - startMidX;
-      final vy = first.y - startMidY;
-      final distFirst = math.sqrt(vx * vx + vy * vy);
-
-      bool addedStrategic = false;
-      print('ROUTING DEBUG - WindTrend: ${windTrend?.trend}, Reliable: ${windTrend?.isReliable}, DistFirst: $distFirst');
-      if (windTrend != null && windTrend.isReliable && distFirst > 1e-3) {
-        // Pour MVP : appliquer logique stratégique dès qu'une rotation fiable est détectée.
-        if (windTrend.trend == WindTrendDirection.veeringRight || windTrend.trend == WindTrendDirection.backingLeft) {
-          final sens = windTrend.sensitivity.clamp(0.0, 1.0);
-            // Offset proportionnel à la distance (ex: 20% à 35% selon sensibilité)
-          final offsetFactor = 0.2 + 0.15 * sens;
-          final offsetDist = distFirst * offsetFactor;
-
-          // Choix côté : veeringRight => aller à droite (tribord) ; backingLeft => gauche (bâbord)
-          // Pour définir droite/gauche on prend un vecteur perpendiculaire au vent supposé moyen.
-          // Sans vent absolu ici, on utilise la perpendiculaire du segment vers la bouée comme proxy.
-          // Perp (vx,vy) -> (vy,-vx)
-          double px = vy;
-          double py = -vx;
-          final normP = math.sqrt(px * px + py * py);
-          if (normP > 1e-6) {
-            px /= normP;
-            py /= normP;
-          }
-          if (windTrend.trend == WindTrendDirection.backingLeft) {
-            // Inverser côté
-            px = -px;
-            py = -py;
-          }
-          final waypointX = startMidX + px * offsetDist;
-          final waypointY = startMidY + py * offsetDist;
-          legs.add(RouteLeg(
-            startX: startMidX,
-            startY: startMidY,
-            endX: waypointX,
-            endY: waypointY,
-            type: RouteLegType.start,
-            label: windTrend.trend == WindTrendDirection.veeringRight ? 'Strat droite' : 'Strat gauche',
-          ));
-          legs.add(RouteLeg(
-            startX: waypointX,
-            startY: waypointY,
-            endX: first.x,
-            endY: first.y,
-            type: RouteLegType.leg,
-            label: '->B${first.id}',
-          ));
-          curX = first.x;
-          curY = first.y;
-          addedStrategic = true;
-        }
-      }
-
-      if (!addedStrategic) {
         // Fallback route directe - UTILISER le système de routing avec tacks
-        print('ROUTING DEBUG - Creating Start->B1 segment: ($startMidX,$startMidY) -> (${first.x},${first.y})');
-        final seg = _routeLegWithTacksIfNeeded(startMidX, startMidY, first.x, first.y, label: 'Start->B${first.id}');
-        print('ROUTING DEBUG - Start->B1 segments created: ${seg.length}');
-        legs.addAll(seg);
-        curX = first.x;
-        curY = first.y;
-      } else {
-        print('ROUTING DEBUG - Strategic segment used instead of direct Start->B1');
-      }
+      // Route directe avec système de routing tactique
+      print('ROUTING DEBUG - Creating Start->B1 segment: ($startMidX,$startMidY) -> (${first.x},${first.y})');
+      final seg = _routeLegWithTacksIfNeeded(startMidX, startMidY, first.x, first.y, label: 'Start->B${first.id}', windTrend: windTrend);
+      print('ROUTING DEBUG - Start->B1 segments created: ${seg.length}');
+      legs.addAll(seg);
+      curX = first.x;
+      curY = first.y;
     }
 
     // Parcours bouées régulières restantes
@@ -165,7 +106,7 @@ class RoutingCalculator {
         continue; // pas de segment initial
       }
       if (curX == b.x && curY == b.y) continue; // déjà positionné
-      final seg = _routeLegWithTacksIfNeeded(curX, curY, b.x, b.y, label: 'B->B${b.id}');
+      final seg = _routeLegWithTacksIfNeeded(curX, curY, b.x, b.y, label: 'B->B${b.id}', windTrend: windTrend);
       legs.addAll(seg);
       curX = b.x;
       curY = b.y;
@@ -175,19 +116,17 @@ class RoutingCalculator {
     // Il sert uniquement pour la ligne de départ
     // Nous ne l'ajoutons donc pas dans le routage
 
-    // Arrivée
+    // Arrivée : côté optimal de la ligne d'arrivée
     if (course.finishLine != null && curX != null && curY != null) {
-      final fx = (course.finishLine!.p1x + course.finishLine!.p2x) / 2;
-      final fy = (course.finishLine!.p1y + course.finishLine!.p2y) / 2;
+      final optimalFinish = _getOptimalFinishPoint(course.finishLine!, curX, curY);
+      final fx = optimalFinish.x;
+      final fy = optimalFinish.y;
       if (fx != curX || fy != curY) {
-        final seg = _routeLegWithTacksIfNeeded(curX, curY, fx, fy, label: 'Finish', finish: true);
+        final seg = _routeLegWithTacksIfNeeded(curX, curY, fx, fy, label: 'Finish', finish: true, windTrend: windTrend);
         legs.addAll(seg);
       }
     }
 
-    // NOTE: Pour une future extension, on pourrait insérer ici une divergence stratégique
-    // sur le premier bord si trend veering/backing pour exploiter la rotation.
-    // (Ex: ajouter un waypoint artificiel vers la droite/gauche avant de rejoindre la première bouée.)
     return RoutePlan(legs);
   }
 
@@ -200,12 +139,100 @@ class RoutingCalculator {
     return d;
   }
 
+  /// Détermine le point optimal de la ligne de départ
+  /// Choisit P1 ou P2 selon la proximité avec la première bouée et les conditions tactiques
+  math.Point<double> _getOptimalStartPoint(LineSegment startLine, List<Buoy> regular, WindTrendSnapshot? windTrend) {
+    final p1 = math.Point(startLine.p1x, startLine.p1y);
+    final p2 = math.Point(startLine.p2x, startLine.p2y);
+    
+    if (regular.isEmpty) {
+      // Pas de bouée, prendre le milieu par défaut
+      return math.Point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    }
+    
+    final firstBuoy = regular.first;
+    final targetPoint = math.Point(firstBuoy.x, firstBuoy.y);
+    
+    // Distance euclidienne vers la première bouée
+    final distToP1 = math.sqrt(math.pow(targetPoint.x - p1.x, 2) + math.pow(targetPoint.y - p1.y, 2));
+    final distToP2 = math.sqrt(math.pow(targetPoint.x - p2.x, 2) + math.pow(targetPoint.y - p2.y, 2));
+    
+    // Choix de base : point le plus proche
+    var optimalPoint = distToP1 <= distToP2 ? p1 : p2;
+    final chosenSide = distToP1 <= distToP2 ? "P1" : "P2";
+    
+    print('OPTIMAL_START - P1: (${p1.x.toStringAsFixed(1)}, ${p1.y.toStringAsFixed(1)}) dist=${distToP1.toStringAsFixed(1)}m');
+    print('OPTIMAL_START - P2: (${p2.x.toStringAsFixed(1)}, ${p2.y.toStringAsFixed(1)}) dist=${distToP2.toStringAsFixed(1)}m');
+    print('OPTIMAL_START - Choix: $chosenSide (plus proche de B${firstBuoy.id})');
+    
+    // Optimisation tactique selon la bascule de vent
+    if (windTrend != null && windDirDeg != null && (windTrend.trend == WindTrendDirection.backingLeft || windTrend.trend == WindTrendDirection.veeringRight)) {
+      // Calcul des angles depuis chaque extrémité vers la première bouée
+      final angleFromP1 = math.atan2(targetPoint.x - p1.x, targetPoint.y - p1.y) * 180 / math.pi;
+      final angleFromP2 = math.atan2(targetPoint.x - p2.x, targetPoint.y - p2.y) * 180 / math.pi;
+      
+      final twaFromP1 = signedDelta(angleFromP1, windDirDeg!);
+      final twaFromP2 = signedDelta(angleFromP2, windDirDeg!);
+      
+      print('OPTIMAL_START - TWA depuis P1: ${twaFromP1.toStringAsFixed(1)}°, depuis P2: ${twaFromP2.toStringAsFixed(1)}°');
+      
+      // Logique tactique : avec bascule à gauche, favoriser le départ qui permet de partir à bâbord
+      // avec bascule à droite, favoriser le départ qui permet de partir à tribord
+      bool favorP1BasedOnTack = false;
+      if (windTrend.trend == WindTrendDirection.backingLeft) {
+        // Bascule à gauche → favoriser bâbord → TWA négatif préférable
+        favorP1BasedOnTack = twaFromP1 < twaFromP2;
+      } else if (windTrend.trend == WindTrendDirection.veeringRight) {
+        // Bascule à droite → favoriser tribord → TWA positif préférable  
+        favorP1BasedOnTack = twaFromP1 > twaFromP2;
+      }
+      
+      // Si la tactique suggère un point différent du plus proche, on peut l'ajuster
+      if ((favorP1BasedOnTack && distToP1 > distToP2) || (!favorP1BasedOnTack && distToP1 < distToP2)) {
+        // Conflit entre distance et tactique
+        final distDiff = (distToP1 - distToP2).abs();
+        if (distDiff < 50) { // Si la différence de distance est faible (<50m), privilégier la tactique
+          optimalPoint = favorP1BasedOnTack ? p1 : p2;
+          final tacticalChoice = favorP1BasedOnTack ? "P1" : "P2";
+          print('OPTIMAL_START - Ajustement tactique: $tacticalChoice (bascule ${windTrend.trend}, diff distance: ${distDiff.toStringAsFixed(1)}m)');
+        } else {
+          print('OPTIMAL_START - Distance trop importante (${distDiff.toStringAsFixed(1)}m), garde choix par proximité');
+        }
+      } else {
+        print('OPTIMAL_START - Tactique et distance alignées sur ${chosenSide}');
+      }
+    }
+    
+    return optimalPoint;
+  }
+  
+  /// Détermine le point optimal de la ligne d'arrivée
+  /// Choisit P1 ou P2 selon la proximité avec la dernière position
+  math.Point<double> _getOptimalFinishPoint(LineSegment finishLine, double lastX, double lastY) {
+    final p1 = math.Point(finishLine.p1x, finishLine.p1y);
+    final p2 = math.Point(finishLine.p2x, finishLine.p2y);
+    final lastPos = math.Point(lastX, lastY);
+    
+    // Distance euclidienne depuis la dernière position
+    final distToP1 = math.sqrt(math.pow(lastPos.x - p1.x, 2) + math.pow(lastPos.y - p1.y, 2));
+    final distToP2 = math.sqrt(math.pow(lastPos.x - p2.x, 2) + math.pow(lastPos.y - p2.y, 2));
+    
+    final optimalPoint = distToP1 <= distToP2 ? p1 : p2;
+    final chosenSide = distToP1 <= distToP2 ? "P1" : "P2";
+    
+    print('OPTIMAL_FINISH - P1: (${p1.x.toStringAsFixed(1)}, ${p1.y.toStringAsFixed(1)}) dist=${distToP1.toStringAsFixed(1)}m');
+    print('OPTIMAL_FINISH - P2: (${p2.x.toStringAsFixed(1)}, ${p2.y.toStringAsFixed(1)}) dist=${distToP2.toStringAsFixed(1)}m');
+    print('OPTIMAL_FINISH - Choix: $chosenSide (plus proche de dernière position)');
+    
+    return optimalPoint;
+  }
+
   /// Génère un label avec l'angle de navigation
   String _createAngleLabel(double headingDeg, String segmentType) {
     return '$segmentType ${headingDeg.toStringAsFixed(0)}°';
   }
 
-  List<RouteLeg> _routeLegWithTacksIfNeeded(double sx, double sy, double ex, double ey, {required String label, bool finish = false}) {
+  List<RouteLeg> _routeLegWithTacksIfNeeded(double sx, double sy, double ex, double ey, {required String label, bool finish = false, WindTrendSnapshot? windTrend}) {
     // Pas de vent ou d'angle => segment direct
     if (windDirDeg == null || optimalUpwindAngle == null) {
       return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label)];
@@ -254,10 +281,10 @@ class RoutingCalculator {
     // Gérer les cas spéciaux : près et portant
     if (absTWA < optimalAngle) {
       print('ROUTING - Besoin de tirer des bords au près (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° < ${optimalAngle.toStringAsFixed(1)}°)');
-      return _createTackingLegs(sx, sy, ex, ey, windDirDeg!, optimalUpwindAngle!, dist, label, finish);
+      return _createTackingLegs(sx, sy, ex, ey, windDirDeg!, optimalUpwindAngle!, dist, label, finish, windTrend);
     } else if (absTWA > 150) {
       print('ROUTING - Besoin d\'empanner au portant (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° > 150°)');
-      return _createJibingLegs(sx, sy, ex, ey, windDirDeg!, optimalUpwindAngle!, dist, label, finish);
+      return _createJibingLegs(sx, sy, ex, ey, windDirDeg!, optimalUpwindAngle!, dist, label, finish, windTrend);
     }
     
     // Ne devrait pas arriver avec la logique mise à jour
@@ -265,9 +292,9 @@ class RoutingCalculator {
     return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: angleLabel)];
   }
 
-  /// Crée des segments pour tirer des bords au près avec stratégie VMG optimale (2 bords maximum)
+  /// Crée des segments pour tirer des bords au près avec stratégie tactique basée sur la bascule
   List<RouteLeg> _createTackingLegs(double sx, double sy, double ex, double ey, 
-      double windDir, double optimalAngle, double dist, String label, bool finish) {
+      double windDir, double optimalAngle, double dist, String label, bool finish, WindTrendSnapshot? windTrend) {
     
     // Caps au près optimaux
     final h1 = norm360(windDir + optimalAngle); // tribord (vent sur tribord)
@@ -280,19 +307,50 @@ class RoutingCalculator {
     final dy = ey - sy;
     final targetVec = math.Point(dx, dy);
     
-    // Déterminer le bord initial optimal (meilleure projection vers la cible)
-    double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
-    double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
+    // **NOUVELLE LOGIQUE TACTIQUE** : Choix du bord basé sur la bascule de vent
+    bool startWithLeftTack = false; // Par défaut : tribord
+    String tackReason = "Défaut";
     
-    final firstVec = proj1 >= proj2 ? v1 : v2;
-    final firstHeading = proj1 >= proj2 ? h1 : h2;
-    final secondVec = proj1 >= proj2 ? v2 : v1;
-    final secondHeading = proj1 >= proj2 ? h2 : h1;
-    final firstTack = proj1 >= proj2 ? "Tribord" : "Bâbord";
-    final secondTack = proj1 >= proj2 ? "Bâbord" : "Tribord";
+    if (windTrend != null) {
+      if (windTrend.trend == WindTrendDirection.backingLeft) {
+        // Bascule à gauche → partir à gauche (bâbord)
+        startWithLeftTack = true;
+        tackReason = "Bascule gauche";
+      } else if (windTrend.trend == WindTrendDirection.veeringRight) {
+        // Bascule à droite → partir à droite (tribord)
+        startWithLeftTack = false;
+        tackReason = "Bascule droite";
+      } else {
+        // Pas de bascule claire → meilleure projection (logique actuelle)
+        double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
+        double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
+        startWithLeftTack = proj2 > proj1;
+        tackReason = "Projection optimale";
+      }
+    } else {
+      // Pas de données de vent → meilleure projection
+      double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
+      double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
+      startWithLeftTack = proj2 > proj1;
+      tackReason = "Pas de bascule";
+    }
+    
+    final firstVec = startWithLeftTack ? v2 : v1;
+    final firstHeading = startWithLeftTack ? h2 : h1;
+    final secondVec = startWithLeftTack ? v1 : v2;
+    final secondHeading = startWithLeftTack ? h1 : h2;
+    final firstTack = startWithLeftTack ? "Bâbord" : "Tribord";
+    final secondTack = startWithLeftTack ? "Tribord" : "Bâbord";
+    
+    // Calculer les projections pour l'optimisation VMG
+    final proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
+    final proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
     
     print('TACKING DEBUG - Start: ($sx,$sy) Target: ($ex,$ey)');
-    print('TACKING DEBUG - Initial tack: $firstTack (${firstHeading.toStringAsFixed(1)}°)');
+    print('TACKING DEBUG - Choix tactique: $firstTack (${firstHeading.toStringAsFixed(1)}°) - Raison: $tackReason');
+    if (windTrend != null) {
+      print('TACKING DEBUG - Bascule détectée: ${windTrend.trend}');
+    }
     
     // Stratégie VMG optimale : calculer le point de virement optimal
     // On cherche le point où virer de bord pour arriver à la bouée sur l'autre amure
@@ -361,7 +419,7 @@ class RoutingCalculator {
 
   /// Crée des segments pour empanner au portant
   List<RouteLeg> _createJibingLegs(double sx, double sy, double ex, double ey, 
-      double windDir, double optimalAngle, double dist, String label, bool finish) {
+      double windDir, double optimalAngle, double dist, String label, bool finish, WindTrendSnapshot? windTrend) {
     
     // Au portant, angle optimal typiquement 140-160° TWA
     final optimalDownwindAngle = 150.0;
@@ -376,13 +434,39 @@ class RoutingCalculator {
     final dy = ey - sy;
     final targetVec = math.Point(dx, dy);
     
-    // Choix du meilleur côté initial
-    double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
-    double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
+    // **LOGIQUE TACTIQUE PORTANT** : même principe qu'au près
+    bool startWithLeftJibe = false; // Par défaut : tribord
+    String jibeReason = "Défaut";
     
-    final firstVec = proj1 >= proj2 ? v1 : v2;
-    final firstHeading = proj1 >= proj2 ? h1 : h2;
-    final firstSide = proj1 >= proj2 ? "tribord" : "bâbord";
+    if (windTrend != null) {
+      if (windTrend.trend == WindTrendDirection.backingLeft) {
+        // Bascule à gauche → partir à gauche (bâbord) au portant aussi
+        startWithLeftJibe = true;
+        jibeReason = "Bascule gauche";
+      } else if (windTrend.trend == WindTrendDirection.veeringRight) {
+        // Bascule à droite → partir à droite (tribord) au portant
+        startWithLeftJibe = false;
+        jibeReason = "Bascule droite";
+      } else {
+        // Pas de bascule → meilleure projection
+        double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
+        double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
+        startWithLeftJibe = proj2 > proj1;
+        jibeReason = "Projection optimale";
+      }
+    } else {
+      // Pas de données → meilleure projection
+      double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
+      double proj2 = (targetVec.x * v2.x + targetVec.y * v2.y);
+      startWithLeftJibe = proj2 > proj1;
+      jibeReason = "Pas de bascule";
+    }
+    
+    final firstVec = startWithLeftJibe ? v2 : v1;
+    final firstHeading = startWithLeftJibe ? h2 : h1;
+    final firstSide = startWithLeftJibe ? "bâbord" : "tribord";
+    
+    print('JIBING DEBUG - Choix tactique portant: $firstSide (${firstHeading.toStringAsFixed(1)}°) - Raison: $jibeReason');
     
     // Distance du premier portant (plus conservateur qu'au près)
     final leg1Dist = dist * 0.4;
