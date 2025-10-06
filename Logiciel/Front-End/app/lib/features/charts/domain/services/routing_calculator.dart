@@ -30,6 +30,11 @@ class RoutePlan {
   bool get isEmpty => legs.isEmpty;
 }
 
+/// Interface pour accéder aux données de polaire
+abstract class PolarData {
+  double getSpeedForConditions(double windSpeed, double twa);
+}
+
 /// Calculateur de routage très simple (MVP) :
 /// - Point de départ = milieu de la ligne de départ si disponible sinon première bouée.
 /// - Ordre des bouées = tri par passageOrder (croissant) puis par id croissant pour celles sans passageOrder.
@@ -38,10 +43,18 @@ class RoutePlan {
 /// Ne calcule pas encore des laylines / VMG optimisés : cette partie viendra ensuite.
 class RoutingCalculator {
   double? windDirDeg; // FROM direction en degrés (injecté optionnellement)
+  double? windSpeed; // vitesse du vent en nœuds
   double? optimalUpwindAngle; // angle TWA optimum (ex: 40°)
   double? currentTwaSigned; // TWA signé courant (-180..180) provenant télémétrie
+  PolarData? polarData; // données de polaire pour calculs de vitesse
 
-  RoutingCalculator({this.windDirDeg, this.optimalUpwindAngle, this.currentTwaSigned});
+  RoutingCalculator({
+    this.windDirDeg, 
+    this.windSpeed,
+    this.optimalUpwindAngle, 
+    this.currentTwaSigned,
+    this.polarData,
+  });
 
   RoutePlan compute(CourseState course, {WindTrendSnapshot? windTrend}) {
     print('COMPUTE ROUTING - Début du calcul de route');
@@ -153,78 +166,122 @@ class RoutingCalculator {
     final firstBuoy = regular.first;
     final targetPoint = math.Point(firstBuoy.x, firstBuoy.y);
     
-    // Distance euclidienne vers la première bouée
-    final distToP1 = math.sqrt(math.pow(targetPoint.x - p1.x, 2) + math.pow(targetPoint.y - p1.y, 2));
-    final distToP2 = math.sqrt(math.pow(targetPoint.x - p2.x, 2) + math.pow(targetPoint.y - p2.y, 2));
+    // Calcul des temps de parcours réels depuis chaque extrémité
+    final timeFromP1 = _estimateTimeToTarget(p1.x, p1.y, targetPoint.x, targetPoint.y);
+    final timeFromP2 = _estimateTimeToTarget(p2.x, p2.y, targetPoint.x, targetPoint.y);
     
-    // Choix de base : point le plus proche
-    var optimalPoint = distToP1 <= distToP2 ? p1 : p2;
-    final chosenSide = distToP1 <= distToP2 ? "P1" : "P2";
+    // Choix du point avec le temps de parcours le plus court
+    final optimalPoint = timeFromP1 <= timeFromP2 ? p1 : p2;
+    final chosenSide = timeFromP1 <= timeFromP2 ? "P1" : "P2";
     
-    print('OPTIMAL_START - P1: (${p1.x.toStringAsFixed(1)}, ${p1.y.toStringAsFixed(1)}) dist=${distToP1.toStringAsFixed(1)}m');
-    print('OPTIMAL_START - P2: (${p2.x.toStringAsFixed(1)}, ${p2.y.toStringAsFixed(1)}) dist=${distToP2.toStringAsFixed(1)}m');
-    print('OPTIMAL_START - Choix: $chosenSide (plus proche de B${firstBuoy.id})');
+    print('OPTIMAL_START - P1: (${p1.x.toStringAsFixed(1)}, ${p1.y.toStringAsFixed(1)}) temps=${timeFromP1.toStringAsFixed(1)}s');
+    print('OPTIMAL_START - P2: (${p2.x.toStringAsFixed(1)}, ${p2.y.toStringAsFixed(1)}) temps=${timeFromP2.toStringAsFixed(1)}s');
+    print('OPTIMAL_START - Choix: $chosenSide (temps optimal vers B${firstBuoy.id})');
     
-    // Optimisation tactique selon la bascule de vent
-    if (windTrend != null && windDirDeg != null && (windTrend.trend == WindTrendDirection.backingLeft || windTrend.trend == WindTrendDirection.veeringRight)) {
-      // Calcul des angles depuis chaque extrémité vers la première bouée
-      final angleFromP1 = math.atan2(targetPoint.x - p1.x, targetPoint.y - p1.y) * 180 / math.pi;
-      final angleFromP2 = math.atan2(targetPoint.x - p2.x, targetPoint.y - p2.y) * 180 / math.pi;
-      
-      final twaFromP1 = signedDelta(angleFromP1, windDirDeg!);
-      final twaFromP2 = signedDelta(angleFromP2, windDirDeg!);
-      
-      print('OPTIMAL_START - TWA depuis P1: ${twaFromP1.toStringAsFixed(1)}°, depuis P2: ${twaFromP2.toStringAsFixed(1)}°');
-      
-      // Logique tactique : avec bascule à gauche, favoriser le départ qui permet de partir à bâbord
-      // avec bascule à droite, favoriser le départ qui permet de partir à tribord
-      bool favorP1BasedOnTack = false;
-      if (windTrend.trend == WindTrendDirection.backingLeft) {
-        // Bascule à gauche → favoriser bâbord → TWA négatif préférable
-        favorP1BasedOnTack = twaFromP1 < twaFromP2;
-      } else if (windTrend.trend == WindTrendDirection.veeringRight) {
-        // Bascule à droite → favoriser tribord → TWA positif préférable  
-        favorP1BasedOnTack = twaFromP1 > twaFromP2;
-      }
-      
-      // Si la tactique suggère un point différent du plus proche, on peut l'ajuster
-      if ((favorP1BasedOnTack && distToP1 > distToP2) || (!favorP1BasedOnTack && distToP1 < distToP2)) {
-        // Conflit entre distance et tactique
-        final distDiff = (distToP1 - distToP2).abs();
-        if (distDiff < 50) { // Si la différence de distance est faible (<50m), privilégier la tactique
-          optimalPoint = favorP1BasedOnTack ? p1 : p2;
-          final tacticalChoice = favorP1BasedOnTack ? "P1" : "P2";
-          print('OPTIMAL_START - Ajustement tactique: $tacticalChoice (bascule ${windTrend.trend}, diff distance: ${distDiff.toStringAsFixed(1)}m)');
-        } else {
-          print('OPTIMAL_START - Distance trop importante (${distDiff.toStringAsFixed(1)}m), garde choix par proximité');
-        }
-      } else {
-        print('OPTIMAL_START - Tactique et distance alignées sur ${chosenSide}');
-      }
+    // Vérifier l'écart de temps
+    final timeDiff = (timeFromP1 - timeFromP2).abs();
+    if (timeDiff < 5.0) { // Si moins de 5 secondes d'écart
+      print('OPTIMAL_START - Écart faible (${timeDiff.toStringAsFixed(1)}s), choix peu critique');
+    } else {
+      final advantage = timeFromP1 < timeFromP2 ? timeFromP2 - timeFromP1 : timeFromP1 - timeFromP2;
+      print('OPTIMAL_START - Avantage significatif: ${advantage.toStringAsFixed(1)}s au $chosenSide');
     }
     
     return optimalPoint;
   }
   
   /// Détermine le point optimal de la ligne d'arrivée
-  /// Choisit P1 ou P2 selon la proximité avec la dernière position
+  /// Choisit P1 ou P2 selon le temps de parcours minimal depuis la dernière position
   math.Point<double> _getOptimalFinishPoint(LineSegment finishLine, double lastX, double lastY) {
     final p1 = math.Point(finishLine.p1x, finishLine.p1y);
     final p2 = math.Point(finishLine.p2x, finishLine.p2y);
-    final lastPos = math.Point(lastX, lastY);
     
-    // Distance euclidienne depuis la dernière position
-    final distToP1 = math.sqrt(math.pow(lastPos.x - p1.x, 2) + math.pow(lastPos.y - p1.y, 2));
-    final distToP2 = math.sqrt(math.pow(lastPos.x - p2.x, 2) + math.pow(lastPos.y - p2.y, 2));
+    // Calcul des temps de parcours réels vers chaque extrémité
+    final timeToP1 = _estimateTimeToTarget(lastX, lastY, p1.x, p1.y);
+    final timeToP2 = _estimateTimeToTarget(lastX, lastY, p2.x, p2.y);
     
-    final optimalPoint = distToP1 <= distToP2 ? p1 : p2;
-    final chosenSide = distToP1 <= distToP2 ? "P1" : "P2";
+    final optimalPoint = timeToP1 <= timeToP2 ? p1 : p2;
+    final chosenSide = timeToP1 <= timeToP2 ? "P1" : "P2";
     
-    print('OPTIMAL_FINISH - P1: (${p1.x.toStringAsFixed(1)}, ${p1.y.toStringAsFixed(1)}) dist=${distToP1.toStringAsFixed(1)}m');
-    print('OPTIMAL_FINISH - P2: (${p2.x.toStringAsFixed(1)}, ${p2.y.toStringAsFixed(1)}) dist=${distToP2.toStringAsFixed(1)}m');
-    print('OPTIMAL_FINISH - Choix: $chosenSide (plus proche de dernière position)');
+    print('OPTIMAL_FINISH - P1: (${p1.x.toStringAsFixed(1)}, ${p1.y.toStringAsFixed(1)}) temps=${timeToP1.toStringAsFixed(1)}s');
+    print('OPTIMAL_FINISH - P2: (${p2.x.toStringAsFixed(1)}, ${p2.y.toStringAsFixed(1)}) temps=${timeToP2.toStringAsFixed(1)}s');
+    print('OPTIMAL_FINISH - Choix: $chosenSide (temps optimal depuis dernière position)');
+    
+    // Vérifier l'écart de temps
+    final timeDiff = (timeToP1 - timeToP2).abs();
+    if (timeDiff < 5.0) { // Si moins de 5 secondes d'écart
+      print('OPTIMAL_FINISH - Écart faible (${timeDiff.toStringAsFixed(1)}s), choix peu critique');
+    } else {
+      final advantage = timeToP1 < timeToP2 ? timeToP2 - timeToP1 : timeToP1 - timeToP2;
+      print('OPTIMAL_FINISH - Avantage significatif: ${advantage.toStringAsFixed(1)}s au $chosenSide');
+    }
     
     return optimalPoint;
+  }
+
+  /// Estime le temps de parcours entre deux points en tenant compte du vent et de la polaire
+  double _estimateTimeToTarget(double startX, double startY, double endX, double endY) {
+    if (windDirDeg == null || windSpeed == null) {
+      // Pas de vent : utiliser vitesse par défaut (5 nds)
+      final distance = math.sqrt(math.pow(endX - startX, 2) + math.pow(endY - startY, 2));
+      return distance / 2.57; // 5 nds ≈ 2.57 m/s
+    }
+
+    final dx = endX - startX;
+    final dy = endY - startY;
+    final distance = math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < 1e-6) return 0.0;
+
+    // Direction géographique du segment (0°=Nord, 90°=Est)
+    final courseDeg = (math.atan2(dx, dy) * 180 / math.pi + 360) % 360;
+    
+    // Angle par rapport au vent (TWA)
+    final twa = signedDelta(courseDeg, windDirDeg!);
+    final absTwa = twa.abs();
+
+    // Obtenir la vitesse depuis la polaire
+    double boatSpeed;
+    if (polarData != null) {
+      boatSpeed = polarData!.getSpeedForConditions(windSpeed!, absTwa);
+    } else {
+      // Polaire simplifiée si pas de données
+      boatSpeed = _getSimplifiedBoatSpeed(windSpeed!, absTwa);
+    }
+
+    // Si c'est du près et qu'on ne peut pas remonter au vent, traitement spécial
+    if (optimalUpwindAngle != null && absTwa < optimalUpwindAngle!) {
+      // Route nécessite des bords - estimation approximative
+      final tackingPenalty = 1.4; // 40% de temps en plus pour les bords
+      boatSpeed = boatSpeed * 0.8; // Réduction de vitesse pour les manœuvres
+      return (distance * tackingPenalty) / boatSpeed;
+    }
+
+    // Route directe possible
+    return distance / boatSpeed;
+  }
+
+  /// Polaire simplifiée quand pas de données détaillées
+  double _getSimplifiedBoatSpeed(double windSpeedKts, double absTwa) {
+    // Vitesse de base proportionnelle au vent
+    final baseSpeed = math.min(windSpeedKts * 0.4, 8.0); // Max 8 nds
+    
+    if (absTwa < 40) {
+      // Près serré - vitesse réduite
+      return baseSpeed * 0.6;
+    } else if (absTwa < 60) {
+      // Près bon - vitesse correcte  
+      return baseSpeed * 0.85;
+    } else if (absTwa < 120) {
+      // Travers - vitesse maximale
+      return baseSpeed * 1.0;
+    } else if (absTwa < 150) {
+      // Grand largue - vitesse élevée
+      return baseSpeed * 0.95;
+    } else {
+      // Vent arrière - vitesse réduite
+      return baseSpeed * 0.7;
+    }
   }
 
   /// Génère un label avec l'angle de navigation

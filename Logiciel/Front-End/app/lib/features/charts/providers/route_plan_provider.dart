@@ -49,6 +49,7 @@ final _routingCalculatorProvider = Provider<RoutingCalculator>((ref) {
   
   return RoutingCalculator(
     windDirDeg: wind.directionDeg,
+    windSpeed: wind.speed,
     optimalUpwindAngle: upwind,
     currentTwaSigned: twaSigned,
   );
