@@ -539,19 +539,19 @@ class RoutingCalculator {
     final dy = ey - sy;
     final targetVec = math.Point(dx, dy);
     
-    // **LOGIQUE TACTIQUE PORTANT** : même principe qu'au près
+    // **LOGIQUE TACTIQUE PORTANT** : partir du côté de la bascule (inverse du près)
     bool startWithLeftJibe = false; // Par défaut : tribord
     String jibeReason = "Défaut";
     
     if (windTrend != null) {
       if (windTrend.trend == WindTrendDirection.backingLeft) {
-        // Bascule à gauche → partir à gauche (bâbord) au portant aussi
+        // Bascule à gauche → partir à gauche (bâbord) au portant (même sens qu'au près)
         startWithLeftJibe = true;
-        jibeReason = "Bascule gauche";
+        jibeReason = "Bascule gauche → partir bâbord";
       } else if (windTrend.trend == WindTrendDirection.veeringRight) {
-        // Bascule à droite → partir à droite (tribord) au portant
+        // Bascule à droite → partir à droite (tribord) au portant (même sens qu'au près)
         startWithLeftJibe = false;
-        jibeReason = "Bascule droite";
+        jibeReason = "Bascule droite → partir tribord";
       } else {
         // Pas de bascule → meilleure projection
         double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
@@ -573,29 +573,102 @@ class RoutingCalculator {
     
     print('JIBING DEBUG - Choix tactique portant: $firstSide (${firstHeading.toStringAsFixed(1)}°) - Raison: $jibeReason');
     
-    // Distance du premier portant (plus conservateur qu'au près)
-    final leg1Dist = dist * 0.4;
-    final wp1x = sx + firstVec.x * leg1Dist;
-    final wp1y = sy + firstVec.y * leg1Dist;
+    // **CALCUL GÉOMÉTRIQUE CORRECT DU POINT D'EMPANNAGE**
+    // Utilisation des laylines : calculer l'intersection des laylines des deux amures
     
-    // Calculer l'angle du second segment
+    // Layline depuis la cible sur l'amure opposée au premier bord
+    final targetLaylineVec = startWithLeftJibe ? v1 : v2; // Si on commence à bâbord, la layline cible est tribord
+    
+    // Résolution géométrique : intersection de deux droites
+    // Droite 1 : position actuelle + t1 * firstVec (premier bord)  
+    // Droite 2 : cible - t2 * targetLaylineVec (layline cible)
+    // 
+    // sx + t1 * firstVec.x = ex - t2 * targetLaylineVec.x
+    // sy + t1 * firstVec.y = ey - t2 * targetLaylineVec.y
+    //
+    // Système 2x2 : résoudre pour t1
+    
+    final det = firstVec.x * targetLaylineVec.y - firstVec.y * targetLaylineVec.x;
+    
+    double wp1x, wp1y;
+    
+    if (det.abs() < 1e-6) {
+      // Droites parallèles (cas dégénéré) - fallback sur distance proportionnelle
+      print('JIBING DEBUG - Laylines parallèles, utilisation fallback');
+      final proj = (targetVec.x * firstVec.x + targetVec.y * firstVec.y);
+      final fallbackDist = math.max(dist * 0.4, proj * 0.6); // Plus conservateur au portant
+      wp1x = sx + firstVec.x * fallbackDist;
+      wp1y = sy + firstVec.y * fallbackDist;
+    } else {
+      // Intersection géométrique exacte
+      final dx_target = ex - sx;
+      final dy_target = ey - sy;
+      
+      final t1 = (dx_target * targetLaylineVec.y - dy_target * targetLaylineVec.x) / det;
+      
+      // Limiter t1 pour éviter des distances excessives (plus conservateur au portant)
+      final maxT1 = dist * 1.0; // Maximum 100% de la distance directe (vs 120% au près)
+      final minT1 = dist * 0.2; // Minimum 20% de la distance directe (vs 30% au près)
+      final limitedT1 = t1.clamp(minT1, maxT1);
+      
+      wp1x = sx + firstVec.x * limitedT1;
+      wp1y = sy + firstVec.y * limitedT1;
+      
+      if (t1 != limitedT1) {
+        print('JIBING DEBUG - T1 limité : ${t1.toStringAsFixed(1)} -> ${limitedT1.toStringAsFixed(1)}');
+      }
+    }
+    
+    print('JIBING DEBUG - First leg: ($sx,$sy) -> (${wp1x.toStringAsFixed(1)},${wp1y.toStringAsFixed(1)}) ($firstSide)');
+    
+    // Vérifier l'angle du second bord (même logique que pour le près)
     final dx2 = ex - wp1x;
     final dy2 = ey - wp1y;
-    final heading2Rad = math.atan2(dx2, dy2);
-    double heading2 = (heading2Rad * 180 / math.pi) % 360;
-    if (heading2 < 0) heading2 += 360;
+    final distToTarget = math.sqrt(dx2 * dx2 + dy2 * dy2);
+    final headingToTarget = math.atan2(dx2, dy2) * 180 / math.pi;
+    final normalizedHeadingToTarget = headingToTarget < 0 ? headingToTarget + 360 : headingToTarget;
+    final twaToTarget = signedDelta(windDir, normalizedHeadingToTarget).abs();
     
+    print('JIBING DEBUG - From jibe point to target: heading=${normalizedHeadingToTarget.toStringAsFixed(1)}°, TWA=${twaToTarget.toStringAsFixed(1)}°');
+    
+    final legs = <RouteLeg>[];
+    
+    // Premier bord portant
     final firstJibeLegTime = _estimateTimeToTarget(sx, sy, wp1x, wp1y);
-    final secondJibeLegTime = _estimateTimeToTarget(wp1x, wp1y, ex, ey);
+    legs.add(RouteLeg(
+      startX: sx, startY: sy, endX: wp1x, endY: wp1y,
+      type: RouteLegType.leg,
+      label: _createAngleLabel(firstHeading, 'Portant'),
+      estimatedTime: firstJibeLegTime,
+    ));
     
-    return [
-      RouteLeg(startX: sx, startY: sy, endX: wp1x, endY: wp1y, 
-              type: RouteLegType.leg, label: _createAngleLabel(firstHeading, 'Portant'),
-              estimatedTime: firstJibeLegTime),
-      RouteLeg(startX: wp1x, startY: wp1y, endX: ex, endY: ey, 
-              type: finish ? RouteLegType.finish : RouteLegType.leg, label: _createAngleLabel(heading2, 'Portant'),
-              estimatedTime: secondJibeLegTime),
-    ];
+    // Second segment : soit au portant optimal soit direct
+    final secondJibeLegTime = _estimateTimeToTarget(wp1x, wp1y, ex, ey);
+    if (twaToTarget <= optimalDownwindAngle - 10) {
+      // Route directe possible (TWA trop serré pour rester au portant optimal)
+      final segmentType = twaToTarget < 60 ? 'Près' : 'Cap';
+      legs.add(RouteLeg(
+        startX: wp1x, startY: wp1y, endX: ex, endY: ey,
+        type: finish ? RouteLegType.finish : RouteLegType.leg,
+        label: _createAngleLabel(normalizedHeadingToTarget, segmentType),
+        estimatedTime: secondJibeLegTime,
+      ));
+      print('JIBING DEBUG - Second leg: direct to target (${segmentType} ${normalizedHeadingToTarget.toStringAsFixed(1)}°)');
+    } else {
+      // Second bord au portant nécessaire
+      final secondHeading = startWithLeftJibe ? h1 : h2; // Inverser pour le second bord
+      final secondSide = startWithLeftJibe ? "tribord" : "bâbord";
+      legs.add(RouteLeg(
+        startX: wp1x, startY: wp1y, endX: ex, endY: ey,
+        type: finish ? RouteLegType.finish : RouteLegType.leg,
+        label: _createAngleLabel(secondHeading, 'Portant'),
+        estimatedTime: secondJibeLegTime,
+      ));
+      print('JIBING DEBUG - Second leg: jibing to target ($secondSide ${secondHeading.toStringAsFixed(1)}°)');
+    }
+    
+    print('JIBING DEBUG - Generated ${legs.length} legs (layline intersection method)');
+    return legs;
   }
 
   double _angleDiff(double a, double b) => ((a - b + 540) % 360) - 180; // legacy (kept for backward compat callers)
