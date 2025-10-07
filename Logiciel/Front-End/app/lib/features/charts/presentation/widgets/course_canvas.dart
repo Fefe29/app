@@ -254,11 +254,14 @@ class _CoursePainter extends CustomPainter {
 
   void _drawLaylines(Canvas canvas, Size size) {
     if (upwindOptimalAngle == null) return;
+    // Dessine les laylines de près (vert) et de portant (orange)
     // Origine : première bouée régulière (bouée au vent pour les laylines), sinon centre bounding box
-    double ox;
-    double oy;
+    double oxUpwind;
+    double oyUpwind;
+    double oxDownwind;
+    double oyDownwind;
     
-    // Chercher la première bouée régulière (par ordre de passage)
+    // Chercher les bouées régulières (par ordre de passage)
     final regularBuoys = state.buoys.where((b) => b.role == BuoyRole.regular).toList();
     if (regularBuoys.isNotEmpty) {
       // Trier par passageOrder puis par id
@@ -276,17 +279,27 @@ class _CoursePainter extends CustomPainter {
         return a.id.compareTo(b.id);
       });
       
+      // Première bouée pour les laylines de près
       final firstBuoy = regularBuoys.first;
-      ox = firstBuoy.x;
-      oy = firstBuoy.y;
+      oxUpwind = firstBuoy.x;
+      oyUpwind = firstBuoy.y;
+      
+      // Dernière bouée pour les laylines de portant
+      final lastBuoy = regularBuoys.last;
+      oxDownwind = lastBuoy.x;
+      oyDownwind = lastBuoy.y;
     } else if (state.buoys.isNotEmpty) {
       final first = state.buoys.first;
-      ox = first.x;
-      oy = first.y;
+      oxUpwind = first.x;
+      oyUpwind = first.y;
+      oxDownwind = first.x;
+      oyDownwind = first.y;
     } else {
       // centre des bounds
-      ox = (_bounds.minX + _bounds.maxX) / 2;
-      oy = (_bounds.minY + _bounds.maxY) / 2;
+      oxUpwind = (_bounds.minX + _bounds.maxX) / 2;
+      oyUpwind = (_bounds.minY + _bounds.maxY) / 2;
+      oxDownwind = oxUpwind;
+      oyDownwind = oyUpwind;
     }
 
   // windDirDeg représente la DIRECTION D'OU PROVIENT le vent (FROM). Pour remonter au vent,
@@ -298,14 +311,14 @@ class _CoursePainter extends CustomPainter {
     final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.minY);
     final length = maxSpan * 1.2; // un peu plus grand que le terrain
 
-    void drawLay(double headingDeg, Color color, String side) {
+    void drawUpwindLay(double headingDeg, Color color, String side) {
       final rad = headingDeg * math.pi / 180.0;
       // Convertir heading (0=N) en vecteur coordonnées logiques (Y vers le haut) : x=sin, y=cos
       final vx = math.sin(rad);
       final vy = math.cos(rad);
-      final ex = ox + vx * length;
-      final ey = oy + vy * length;
-      final p1 = _project(ox, oy, size);
+      final ex = oxUpwind + vx * length;
+      final ey = oyUpwind + vy * length;
+      final p1 = _project(oxUpwind, oyUpwind, size);
       final p2 = _project(ex, ey, size);
       final paint = Paint()
         ..color = color
@@ -336,8 +349,58 @@ class _CoursePainter extends CustomPainter {
       );
     }
 
-    drawLay(heading1, Colors.lightGreenAccent.shade400, 'Bb');  // Bâbord
-    drawLay(heading2, Colors.lightGreenAccent.shade700, 'Tb');  // Tribord
+    drawUpwindLay(heading1, Colors.lightGreenAccent.shade400, 'Bb');  // Bâbord
+    drawUpwindLay(heading2, Colors.lightGreenAccent.shade700, 'Tb');  // Tribord
+    
+    // LAYLINES DE PORTANT - partent de la dernière bouée et remontent
+    // Angle optimal de portant (typiquement 140-160° TWA)
+    const optimalDownwindAngle = 150.0;
+    
+    // Caps au portant optimaux inversés (navigation depuis la bouée de portant VERS le haut)
+    // Avec inversion tribord/bâbord et ajout de 180° pour corriger le sens
+    final downwindHeading1 = (windDirDeg + 180.0 + optimalDownwindAngle) % 360.0; // tribord portant inversé -> bâbord
+    final downwindHeading2 = (windDirDeg + 180.0 - optimalDownwindAngle) % 360.0; // bâbord portant inversé -> tribord
+    
+    void drawDownwindLay(double headingDeg, Color color, String side) {
+      final rad = headingDeg * math.pi / 180.0;
+      // Convertir heading (0=N) en vecteur coordonnées logiques (Y vers le haut) : x=sin, y=cos
+      final vx = math.sin(rad);
+      final vy = math.cos(rad);
+      final ex = oxDownwind + vx * length;
+      final ey = oyDownwind + vy * length;
+      final p1 = _project(oxDownwind, oyDownwind, size);
+      final p2 = _project(ex, ey, size);
+      final paint = Paint()
+        ..color = color
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+      // Trait en pointillés avec un pattern différent pour le portant
+      const dash = 8.0;
+      const gap = 8.0;
+      final total = (p2 - p1).distance;
+      final dir = (p2 - p1) / total;
+      double dist = 0;
+      while (dist < total) {
+        final s = p1 + dir * dist;
+        final e = p1 + dir * math.min(dist + dash, total);
+        canvas.drawLine(s, e, paint);
+        dist += dash + gap;
+      }
+      
+      // Afficher l'angle de la layline (avec correction de 180° car on remonte)
+      final midPoint = p1 + dir * (total * 0.4); // Position à 40% pour éviter chevauchement avec près
+      final displayAngle = headingDeg; // Pas de +180 car déjà corrigé dans le calcul du cap
+      _drawText(
+        canvas,
+        '${displayAngle.toStringAsFixed(0)}° $side',
+        midPoint + const Offset(5, 8),
+        fontSize: 10,
+        color: color.withOpacity(0.9),
+      );
+    }
+    
+    drawDownwindLay(downwindHeading1, Colors.orangeAccent.shade400, 'Bb↑');  // Bâbord portant remontant (inversé)
+    drawDownwindLay(downwindHeading2, Colors.orangeAccent.shade700, 'Tb↑');  // Tribord portant remontant (inversé)
   }
 
   String _shortLabel(RouteLeg leg) {
