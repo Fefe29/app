@@ -15,6 +15,7 @@ class RouteLeg {
     required this.endY,
     required this.type,
     this.label,
+    this.estimatedTime,
   });
   final double startX;
   final double startY;
@@ -22,12 +23,28 @@ class RouteLeg {
   final double endY;
   final RouteLegType type;
   final String? label; // ex: "B2->B3"
+  final double? estimatedTime; // Temps estimé en secondes pour ce segment
 }
 
 class RoutePlan {
   RoutePlan(this.legs);
   final List<RouteLeg> legs;
   bool get isEmpty => legs.isEmpty;
+  
+  /// Temps total estimé en secondes pour le parcours complet
+  double get totalEstimatedTime {
+    return legs.fold(0.0, (sum, leg) => sum + (leg.estimatedTime ?? 0.0));
+  }
+  
+  /// Temps total formaté en minutes et secondes
+  String get formattedTotalTime {
+    final totalSeconds = totalEstimatedTime;
+    if (totalSeconds == 0.0) return "--:--";
+    
+    final minutes = (totalSeconds / 60).floor();
+    final seconds = (totalSeconds % 60).floor();
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 }
 
 /// Interface pour accéder aux données de polaire
@@ -292,7 +309,8 @@ class RoutingCalculator {
   List<RouteLeg> _routeLegWithTacksIfNeeded(double sx, double sy, double ex, double ey, {required String label, bool finish = false, WindTrendSnapshot? windTrend}) {
     // Pas de vent ou d'angle => segment direct
     if (windDirDeg == null || optimalUpwindAngle == null) {
-      return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label)];
+      final estimatedTime = _estimateTimeToTarget(sx, sy, ex, ey);
+      return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: label, estimatedTime: estimatedTime)];
     }
   final dx = ex - sx;
   final dy = ey - sy;
@@ -332,7 +350,9 @@ class RoutingCalculator {
     
     if (absTWA >= optimalAngle && absTWA <= 150) {
       print('ROUTING - Route directe possible (TheoreticalTWA=${theoreticalTWA.toStringAsFixed(1)}° dans zone de navigation directe)');
-      return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: angleLabel)];
+      final estimatedTime = _estimateTimeToTarget(sx, sy, ex, ey);
+      print('ROUTING DEBUG - Temps estimé pour segment direct: ${estimatedTime.toStringAsFixed(1)}s');
+      return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: angleLabel, estimatedTime: estimatedTime)];
     }
     
     // Gérer les cas spéciaux : près et portant
@@ -346,7 +366,8 @@ class RoutingCalculator {
     
     // Ne devrait pas arriver avec la logique mise à jour
     print('ROUTING - Cas non géré, route directe par défaut');
-    return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: angleLabel)];
+    final estimatedTime = _estimateTimeToTarget(sx, sy, ex, ey);
+    return [RouteLeg(startX: sx, startY: sy, endX: ex, endY: ey, type: finish ? RouteLegType.finish : RouteLegType.leg, label: angleLabel, estimatedTime: estimatedTime)];
   }
 
   /// Crée des segments pour tirer des bords au près avec stratégie tactique basée sur la bascule
@@ -466,20 +487,24 @@ class RoutingCalculator {
     final legs = <RouteLeg>[];
     
     // Premier bord
+    final firstLegTime = _estimateTimeToTarget(sx, sy, wp1x, wp1y);
     legs.add(RouteLeg(
       startX: sx, startY: sy, endX: wp1x, endY: wp1y,
       type: RouteLegType.leg,
-      label: _createAngleLabel(firstHeading, 'Près')
+      label: _createAngleLabel(firstHeading, 'Près'),
+      estimatedTime: firstLegTime,
     ));
     
     // Second segment : soit au près soit direct
+    final secondLegTime = _estimateTimeToTarget(wp1x, wp1y, ex, ey);
     if (twaToTarget >= optimalAngle + 5) {
       // Route directe possible
       final segmentType = twaToTarget > 150 ? 'Portant' : 'Cap';
       legs.add(RouteLeg(
         startX: wp1x, startY: wp1y, endX: ex, endY: ey,
         type: finish ? RouteLegType.finish : RouteLegType.leg,
-        label: _createAngleLabel(normalizedHeadingToTarget, segmentType)
+        label: _createAngleLabel(normalizedHeadingToTarget, segmentType),
+        estimatedTime: secondLegTime,
       ));
       print('TACKING DEBUG - Second leg: direct to target (${segmentType} ${normalizedHeadingToTarget.toStringAsFixed(1)}°)');
     } else {
@@ -487,7 +512,8 @@ class RoutingCalculator {
       legs.add(RouteLeg(
         startX: wp1x, startY: wp1y, endX: ex, endY: ey,
         type: finish ? RouteLegType.finish : RouteLegType.leg,
-        label: _createAngleLabel(secondHeading, 'Près')
+        label: _createAngleLabel(secondHeading, 'Près'),
+        estimatedTime: secondLegTime,
       ));
       print('TACKING DEBUG - Second leg: tacking to target ($secondTack ${secondHeading.toStringAsFixed(1)}°)');
     }
@@ -559,11 +585,16 @@ class RoutingCalculator {
     double heading2 = (heading2Rad * 180 / math.pi) % 360;
     if (heading2 < 0) heading2 += 360;
     
+    final firstJibeLegTime = _estimateTimeToTarget(sx, sy, wp1x, wp1y);
+    final secondJibeLegTime = _estimateTimeToTarget(wp1x, wp1y, ex, ey);
+    
     return [
       RouteLeg(startX: sx, startY: sy, endX: wp1x, endY: wp1y, 
-              type: RouteLegType.leg, label: _createAngleLabel(firstHeading, 'Portant')),
+              type: RouteLegType.leg, label: _createAngleLabel(firstHeading, 'Portant'),
+              estimatedTime: firstJibeLegTime),
       RouteLeg(startX: wp1x, startY: wp1y, endX: ex, endY: ey, 
-              type: finish ? RouteLegType.finish : RouteLegType.leg, label: _createAngleLabel(heading2, 'Portant')),
+              type: finish ? RouteLegType.finish : RouteLegType.leg, label: _createAngleLabel(heading2, 'Portant'),
+              estimatedTime: secondJibeLegTime),
     ];
   }
 

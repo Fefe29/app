@@ -43,6 +43,7 @@ class _HeaderStatus extends ConsumerWidget {
 		final wind = ref.watch(windSampleProvider);
 		final course = ref.watch(courseProvider);
 		final windTrend = ref.watch(windTrendSnapshotProvider);
+		final route = ref.watch(routePlanProvider);
 		
 		// Conditions pour activer le bouton de routage
 		// Maintenant on permet le routage même avec des données non fiables
@@ -61,6 +62,16 @@ class _HeaderStatus extends ConsumerWidget {
 					const SizedBox(width: 16),
 					Text('Vent: ${wind.directionDeg.toStringAsFixed(0)}° / ${wind.speed.toStringAsFixed(1)} nds'),
 					const SizedBox(width: 16),
+					if (!route.isEmpty) ...[
+						Icon(Icons.timer, size: 16, color: Colors.green.shade700),
+						const SizedBox(width: 4),
+						Text('Temps estimé: ${route.formattedTotalTime}', 
+							style: TextStyle(
+								color: Colors.green.shade700,
+								fontWeight: FontWeight.w600,
+							)),
+						const SizedBox(width: 16),
+					],
 					ElevatedButton.icon(
 						onPressed: canRoute ? () {
 							print('CHART_PAGE - Bouton Nouveau routage appuyé');

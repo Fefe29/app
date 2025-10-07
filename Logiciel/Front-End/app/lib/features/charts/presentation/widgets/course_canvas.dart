@@ -205,6 +205,8 @@ class _CoursePainter extends CustomPainter {
       canvas.drawLine(p1, p2, pathPaint);
       // Optionnel : petit marqueur
       final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
+      
+      // Afficher seulement le nom du segment
       _drawText(canvas, _shortLabel(leg), mid + const Offset(4, -10), fontSize: 10, color: Colors.cyan.shade900);
     }
   }
@@ -212,25 +214,25 @@ class _CoursePainter extends CustomPainter {
   void _drawWind(Canvas canvas, Size size) {
     // Flèche montrant la direction VERS laquelle souffle le vent (sens inverse de la provenance).
     // Direction FROM = windDirDeg. Direction TO = windDirDeg + 180°.
-    const arrowLen = 70.0;
+    const arrowLen = 50.0; // Réduit de 70 à 50
     final toDir = (windDirDeg + 180.0) % 360.0;
     final angleRad = toDir * math.pi / 180.0;
     // Vecteur écran (0°=Nord => vers le haut => y négatif) donc : x=sin, y=-cos
     final vx = math.sin(angleRad);
     final vy = -math.cos(angleRad);
 
-    final base = Offset(size.width - margin - arrowLen * 0.2, margin + 10);
+    final base = Offset(size.width - margin - 120, margin + 10); // Décalé plus à gauche
     final tip = base + Offset(vx, vy) * arrowLen;
 
     final shaft = Paint()
-      ..color = Colors.indigo.shade400
-      ..strokeWidth = 4
+      ..color = Colors.black // Changé en noir
+      ..strokeWidth = 3 // Réduit de 4 à 3
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(base, tip, shaft);
 
     // Triangle tête pointant vers la DESTINATION du vent.
-    final headSize = 12.0;
+    final headSize = 10.0; // Réduit de 12 à 10
     final ortho = Offset(-vy, vx);
     final headP1 = tip;
     final headP2 = tip - Offset(vx, vy) * headSize + ortho * (headSize * 0.6);
@@ -241,13 +243,13 @@ class _CoursePainter extends CustomPainter {
       ..lineTo(headP3.dx, headP3.dy)
       ..close();
     final headPaint = Paint()
-      ..color = Colors.indigo.shade300
+      ..color = Colors.black // Changé en noir
       ..style = PaintingStyle.fill;
     canvas.drawPath(headPath, headPaint);
     canvas.drawPath(headPath, shaft);
 
     final label = 'Vent→  from ${windDirDeg.toStringAsFixed(0)}°  ${windSpeed.toStringAsFixed(1)} nds';
-    _drawText(canvas, label, base + const Offset(-210, 8), fontSize: 12, color: Colors.indigo.shade700);
+    _drawText(canvas, label, base + const Offset(-180, 8), fontSize: 12, color: Colors.black87); // Ajusté position et couleur
   }
 
   void _drawLaylines(Canvas canvas, Size size) {
