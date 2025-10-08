@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../charts/providers/course_providers.dart';
@@ -14,6 +16,7 @@ import '../../providers/coordinate_system_provider.dart';
 import 'coordinate_system_config.dart';
 import '../../../../data/datasources/maps/providers/map_providers.dart';
 import '../../../../data/datasources/maps/models/map_tile_set.dart';
+import 'tile_image_service.dart';
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
 class CourseCanvas extends ConsumerWidget {
@@ -29,8 +32,13 @@ class CourseCanvas extends ConsumerWidget {
     final coordinateService = ref.watch(coordinateSystemProvider);
     final maps = ref.watch(mapManagerProvider); // Cartes téléchargées
     
-    // Note: Pour l'instant, on affiche des rectangles colorés pour les cartes
-    // Les vraies images de tuiles seront intégrées dans une version future
+    // DEBUG: Vérification des cartes disponibles
+    print('TILES DEBUG - Nombre de cartes: ${maps.length}');
+    for (var i = 0; i < maps.length; i++) {
+      print('TILES DEBUG - Carte $i: id=${maps[i].id}, status=${maps[i].status}, name=${maps[i].name}');
+    }
+    final completedMaps = maps.where((map) => map.status == MapDownloadStatus.completed).toList();
+    print('TILES DEBUG - Cartes complétées: ${completedMaps.length}');
     
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
       return const Center(
@@ -49,6 +57,32 @@ class CourseCanvas extends ConsumerWidget {
       builder: (context, constraints) {
         return Stack(
           children: [
+            // Chargement et affichage des tuiles de cartes - VERSION DIRECTE POUR TEST
+            FutureBuilder<List<LoadedTile>>(
+              future: _loadTilesDirectly(),
+              builder: (context, snapshot) {
+                print('TILES DEBUG - FutureBuilder: hasData=${snapshot.hasData}, hasError=${snapshot.hasError}');
+                if (snapshot.hasError) {
+                  print('TILES DEBUG - Erreur: ${snapshot.error}');
+                }
+                if (snapshot.hasData) {
+                  print('TILES DEBUG - ${snapshot.data!.length} tuiles chargées pour rendu');
+                  return CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: _TilePainter(
+                      snapshot.data!,
+                      coordinateService,
+                      constraints,
+                    ),
+                  );
+                }
+                // Pendant le chargement : message simple
+                return const Center(
+                  child: Text('Chargement des tuiles...', style: TextStyle(color: Colors.white)),
+                );
+              },
+            ),
+            // Canvas principal avec le parcours
             RepaintBoundary(
               child: CustomPaint(
                 size: Size(constraints.maxWidth, constraints.maxHeight),
@@ -74,6 +108,125 @@ class CourseCanvas extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<List<LoadedTile>> _loadTilesForMap(MapTileSet map) async {
+    print('TILES DEBUG - _loadTilesForMap appelée pour: ${map.id}');
+    // Construire le chemin vers les tuiles de cette carte
+    final mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps/${map.id}';
+    print('TILES DEBUG - Chemin des tuiles: $mapPath');
+    final tiles = await TileImageService.preloadMapTiles(map.id, mapPath);
+    print('TILES DEBUG - ${tiles.length} tuiles chargées pour ${map.id}');
+    return tiles;
+  }
+
+  Future<List<LoadedTile>> _loadTilesDirectly() async {
+    print('TILES DEBUG - _loadTilesDirectly appelée');
+    // Chargement direct des tuiles téléchargées
+    const mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
+    const mapId = 'map_1759955517334_43.535_6.999';
+    print('TILES DEBUG - Chargement direct: $mapPath/$mapId');
+    final tiles = await TileImageService.preloadMapTiles(mapId, mapPath);
+    print('TILES DEBUG - ${tiles.length} tuiles chargées directement');
+    return tiles;
+  }
+}
+
+class _TilePainter extends CustomPainter {
+  _TilePainter(this.tiles, this.coordinateService, this.constraints);
+  
+  final List<LoadedTile> tiles;
+  final CoordinateSystemService coordinateService;
+  final BoxConstraints constraints;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final tile in tiles) {
+      _drawTile(canvas, size, tile);
+    }
+  }
+
+  void _drawTile(Canvas canvas, Size size, LoadedTile tile) {
+    print('TILES DEBUG - Dessin tuile ${tile.x},${tile.y} zoom=${tile.zoom}');
+    
+    try {
+      // Positionnement simple des tuiles : grille 3x5 centrée
+      // Nos tuiles vont de x=17021 à 17023 (3 tuiles) et y=11969 à 11973 (5 tuiles)
+      final minX = 17021;
+      final minY = 11969;
+      final relativeX = tile.x - minX; // 0, 1, 2
+      final relativeY = tile.y - minY; // 0, 1, 2, 3, 4
+      
+      const tileSize = 180.0; // Taille réduite pour bien voir
+      
+      // Centrer la grille sur l'écran
+      final gridWidth = 3 * tileSize;
+      final gridHeight = 5 * tileSize;
+      final startX = (size.width - gridWidth) / 2;
+      final startY = (size.height - gridHeight) / 2;
+      
+      final rect = Rect.fromLTWH(
+        startX + relativeX * tileSize,
+        startY + relativeY * tileSize,
+        tileSize,
+        tileSize,
+      );
+      
+      print('TILES DEBUG - Tuile ${tile.x},${tile.y} -> relative ($relativeX,$relativeY) -> rect: $rect');
+      
+      // Dessiner l'image de la tuile
+      final paint = Paint()
+        ..filterQuality = FilterQuality.medium;
+      
+      canvas.drawImageRect(
+        tile.image,
+        Rect.fromLTWH(0, 0, tile.image.width.toDouble(), tile.image.height.toDouble()),
+        rect,
+        paint,
+      );
+      
+      print('TILES DEBUG - Tuile ${tile.x},${tile.y} dessinée avec succès');
+      
+    } catch (e) {
+      print('TILES DEBUG - Erreur lors du dessin de la tuile ${tile.x},${tile.y}: $e');
+    }
+  }
+
+  /// Convertit les coordonnées de tuile en position géographique
+  GeographicPosition _tileToGeoPosition(int tileX, int tileY, int zoom) {
+    final n = 1 << zoom;
+    final lon = tileX / n * 360.0 - 180.0;
+    final latRad = math.atan((math.exp(math.pi * (1 - 2 * tileY / n)) - math.exp(-math.pi * (1 - 2 * tileY / n))) / 2);
+    final lat = latRad * 180.0 / math.pi;
+    
+    return GeographicPosition(latitude: lat, longitude: lon);
+  }
+
+  /// Calcule la taille d'une tuile à l'écran
+  double _calculateTileScreenSize(int zoom, Size size) {
+    const baseTileSize = 256.0;
+    final scaleFactor = size.width / 1000.0;
+    return baseTileSize * scaleFactor / (1 << (15 - zoom));
+  }
+
+  Offset _project(double x, double y, Size size) {
+    // Projection simple centrée pour les tuiles
+    const margin = 24.0;
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+    
+    // Facteur d'échelle basé sur la taille de l'écran
+    final scale = math.min(size.width, size.height) / 1000.0;
+    
+    final px = centerX + x * scale;
+    final py = centerY - y * scale; // y inversé
+    
+    return Offset(px, py);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TilePainter oldDelegate) {
+    return oldDelegate.tiles != tiles;
   }
 }
 
@@ -186,8 +339,7 @@ class _CoursePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawRect(Offset.zero & size, bg);
 
-    // Dessiner les cartes en arrière-plan
-    _drawMaps(canvas, size);
+        // Les cartes sont maintenant dessinées par _TilePainter en arrière-plan
 
     _drawGrid(canvas, size);
 
@@ -696,68 +848,9 @@ class _CoursePainter extends CustomPainter {
     tp.paint(canvas, position);
   }
 
-  /// Dessine les cartes téléchargées en arrière-plan
-  void _drawMaps(Canvas canvas, Size size) {
-    for (int i = 0; i < maps.length; i++) {
-      final map = maps[i];
-      if (map.status == MapDownloadStatus.completed) {
-        // Pour l'instant, dessiner un rectangle coloré pour indiquer la zone de la carte
-        _drawMapPlaceholder(canvas, size, map);
-      }
-    }
-  }
 
-  /// Dessine un placeholder coloré pour les cartes (temporaire)
-  void _drawMapPlaceholder(Canvas canvas, Size size, MapTileSet map) {
-    final mapBounds = map.bounds;
-    
-    // Convertir les coordonnées géographiques de la carte vers les coordonnées d'écran
-    final topLeftGeo = GeographicPosition(
-      latitude: mapBounds.maxLatitude, 
-      longitude: mapBounds.minLongitude
-    );
-    final bottomRightGeo = GeographicPosition(
-      latitude: mapBounds.minLatitude, 
-      longitude: mapBounds.maxLongitude
-    );
-    
-    try {
-      final topLeftLocal = coordinateService.toLocal(topLeftGeo);
-      final bottomRightLocal = coordinateService.toLocal(bottomRightGeo);
-      
-      final topLeft = _project(topLeftLocal.x, topLeftLocal.y, size);
-      final bottomRight = _project(bottomRightLocal.x, bottomRightLocal.y, size);
-      
-      final rect = Rect.fromPoints(topLeft, bottomRight);
-      
-      // Fond bleu semi-transparent pour la zone de carte
-      final fillPaint = Paint()
-        ..color = Colors.blue.withOpacity(0.1)
-        ..style = PaintingStyle.fill;
-      
-      // Bordure bleue pour délimiter la zone
-      final borderPaint = Paint()
-        ..color = Colors.blue.withOpacity(0.8)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0;
-      
-      canvas.drawRect(rect, fillPaint);
-      canvas.drawRect(rect, borderPaint);
-      
-      // Label de la carte
-      final center = rect.center;
-      _drawText(
-        canvas, 
-        'Carte: ${map.id}',
-        center + const Offset(-30, -8),
-        fontSize: 10,
-        color: Colors.blue.shade800,
-      );
-    } catch (e) {
-      // Si la conversion échoue, ignorer cette carte
-      print('Erreur lors de la conversion des coordonnées de la carte ${map.id}: $e');
-    }
-  }
+
+
   
 
 
@@ -772,6 +865,61 @@ class _CoursePainter extends CustomPainter {
         oldDelegate.coordinateService.config.origin != coordinateService.config.origin ||
         oldDelegate.maps != maps;
   }
+}
+
+/// Painter pour afficher des rectangles bleus placeholder quand les tuiles ne sont pas disponibles
+class _MapPlaceholderPainter extends CustomPainter {
+  const _MapPlaceholderPainter(this.coordinateService);
+  
+  final CoordinateSystemService coordinateService;
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    print('TILES DEBUG - _MapPlaceholderPainter.paint appelé');
+    
+    // Dessiner une grille de rectangles bleus 256x256 comme placeholder
+    final paint = Paint()
+      ..color = Colors.blue.withAlpha(100)
+      ..style = PaintingStyle.fill;
+    
+    final borderPaint = Paint()
+      ..color = Colors.blue.withAlpha(180)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    
+    // Grille 3x3 de rectangles 256x256
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        final rect = Rect.fromLTWH(
+          i * 256.0, 
+          j * 256.0, 
+          256.0, 
+          256.0
+        );
+        
+        // Seulement si le rectangle est visible dans l'écran
+        if (rect.right > 0 && rect.bottom > 0 && 
+            rect.left < size.width && rect.top < size.height) {
+          canvas.drawRect(rect, paint);
+          canvas.drawRect(rect, borderPaint);
+        }
+      }
+    }
+    
+    // Texte informatif
+    final textPainter = TextPainter(
+      text: const TextSpan(
+        text: 'Chargement des tuiles...',
+        style: TextStyle(color: Colors.white, fontSize: 16),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(20, size.height - 50));
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _Bounds {

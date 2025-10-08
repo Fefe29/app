@@ -67,12 +67,12 @@ class CoordinateSystemService {
 class CoordinateSystemNotifier extends Notifier<CoordinateSystemService> {
   @override
   CoordinateSystemService build() {
-    // Default to Mediterranean (can be configured later)
+    // Default to downloaded map area (43.535, 6.999)
     return CoordinateSystemService(
       config: const CoordinateSystemConfig(
-        origin: GeographicPosition(latitude: 43.5, longitude: 7.0),
-        name: 'Méditerranée',
-        description: 'Côte d\'Azur, France',
+        origin: GeographicPosition(latitude: 43.535, longitude: 6.999),
+        name: 'Carte téléchargée',
+        description: 'Zone des tuiles OpenStreetMap téléchargées',
       ),
     );
   }
