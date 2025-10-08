@@ -115,7 +115,7 @@ class CurrentsConfigPresets:
             arrow_scale_degrees=0.1,
             depth_min=0.0,
             depth_max=1.0,
-            output_filename="Logiciel/Front-End/app/lib/app/data/datasources/current/test_currents.geojson"
+            output_filename="Logiciel/Front-End/app/lib/data/datasources/current/repository/test_currents.geojson"
         )
     
     # =========================================================================
@@ -128,7 +128,7 @@ class CurrentsConfigPresets:
             # Zone Bretagne Sud (Golfe du Morbihan, Belle-Île)
             lon_min=-3.5, lon_max=-2.0,
             lat_min=47.0, lat_max=47.8,
-            output_file="Logiciel/Front-End/app/lib/app/data/datasources/current/bretagne_sud_currents.geojson"
+            output_file="Logiciel/Front-End/app/lib/data/datasources/current/repository/bretagne_sud_currents.geojson"
         )
     
     @staticmethod
@@ -137,7 +137,7 @@ class CurrentsConfigPresets:
             # Manche occidentale (Brest à Cherbourg)
             lon_min=-5.0, lon_max=-1.0,
             lat_min=48.0, lat_max=50.0,
-            output_file="Logiciel/Front-End/app/lib/app/data/datasources/current/manche_currents.geojson"
+            output_file="Logiciel/Front-End/app/lib/data/datasources/current/repository/manche_currents.geojson"
         )
     
     @classmethod
@@ -164,7 +164,7 @@ class CurrentsConfigPresets:
             arrow_scale_degrees=arrow_scale,
             depth_min=0.0,
             depth_max=1.0,
-            output_filename="Logiciel/Front-End/app/lib/app/data/datasources/current/atlantique.geojson"
+            output_filename="Logiciel/Front-End/app/lib/data/datasources/current/repository/atlantique.geojson"
         )
     
     @classmethod
@@ -191,7 +191,7 @@ class CurrentsConfigPresets:
             arrow_scale_degrees=arrow_scale,
             depth_min=0.0,
             depth_max=1.0,
-            output_filename="Logiciel/Front-End/app/lib/app/data/datasources/current/gascogne.geojson"
+            output_filename="Logiciel/Front-End/app/lib/data/datasources/current/repository/gascogne.geojson"
         )
     
     # =========================================================================
@@ -223,7 +223,7 @@ class CurrentsConfigPresets:
             arrow_scale_degrees=0.02,
             depth_min=0.0,
             depth_max=1.0,
-            output_filename="Logiciel/Front-End/app/lib/app/data/datasources/current/haute_resolution.geojson"
+            output_filename="Logiciel/Front-End/app/lib/data/datasources/current/repository/haute_resolution.geojson"
         )
     
     @classmethod
@@ -247,7 +247,7 @@ class CurrentsConfigPresets:
             arrow_scale_degrees=0.07,
             depth_min=0.0,
             depth_max=1.0,
-            output_filename="Logiciel/Front-End/app/lib/app/data/datasources/current/prevision_longue.geojson"
+            output_filename="Logiciel/Front-End/app/lib/data/datasources/current/repository/prevision_longue.geojson"
         )
     
     # =========================================================================
@@ -276,7 +276,7 @@ class CurrentsConfigPresets:
             "arrow_scale_degrees": 0.05,
             "depth_min": 0.0,
             "depth_max": 1.0,
-            "output_filename": "Logiciel/Front-End/app/lib/app/data/datasources/current/custom.geojson"
+            "output_filename": "Logiciel/Front-End/app/lib/data/datasources/current/repository/custom.geojson"
         }
         defaults.update(kwargs)
         
