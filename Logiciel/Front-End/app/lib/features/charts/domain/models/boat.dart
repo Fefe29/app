@@ -3,14 +3,14 @@
 /// et la table de polaires associée.
 /// \n
 import 'polar_table.dart';
+import 'geographic_position.dart';
 
 class Boat {
   Boat({
     required this.lengthMeters,
     required this.beamMeters,
     required this.draftMeters,
-    required this.x,
-    required this.y,
+    required this.position,
     required this.polars,
   });
 
@@ -18,35 +18,62 @@ class Boat {
   double beamMeters; // Largeur
   double draftMeters; // Tirant d'eau
 
-  double x; // Coordonnée X courante
-  double y; // Coordonnée Y courante
-
+  GeographicPosition position; // Position géographique courante
+  
   final PolarTable? polars; // Peut être null si non chargé
 
-  final List<double> _historyX = [];
-  final List<double> _historyY = [];
+  final List<GeographicPosition> _positionHistory = [];
+
+  /// Legacy getters for compatibility with existing code
+  double get x => tempLocalPos?.x ?? 0.0;
+  double get y => tempLocalPos?.y ?? 0.0;
+  
+  /// Temporary local position for backward compatibility
+  LocalPosition? tempLocalPos;
+
+  /// Legacy constructor (will be removed after migration)
+  Boat.legacy({
+    required this.lengthMeters,
+    required this.beamMeters,
+    required this.draftMeters,
+    required double x,
+    required double y,
+    required this.polars,
+  }) : position = const GeographicPosition(latitude: 0, longitude: 0),
+       tempLocalPos = LocalPosition(x: x, y: y);
 
   /// Enregistre la position actuelle dans l'historique.
   void snapshotPosition() {
-    _historyX.add(x);
-    _historyY.add(y);
+    _positionHistory.add(position);
   }
 
   /// Met à jour la position et garde une trace historique (optionnel).
-  void moveTo(double newX, double newY, {bool record = true}) {
-    x = newX;
-    y = newY;
+  void moveTo(GeographicPosition newPosition, {bool record = true}) {
+    position = newPosition;
     if (record) snapshotPosition();
   }
 
-  /// Retourne les coordonnées courantes.
-  List<double> get position => [x, y];
+  /// Legacy moveTo with x/y coordinates
+  void moveToXY(double newX, double newY, {bool record = true}) {
+    tempLocalPos = LocalPosition(x: newX, y: newY);
+    if (record) {
+      // For legacy compatibility, we'll create a fake geographic position
+      _positionHistory.add(position);
+    }
+  }
 
-  /// Historique X (copie non modifiable).
-  List<double> get historyX => List.unmodifiable(_historyX);
+  /// Retourne la position géographique courante.
+  GeographicPosition get currentPosition => position;
 
-  /// Historique Y (copie non modifiable).
-  List<double> get historyY => List.unmodifiable(_historyY);
+  /// Legacy position getter
+  List<double> get legacyPosition => [x, y];
+
+  /// Historique des positions (copie non modifiable).
+  List<GeographicPosition> get positionHistory => List.unmodifiable(_positionHistory);
+
+  /// Legacy history getters for backward compatibility
+  List<double> get historyX => _positionHistory.map((pos) => pos.longitude).toList();
+  List<double> get historyY => _positionHistory.map((pos) => pos.latitude).toList();
 
   /// Affiche (console) les informations principales du bateau.
   void printInfo() {

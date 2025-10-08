@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/services/routing_calculator.dart';
 import 'course_providers.dart';
 import 'polar_providers.dart';
+import 'coordinate_system_provider.dart';
 import 'package:kornog/common/providers/app_providers.dart';
 import 'wind_trend_provider.dart';
 import '../domain/services/wind_trend_analyzer.dart';
@@ -35,6 +36,7 @@ final _routingCalculatorProvider = Provider<RoutingCalculator>((ref) {
   final wind = ref.watch(windSampleProvider); // fournit TWD et TWS
   final vmc = ref.watch(vmcUpwindProvider);
   final twaSigned = ref.watch(metricProvider('wind.twa')).maybeWhen(data: (m) => m.value, orElse: () => null);
+  final coordinateService = ref.watch(coordinateSystemProvider);
   
   // Calcul de l'angle optimal basé sur la force du vent
   final optimalFromWind = _calculateOptimalUpwindAngle(wind.speed);
@@ -48,6 +50,7 @@ final _routingCalculatorProvider = Provider<RoutingCalculator>((ref) {
   }
   
   return RoutingCalculator(
+    coordinateService: coordinateService,
     windDirDeg: wind.directionDeg,
     windSpeed: wind.speed,
     optimalUpwindAngle: upwind,

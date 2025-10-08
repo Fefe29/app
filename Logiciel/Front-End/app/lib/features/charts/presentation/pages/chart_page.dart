@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
 import '../widgets/course_canvas.dart';
 import '../widgets/course_menu.dart';
+import '../widgets/coordinate_system_config.dart';
 import '../../providers/wind_trend_provider.dart';
 
 
@@ -94,6 +95,16 @@ class _HeaderStatus extends ConsumerWidget {
 						),
 					),
 					const Spacer(),
+					IconButton(
+						onPressed: () {
+							showDialog(
+								context: context,
+								builder: (context) => const CoordinateSystemConfigDialog(),
+							);
+						},
+						icon: const Icon(Icons.map, size: 18),
+						tooltip: 'Configuration des coordonnées géographiques',
+					),
 					TextButton.icon(
 						onPressed: () {
 							// TODO: import fichier / asset

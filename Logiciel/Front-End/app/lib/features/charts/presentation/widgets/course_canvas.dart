@@ -11,6 +11,9 @@ import 'package:kornog/common/providers/app_providers.dart';
 import '../../../charts/providers/polar_providers.dart';
 import '../../../charts/providers/wind_trend_provider.dart';
 import '../../../charts/domain/services/wind_trend_analyzer.dart';
+import '../../domain/models/geographic_position.dart';
+import '../../providers/coordinate_system_provider.dart';
+import 'coordinate_system_config.dart';
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
 class CourseCanvas extends ConsumerWidget {
@@ -18,28 +21,51 @@ class CourseCanvas extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-  final course = ref.watch(courseProvider);
-  final route = ref.watch(routePlanProvider);
-  final wind = ref.watch(windSampleProvider);
-  final vmcUp = ref.watch(vmcUpwindProvider); // Pour laylines (angle optimal de près)
-  final windTrend = ref.watch(windTrendSnapshotProvider); // Analyse des tendances de vent
+    final course = ref.watch(courseProvider);
+    final route = ref.watch(routePlanProvider);
+    final wind = ref.watch(windSampleProvider);
+    final vmcUp = ref.watch(vmcUpwindProvider); // Pour laylines (angle optimal de près)
+    final windTrend = ref.watch(windTrendSnapshotProvider); // Analyse des tendances de vent
+    final coordinateService = ref.watch(coordinateSystemProvider);
+    
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
-      return const Center(child: Text('Aucune bouée / ligne'));
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Aucune bouée / ligne'),
+            SizedBox(height: 16),
+            CoordinateSystemInfo(),
+          ],
+        ),
+      );
     }
+    
     return LayoutBuilder(
       builder: (context, constraints) {
-        return RepaintBoundary(
-          child: CustomPaint(
-            size: Size(constraints.maxWidth, constraints.maxHeight),
-            painter: _CoursePainter(
-              course,
-              route,
-              wind.directionDeg,
-              wind.speed,
-              vmcUp?.angleDeg,
-              windTrend,
+        return Stack(
+          children: [
+            RepaintBoundary(
+              child: CustomPaint(
+                size: Size(constraints.maxWidth, constraints.maxHeight),
+                painter: _CoursePainter(
+                  course,
+                  route,
+                  wind.directionDeg,
+                  wind.speed,
+                  vmcUp?.angleDeg,
+                  windTrend,
+                  coordinateService,
+                ),
+              ),
             ),
-          ),
+            // Coordinate system info overlay
+            const Positioned(
+              top: 8,
+              right: 8,
+              child: CoordinateSystemInfo(),
+            ),
+          ],
         );
       },
     );
@@ -54,6 +80,7 @@ class _CoursePainter extends CustomPainter {
     this.windSpeed,
     this.upwindOptimalAngle,
     this.windTrend,
+    this.coordinateService,
   );
   final CourseState state;
   final RoutePlan route;
@@ -61,6 +88,7 @@ class _CoursePainter extends CustomPainter {
   final double windSpeed; // nds
   final double? upwindOptimalAngle; // angle (°) par rapport au vent pour meilleure VMG près
   final WindTrendSnapshot windTrend; // Analyse des tendances de vent
+  final CoordinateSystemService coordinateService;
 
   static const double margin = 24.0; // logical px margin inside canvas
   static const double buoyRadius = 8.0;
@@ -70,16 +98,40 @@ class _CoursePainter extends CustomPainter {
   _Bounds _computeBounds() {
     final xs = <double>[];
     final ys = <double>[];
+    
+    // Convert geographic positions to local coordinates for display
+    final converter = CoordinateConverter(origin: coordinateService.config.origin);
+    
     for (final b in state.buoys) {
-      xs..add(b.x);
-      ys..add(b.y);
+      LocalPosition localPos;
+      if (b.tempLocalPos != null) {
+        // Legacy format - use temporary local position
+        localPos = b.tempLocalPos!;
+      } else {
+        // Geographic format - convert to local
+        localPos = converter.geographicToLocal(b.position);
+      }
+      xs.add(localPos.x);
+      ys.add(localPos.y);
     }
+    
     for (final l in [state.startLine, state.finishLine]) {
       if (l != null) {
-        xs..add(l.p1x)..add(l.p2x);
-        ys..add(l.p1y)..add(l.p2y);
+        LocalPosition p1, p2;
+        if (l.tempLocalP1 != null && l.tempLocalP2 != null) {
+          // Legacy format
+          p1 = l.tempLocalP1!;
+          p2 = l.tempLocalP2!;
+        } else {
+          // Geographic format
+          p1 = converter.geographicToLocal(l.point1);
+          p2 = converter.geographicToLocal(l.point2);
+        }
+        xs.addAll([p1.x, p2.x]);
+        ys.addAll([p1.y, p2.y]);
       }
     }
+    
     if (xs.isEmpty || ys.isEmpty) {
       return const _Bounds(0, 100, 0, 100); // default square
     }
@@ -154,8 +206,11 @@ class _CoursePainter extends CustomPainter {
   void _drawLines(Canvas canvas, Size size) {
     for (final line in [state.startLine, state.finishLine]) {
       if (line == null) continue;
-      final p1 = _project(line.p1x, line.p1y, size);
-      final p2 = _project(line.p2x, line.p2y, size);
+      // Convert geographic coordinates to local for projection
+      final localP1 = coordinateService.toLocal(line.point1);
+      final localP2 = coordinateService.toLocal(line.point2);
+      final p1 = _project(localP1.x, localP1.y, size);
+      final p2 = _project(localP2.x, localP2.y, size);
       final paint = Paint()
         ..strokeWidth = line.type == LineType.start ? 4 : 3
         ..style = PaintingStyle.stroke
@@ -175,7 +230,9 @@ class _CoursePainter extends CustomPainter {
 
   void _drawBuoys(Canvas canvas, Size size) {
     for (final b in state.buoys) {
-      final p = _project(b.x, b.y, size);
+      // Convert geographic coordinates to local for projection
+      final localPos = coordinateService.toLocal(b.position);
+      final p = _project(localPos.x, localPos.y, size);
       final colors = _colorsForRole(b.role);
       final fill = Paint()
         ..style = PaintingStyle.fill
@@ -253,60 +310,108 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawLaylines(Canvas canvas, Size size) {
-    if (upwindOptimalAngle == null) return;
-    // Dessine les laylines de près (vert) et de portant (orange)
-    // Origine : première bouée régulière (bouée au vent pour les laylines), sinon centre bounding box
-    double oxUpwind;
-    double oyUpwind;
-    double oxDownwind;
-    double oyDownwind;
+    if (upwindOptimalAngle == null || windDirDeg == null) return;
     
-    // Chercher les bouées régulières (par ordre de passage)
+    // Pour l'instant, analyse simplifiée : laylines de près sur premières bouées, portant sur dernières
     final regularBuoys = state.buoys.where((b) => b.role == BuoyRole.regular).toList();
-    if (regularBuoys.isNotEmpty) {
-      // Trier par passageOrder puis par id
-      regularBuoys.sort((a, b) {
-        final ao = a.passageOrder;
-        final bo = b.passageOrder;
-        if (ao != null && bo != null) {
-          final c = ao.compareTo(bo);
-          if (c != 0) return c;
-        } else if (ao != null) {
-          return -1;
-        } else if (bo != null) {
-          return 1;
-        }
-        return a.id.compareTo(b.id);
-      });
+    if (regularBuoys.isEmpty) return;
+    
+    // Trier par passageOrder puis par id
+    regularBuoys.sort((a, b) {
+      final ao = a.passageOrder;
+      final bo = b.passageOrder;
+      if (ao != null && bo != null) {
+        final c = ao.compareTo(bo);
+        if (c != 0) return c;
+      } else if (ao != null) {
+        return -1;
+      } else if (bo != null) {
+        return 1;
+      }
+      return a.id.compareTo(b.id);
+    });
+    
+    // Analyse simplifiée du parcours selon la direction générale du vent
+    for (int i = 0; i < regularBuoys.length; i++) {
+      final buoy = regularBuoys[i];
+      final buoyLocal = coordinateService.toLocal(buoy.position);
       
-      // Première bouée pour les laylines de près
-      final firstBuoy = regularBuoys.first;
-      oxUpwind = firstBuoy.x;
-      oyUpwind = firstBuoy.y;
+      // Analyser le type de bord pour atteindre cette bouée
+      final legType = _analyzeLegTowardsBuoy(buoy, i == 0 ? null : regularBuoys[i - 1]);
       
-      // Dernière bouée pour les laylines de portant
-      final lastBuoy = regularBuoys.last;
-      oxDownwind = lastBuoy.x;
-      oyDownwind = lastBuoy.y;
-    } else if (state.buoys.isNotEmpty) {
-      final first = state.buoys.first;
-      oxUpwind = first.x;
-      oyUpwind = first.y;
-      oxDownwind = first.x;
-      oyDownwind = first.y;
-    } else {
-      // centre des bounds
-      oxUpwind = (_bounds.minX + _bounds.maxX) / 2;
-      oyUpwind = (_bounds.minY + _bounds.maxY) / 2;
-      oxDownwind = oxUpwind;
-      oyDownwind = oyUpwind;
+      if (legType == 'PRÈS') {
+        // Si on fait du près pour atteindre cette bouée → laylines de près depuis cette bouée
+        _drawUpwindLaylines(canvas, size, buoyLocal.x, buoyLocal.y, 'B${buoy.id}');
+      } else if (legType == 'PORTANT') {
+        // Si on fait du portant pour atteindre cette bouée → laylines de portant depuis cette bouée
+        _drawDownwindLaylines(canvas, size, buoyLocal.x, buoyLocal.y, 'B${buoy.id}');
+      }
     }
+  }
+  
+  /// Analyse le type de bord nécessaire pour atteindre une bouée
+  String? _analyzeLegTowardsBuoy(Buoy targetBuoy, Buoy? previousBuoy) {
+    if (windDirDeg == null || upwindOptimalAngle == null) return null;
+    
+    // Déterminer le point de départ
+    GeographicPosition startPos;
+    if (previousBuoy == null) {
+      // Premier bord : depuis la ligne de départ ou point arbitraire
+      if (state.startLine != null) {
+        final lat = (state.startLine!.point1.latitude + state.startLine!.point2.latitude) / 2;
+        final lon = (state.startLine!.point1.longitude + state.startLine!.point2.longitude) / 2;
+        startPos = GeographicPosition(latitude: lat, longitude: lon);
+      } else {
+        // Point arbitraire au sud de la bouée
+        startPos = GeographicPosition(
+          latitude: targetBuoy.position.latitude - 0.01,
+          longitude: targetBuoy.position.longitude,
+        );
+      }
+    } else {
+      startPos = previousBuoy.position;
+    }
+    
+    // Calculer le bearing requis et le TWA
+    final startLocal = coordinateService.toLocal(startPos);
+    final endLocal = coordinateService.toLocal(targetBuoy.position);
+    
+    final dx = endLocal.x - startLocal.x;
+    final dy = endLocal.y - startLocal.y;
+    final dist = math.sqrt(dx * dx + dy * dy);
+    
+    if (dist < 1e-6) return null;
+    
+    // Heading géographique (0=N, 90=E)
+    final headingRad = math.atan2(dx, dy);
+    double headingDeg = (headingRad * 180 / math.pi) % 360;
+    if (headingDeg < 0) headingDeg += 360;
+    
+    // Calculer le TWA théorique
+    double theoreticalTWA = (headingDeg - windDirDeg!) % 360;
+    if (theoreticalTWA > 180) theoreticalTWA -= 360;
+    if (theoreticalTWA < -180) theoreticalTWA += 360;
+    
+    final absTWA = theoreticalTWA.abs();
+    
+    // Déterminer le type de bord
+    if (absTWA < upwindOptimalAngle!) {
+      return 'PRÈS';
+    } else if (absTWA > 150) {
+      return 'PORTANT';
+    }
+    return null; // Pas de laylines pour le travers
+  }
 
-  // windDirDeg représente la DIRECTION D'OU PROVIENT le vent (FROM). Pour remonter au vent,
-  // les laylines montrent la DIRECTION DE NAVIGATION du bateau (cap + 180° par rapport au vent).
-  // Caps de navigation au près = (windDirDeg + 180°) +/- upwindOptimalAngle.
-  final heading1 = (windDirDeg + 180.0 - upwindOptimalAngle!) % 360.0; // tack bâbord 
-  final heading2 = (windDirDeg + 180.0 + upwindOptimalAngle!) % 360.0; // tack tribord
+
+
+  /// Dessine les laylines de près depuis une bouée
+  void _drawUpwindLaylines(Canvas canvas, Size size, double ox, double oy, String buoyLabel) {
+    // windDirDeg représente la DIRECTION D'OU PROVIENT le vent (FROM). Pour remonter au vent,
+    // les laylines montrent la DIRECTION DE NAVIGATION du bateau (cap + 180° par rapport au vent).
+    // Caps de navigation au près = (windDirDeg + 180°) +/- upwindOptimalAngle.
+    final heading1 = (windDirDeg! + 180.0 - upwindOptimalAngle!) % 360.0; // tack bâbord 
+    final heading2 = (windDirDeg! + 180.0 + upwindOptimalAngle!) % 360.0; // tack tribord
 
     final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.minY);
     final length = maxSpan * 1.2; // un peu plus grand que le terrain
@@ -316,9 +421,9 @@ class _CoursePainter extends CustomPainter {
       // Convertir heading (0=N) en vecteur coordonnées logiques (Y vers le haut) : x=sin, y=cos
       final vx = math.sin(rad);
       final vy = math.cos(rad);
-      final ex = oxUpwind + vx * length;
-      final ey = oyUpwind + vy * length;
-      final p1 = _project(oxUpwind, oyUpwind, size);
+      final ex = ox + vx * length;
+      final ey = oy + vy * length;
+      final p1 = _project(ox, oy, size);
       final p2 = _project(ex, ey, size);
       final paint = Paint()
         ..color = color
@@ -328,47 +433,54 @@ class _CoursePainter extends CustomPainter {
       const dash = 10.0;
       const gap = 6.0;
       final total = (p2 - p1).distance;
-      final dir = (p2 - p1) / total;
-      double dist = 0;
-      while (dist < total) {
-        final s = p1 + dir * dist;
-        final e = p1 + dir * math.min(dist + dash, total);
-        canvas.drawLine(s, e, paint);
-        dist += dash + gap;
+      if (total > 0) {
+        final dir = (p2 - p1) / total;
+        double dist = 0;
+        while (dist < total) {
+          final s = p1 + dir * dist;
+          final e = p1 + dir * math.min(dist + dash, total);
+          canvas.drawLine(s, e, paint);
+          dist += dash + gap;
+        }
+        
+        // Afficher l'angle de la layline
+        final midPoint = p1 + dir * (total * 0.6); // Position à 60% de la ligne
+        final displayAngle = (headingDeg + 180) % 360;
+        _drawText(
+          canvas,
+          '${displayAngle.toStringAsFixed(0)}° $side ($buoyLabel)',
+          midPoint + const Offset(5, -10),
+          fontSize: 9,
+          color: color.withOpacity(0.9),
+        );
       }
-      
-      // Afficher l'angle de la layline
-      final midPoint = p1 + dir * (total * 0.6); // Position à 60% de la ligne
-      final displayAngle = (headingDeg + 180) % 360;
-      _drawText(
-        canvas,
-        '${displayAngle.toStringAsFixed(0)}° $side',
-        midPoint + const Offset(5, -10),
-        fontSize: 10,
-        color: color.withOpacity(0.9),
-      );
     }
 
     drawUpwindLay(heading1, Colors.lightGreenAccent.shade400, 'Bb');  // Bâbord
     drawUpwindLay(heading2, Colors.lightGreenAccent.shade700, 'Tb');  // Tribord
-    
-    // LAYLINES DE PORTANT - partent de la dernière bouée et remontent
+  }
+
+  /// Dessine les laylines de portant depuis une bouée
+  void _drawDownwindLaylines(Canvas canvas, Size size, double ox, double oy, String buoyLabel) {
     // Angle optimal de portant (typiquement 140-160° TWA)
     const optimalDownwindAngle = 150.0;
     
     // Caps au portant optimaux inversés (navigation depuis la bouée de portant VERS le haut)
     // Avec inversion tribord/bâbord et ajout de 180° pour corriger le sens
-    final downwindHeading1 = (windDirDeg + 180.0 + optimalDownwindAngle) % 360.0; // tribord portant inversé -> bâbord
-    final downwindHeading2 = (windDirDeg + 180.0 - optimalDownwindAngle) % 360.0; // bâbord portant inversé -> tribord
+    final downwindHeading1 = (windDirDeg! + 180.0 + optimalDownwindAngle) % 360.0; // tribord portant inversé -> bâbord
+    final downwindHeading2 = (windDirDeg! + 180.0 - optimalDownwindAngle) % 360.0; // bâbord portant inversé -> tribord
+    
+    final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.minY);
+    final length = maxSpan * 1.2; // un peu plus grand que le terrain
     
     void drawDownwindLay(double headingDeg, Color color, String side) {
       final rad = headingDeg * math.pi / 180.0;
       // Convertir heading (0=N) en vecteur coordonnées logiques (Y vers le haut) : x=sin, y=cos
       final vx = math.sin(rad);
       final vy = math.cos(rad);
-      final ex = oxDownwind + vx * length;
-      final ey = oyDownwind + vy * length;
-      final p1 = _project(oxDownwind, oyDownwind, size);
+      final ex = ox + vx * length;
+      final ey = oy + vy * length;
+      final p1 = _project(ox, oy, size);
       final p2 = _project(ex, ey, size);
       final paint = Paint()
         ..color = color
@@ -378,25 +490,27 @@ class _CoursePainter extends CustomPainter {
       const dash = 8.0;
       const gap = 8.0;
       final total = (p2 - p1).distance;
-      final dir = (p2 - p1) / total;
-      double dist = 0;
-      while (dist < total) {
-        final s = p1 + dir * dist;
-        final e = p1 + dir * math.min(dist + dash, total);
-        canvas.drawLine(s, e, paint);
-        dist += dash + gap;
+      if (total > 0) {
+        final dir = (p2 - p1) / total;
+        double dist = 0;
+        while (dist < total) {
+          final s = p1 + dir * dist;
+          final e = p1 + dir * math.min(dist + dash, total);
+          canvas.drawLine(s, e, paint);
+          dist += dash + gap;
+        }
+        
+        // Afficher l'angle de la layline (avec correction de 180° car on remonte)
+        final midPoint = p1 + dir * (total * 0.4); // Position à 40% pour éviter chevauchement avec près
+        final displayAngle = headingDeg; // Pas de +180 car déjà corrigé dans le calcul du cap
+        _drawText(
+          canvas,
+          '${displayAngle.toStringAsFixed(0)}° $side ($buoyLabel)',
+          midPoint + const Offset(5, 8),
+          fontSize: 9,
+          color: color.withOpacity(0.9),
+        );
       }
-      
-      // Afficher l'angle de la layline (avec correction de 180° car on remonte)
-      final midPoint = p1 + dir * (total * 0.4); // Position à 40% pour éviter chevauchement avec près
-      final displayAngle = headingDeg; // Pas de +180 car déjà corrigé dans le calcul du cap
-      _drawText(
-        canvas,
-        '${displayAngle.toStringAsFixed(0)}° $side',
-        midPoint + const Offset(5, 8),
-        fontSize: 10,
-        color: color.withOpacity(0.9),
-      );
     }
     
     drawDownwindLay(downwindHeading1, Colors.orangeAccent.shade400, 'Bb↑');  // Bâbord portant remontant (inversé)
@@ -544,9 +658,22 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawBoundsInfo(Canvas canvas, Size size) {
-    final txt = 'X:[${_bounds.minX.toStringAsFixed(1)} ; ${_bounds.maxX.toStringAsFixed(1)}]  '
-        'Y:[${_bounds.minY.toStringAsFixed(1)} ; ${_bounds.maxY.toStringAsFixed(1)}]';
-    _drawText(canvas, txt, Offset(8, size.height - 18), fontSize: 11, color: Colors.blueGrey);
+    // Convert bounds back to geographic coordinates for display
+    final converter = CoordinateConverter(origin: coordinateService.config.origin);
+    final southWest = converter.localToGeographic(LocalPosition(x: _bounds.minX, y: _bounds.minY));
+    final northEast = converter.localToGeographic(LocalPosition(x: _bounds.maxX, y: _bounds.maxY));
+    
+    final localTxt = 'Locale: X:[${_bounds.minX.toStringAsFixed(1)}m ; ${_bounds.maxX.toStringAsFixed(1)}m]  '
+        'Y:[${_bounds.minY.toStringAsFixed(1)}m ; ${_bounds.maxY.toStringAsFixed(1)}m]';
+    
+    final geoTxt = 'Géo: Lat:[${southWest.latitude.toStringAsFixed(4)}° ; ${northEast.latitude.toStringAsFixed(4)}°]  '
+        'Lon:[${southWest.longitude.toStringAsFixed(4)}° ; ${northEast.longitude.toStringAsFixed(4)}°]';
+    
+    // Local coordinates
+    _drawText(canvas, localTxt, Offset(8, size.height - 34), fontSize: 10, color: Colors.blueGrey);
+    
+    // Geographic coordinates  
+    _drawText(canvas, geoTxt, Offset(8, size.height - 18), fontSize: 10, color: Colors.green.shade600);
   }
 
   void _drawText(Canvas canvas, String text, Offset position, {double fontSize = 14, Color color = Colors.black}) {
@@ -565,7 +692,8 @@ class _CoursePainter extends CustomPainter {
         oldDelegate.windDirDeg != windDirDeg ||
         oldDelegate.windSpeed != windSpeed ||
         oldDelegate.upwindOptimalAngle != upwindOptimalAngle ||
-        oldDelegate.windTrend != windTrend;
+        oldDelegate.windTrend != windTrend ||
+        oldDelegate.coordinateService.config.origin != coordinateService.config.origin;
   }
 }
 

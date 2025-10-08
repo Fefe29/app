@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'package:kornog/common/utils/angle_utils.dart';
 
 import '../../domain/models/course.dart';
+import '../../domain/models/geographic_position.dart';
+import '../../providers/coordinate_system_provider.dart';
 import 'wind_trend_analyzer.dart';
 
 /// Type de segment parcouru par le routage.
@@ -64,6 +66,7 @@ class RoutingCalculator {
   double? optimalUpwindAngle; // angle TWA optimum (ex: 40°)
   double? currentTwaSigned; // TWA signé courant (-180..180) provenant télémétrie
   PolarData? polarData; // données de polaire pour calculs de vitesse
+  CoordinateSystemService coordinateService; // Service pour conversion géographique ↔ locale
 
   RoutingCalculator({
     this.windDirDeg, 
@@ -71,7 +74,37 @@ class RoutingCalculator {
     this.optimalUpwindAngle, 
     this.currentTwaSigned,
     this.polarData,
+    required this.coordinateService,
   });
+
+  /// Convertit une bouée en coordonnées locales pour les calculs
+  math.Point<double> _buoyToLocalPoint(Buoy buoy) {
+    // Si la bouée utilise encore les coordonnées legacy, les utiliser
+    if (buoy.tempLocalPos != null) {
+      return math.Point(buoy.tempLocalPos!.x, buoy.tempLocalPos!.y);
+    }
+    // Sinon, convertir les coordonnées géographiques en locales
+    final localPos = coordinateService.toLocal(buoy.position);
+    return math.Point(localPos.x, localPos.y);
+  }
+
+  /// Convertit une ligne en points locaux pour les calculs
+  (math.Point<double>, math.Point<double>) _lineToLocalPoints(LineSegment line) {
+    // Si la ligne utilise encore les coordonnées legacy, les utiliser
+    if (line.tempLocalP1 != null && line.tempLocalP2 != null) {
+      return (
+        math.Point(line.tempLocalP1!.x, line.tempLocalP1!.y),
+        math.Point(line.tempLocalP2!.x, line.tempLocalP2!.y),
+      );
+    }
+    // Sinon, convertir les coordonnées géographiques en locales
+    final localP1 = coordinateService.toLocal(line.point1);
+    final localP2 = coordinateService.toLocal(line.point2);
+    return (
+      math.Point(localP1.x, localP1.y),
+      math.Point(localP2.x, localP2.y),
+    );
+  }
 
   RoutePlan compute(CourseState course, {WindTrendSnapshot? windTrend}) {
     print('COMPUTE ROUTING - Début du calcul de route');
@@ -108,8 +141,9 @@ class RoutingCalculator {
       curX = optimalStart.x;
       curY = optimalStart.y;
     } else if (regular.isNotEmpty) {
-      curX = regular.first.x;
-      curY = regular.first.y;
+      final firstPoint = _buoyToLocalPoint(regular.first);
+      curX = firstPoint.x;
+      curY = firstPoint.y;
     }
 
     // Ajoute segment début -> première bouée seulement si départ existe et qu'on a des bouées
@@ -119,27 +153,29 @@ class RoutingCalculator {
       final startMidY = curY!;
         // Fallback route directe - UTILISER le système de routing avec tacks
       // Route directe avec système de routing tactique
-      print('ROUTING DEBUG - Creating Start->B1 segment: ($startMidX,$startMidY) -> (${first.x},${first.y})');
-      final seg = _routeLegWithTacksIfNeeded(startMidX, startMidY, first.x, first.y, label: 'Start->B${first.id}', windTrend: windTrend);
+      final firstPoint = _buoyToLocalPoint(first);
+      print('ROUTING DEBUG - Creating Start->B1 segment: ($startMidX,$startMidY) -> (${firstPoint.x},${firstPoint.y})');
+      final seg = _routeLegWithTacksIfNeeded(startMidX, startMidY, firstPoint.x, firstPoint.y, label: 'Start->B${first.id}', windTrend: windTrend);
       print('ROUTING DEBUG - Start->B1 segments created: ${seg.length}');
       legs.addAll(seg);
-      curX = first.x;
-      curY = first.y;
+      curX = firstPoint.x;
+      curY = firstPoint.y;
     }
 
     // Parcours bouées régulières restantes
     for (var i = 0; i < regular.length; i++) {
       final b = regular[i];
+      final buoyPoint = _buoyToLocalPoint(b);
       if (curX == null || curY == null) {
-        curX = b.x;
-        curY = b.y;
+        curX = buoyPoint.x;
+        curY = buoyPoint.y;
         continue; // pas de segment initial
       }
-      if (curX == b.x && curY == b.y) continue; // déjà positionné
-      final seg = _routeLegWithTacksIfNeeded(curX, curY, b.x, b.y, label: 'B->B${b.id}', windTrend: windTrend);
+      if (curX == buoyPoint.x && curY == buoyPoint.y) continue; // déjà positionné
+      final seg = _routeLegWithTacksIfNeeded(curX, curY, buoyPoint.x, buoyPoint.y, label: 'B->B${b.id}', windTrend: windTrend);
       legs.addAll(seg);
-      curX = b.x;
-      curY = b.y;
+      curX = buoyPoint.x;
+      curY = buoyPoint.y;
     }
 
     // Le viseur (target) ne fait pas partie de la séquence de course
@@ -172,8 +208,7 @@ class RoutingCalculator {
   /// Détermine le point optimal de la ligne de départ
   /// Choisit P1 ou P2 selon la proximité avec la première bouée et les conditions tactiques
   math.Point<double> _getOptimalStartPoint(LineSegment startLine, List<Buoy> regular, WindTrendSnapshot? windTrend) {
-    final p1 = math.Point(startLine.p1x, startLine.p1y);
-    final p2 = math.Point(startLine.p2x, startLine.p2y);
+    final (p1, p2) = _lineToLocalPoints(startLine);
     
     if (regular.isEmpty) {
       // Pas de bouée, prendre le milieu par défaut
@@ -181,7 +216,7 @@ class RoutingCalculator {
     }
     
     final firstBuoy = regular.first;
-    final targetPoint = math.Point(firstBuoy.x, firstBuoy.y);
+    final targetPoint = _buoyToLocalPoint(firstBuoy);
     
     // Calcul des temps de parcours réels depuis chaque extrémité
     final timeFromP1 = _estimateTimeToTarget(p1.x, p1.y, targetPoint.x, targetPoint.y);
@@ -210,8 +245,7 @@ class RoutingCalculator {
   /// Détermine le point optimal de la ligne d'arrivée
   /// Choisit P1 ou P2 selon le temps de parcours minimal depuis la dernière position
   math.Point<double> _getOptimalFinishPoint(LineSegment finishLine, double lastX, double lastY) {
-    final p1 = math.Point(finishLine.p1x, finishLine.p1y);
-    final p2 = math.Point(finishLine.p2x, finishLine.p2y);
+    final (p1, p2) = _lineToLocalPoints(finishLine);
     
     // Calcul des temps de parcours réels vers chaque extrémité
     final timeToP1 = _estimateTimeToTarget(lastX, lastY, p1.x, p1.y);

@@ -2,8 +2,10 @@
 /// See ARCHITECTURE_DOCS.md (section: course_menu.dart).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/course_providers.dart';
 import '../../domain/models/course.dart';
+import '../../providers/course_providers.dart';
+import 'geographic_buoy_dialog.dart';
+import 'geographic_line_dialog.dart';
 
 /// Menu déroulant permettant d'ajouter / modifier des bouées.
 class CourseMenuButton extends ConsumerWidget {
@@ -74,219 +76,31 @@ class CourseMenuButton extends ConsumerWidget {
     );
     
     if (action != null) {
-      await _openBuoyDialog(context, ref, role: BuoyRole.regular);
+      await showDialog(
+        context: context,
+        builder: (context) => const GeographicBuoyDialog(role: BuoyRole.regular),
+      );
     }
   }
 
   Future<void> _openStartLineDialog(BuildContext context, WidgetRef ref) async {
-    // Controllers pour les champs de texte
-    final viseurXController = TextEditingController();
-    final viseurYController = TextEditingController();
-    final committeeXController = TextEditingController();
-    final committeeYController = TextEditingController();
-
-    // Si une ligne de départ existe déjà, pré-remplir avec les valeurs actuelles
     final course = ref.read(courseProvider);
-    if (course.startLine != null) {
-      viseurXController.text = course.startLine!.p1x.toStringAsFixed(1);
-      viseurYController.text = course.startLine!.p1y.toStringAsFixed(1);
-      committeeXController.text = course.startLine!.p2x.toStringAsFixed(1);
-      committeeYController.text = course.startLine!.p2y.toStringAsFixed(1);
-    }
-    
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ligne de départ'),
-        content: SizedBox(
-          width: 350,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Renseignez les positions du viseur et du comité :'),
-              const SizedBox(height: 16),
-              
-              // Position du viseur
-              const Text('Position du viseur :', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: viseurXController,
-                      decoration: const InputDecoration(
-                        labelText: 'X (m)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: viseurYController,
-                      decoration: const InputDecoration(
-                        labelText: 'Y (m)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Position du comité
-              const Text('Position du comité :', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: committeeXController,
-                      decoration: const InputDecoration(
-                        labelText: 'X (m)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: committeeYController,
-                      decoration: const InputDecoration(
-                        labelText: 'Y (m)',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              viseurXController.dispose();
-              viseurYController.dispose();
-              committeeXController.dispose();
-              committeeYController.dispose();
-              Navigator.of(ctx).pop();
-            }, 
-            child: const Text('Annuler')
-          ),
-          FilledButton(
-            onPressed: () {
-              final viseurX = double.tryParse(viseurXController.text);
-              final viseurY = double.tryParse(viseurYController.text);
-              final committeeX = double.tryParse(committeeXController.text);
-              final committeeY = double.tryParse(committeeYController.text);
-              
-              if (viseurX != null && viseurY != null && committeeX != null && committeeY != null) {
-                ref.read(courseProvider.notifier).setStartLine(
-                  viseurX, viseurY,
-                  committeeX, committeeY,
-                );
-                viseurXController.dispose();
-                viseurYController.dispose();
-                committeeXController.dispose();
-                committeeYController.dispose();
-                Navigator.of(ctx).pop();
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Veuillez saisir des coordonnées valides'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text('Définir'),
-          )
-        ],
+      builder: (ctx) => GeographicLineDialog(
+        lineType: LineType.start,
+        existingLine: course.startLine,
       ),
     );
   }
 
   Future<void> _openFinishLineDialog(BuildContext context, WidgetRef ref) async {
     final course = ref.read(courseProvider);
-    final allBuoys = course.buoys.toList();
-    
-    if (allBuoys.length < 2) {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Marques manquantes'),
-          content: const Text('Vous devez créer au moins deux marques avant de définir la ligne d\'arrivée.'),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
-          ],
-        ),
-      );
-      return;
-    }
-    
-    Buoy? selectedMark1;
-    Buoy? selectedMark2;
-    
     await showDialog<void>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Ligne d\'arrivée'),
-          content: SizedBox(
-            width: 350,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Sélectionnez les marques pour la ligne d\'arrivée :'),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<Buoy>(
-                  decoration: const InputDecoration(
-                    labelText: 'Marque 1',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: selectedMark1,
-                  items: allBuoys.map((buoy) => DropdownMenuItem(
-                    value: buoy,
-                    child: Text('${_labelFor(buoy)} (${buoy.x.toStringAsFixed(1)}, ${buoy.y.toStringAsFixed(1)})'),
-                  )).toList(),
-                  onChanged: (buoy) => setState(() => selectedMark1 = buoy),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<Buoy>(
-                  decoration: const InputDecoration(
-                    labelText: 'Marque 2',
-                    border: OutlineInputBorder(),
-                  ),
-                  value: selectedMark2,
-                  items: allBuoys.where((b) => b != selectedMark1).map((buoy) => DropdownMenuItem(
-                    value: buoy,
-                    child: Text('${_labelFor(buoy)} (${buoy.x.toStringAsFixed(1)}, ${buoy.y.toStringAsFixed(1)})'),
-                  )).toList(),
-                  onChanged: (buoy) => setState(() => selectedMark2 = buoy),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
-            FilledButton(
-              onPressed: selectedMark1 != null && selectedMark2 != null ? () {
-                ref.read(courseProvider.notifier).setFinishLine(
-                  selectedMark1!.x, selectedMark1!.y,
-                  selectedMark2!.x, selectedMark2!.y,
-                );
-                Navigator.of(ctx).pop();
-              } : null,
-              child: const Text('Définir'),
-            )
-          ],
-        ),
+      builder: (ctx) => GeographicLineDialog(
+        lineType: LineType.finish,
+        existingLine: course.finishLine,
       ),
     );
   }
@@ -389,13 +203,28 @@ class CourseMenuButton extends ConsumerWidget {
   Future<void> _editItem(BuildContext context, WidgetRef ref, _ModificationItem item) async {
     switch (item.type) {
       case _ModificationItemType.buoy:
-        await _openBuoyDialog(context, ref, existing: item.buoy, role: item.buoy!.role);
+        await showDialog(
+          context: context,
+          builder: (context) => GeographicBuoyDialog(role: item.buoy!.role, existing: item.buoy),
+        );
         break;
       case _ModificationItemType.startLine:
-        await _openStartLineEditDialog(context, ref, item.startLine!);
+        await showDialog(
+          context: context,
+          builder: (context) => GeographicLineDialog(
+            lineType: LineType.start,
+            existingLine: item.startLine,
+          ),
+        );
         break;
       case _ModificationItemType.finishLine:
-        await _openFinishLineEditDialog(context, ref, item.finishLine!);
+        await showDialog(
+          context: context,
+          builder: (context) => GeographicLineDialog(
+            lineType: LineType.finish,
+            existingLine: item.finishLine,
+          ),
+        );
         break;
     }
   }
@@ -433,168 +262,11 @@ class CourseMenuButton extends ConsumerWidget {
     }
   }
 
-  Future<void> _openStartLineEditDialog(BuildContext context, WidgetRef ref, LineSegment startLine) async {
-    final x1 = TextEditingController(text: startLine.p1x.toString());
-    final y1 = TextEditingController(text: startLine.p1y.toString());
-    final x2 = TextEditingController(text: startLine.p2x.toString());
-    final y2 = TextEditingController(text: startLine.p2y.toString());
-    final formKey = GlobalKey<FormState>();
-    
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Modifier ligne de départ'),
-        content: Form(
-          key: formKey,
-          child: SizedBox(
-            width: 340,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Position du viseur:'),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Expanded(child: _numField(label: 'X viseur', controller: x1)), 
-                  const SizedBox(width: 8), 
-                  Expanded(child: _numField(label: 'Y viseur', controller: y1))
-                ]),
-                const SizedBox(height: 16),
-                const Text('Position du comité:'),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Expanded(child: _numField(label: 'X comité', controller: x2)), 
-                  const SizedBox(width: 8), 
-                  Expanded(child: _numField(label: 'Y comité', controller: y2))
-                ]),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
-          FilledButton(
-            onPressed: () {
-              if (!(formKey.currentState?.validate() ?? false)) return;
-              final nx1 = double.parse(x1.text.replaceAll(',', '.'));
-              final ny1 = double.parse(y1.text.replaceAll(',', '.'));
-              final nx2 = double.parse(x2.text.replaceAll(',', '.'));
-              final ny2 = double.parse(y2.text.replaceAll(',', '.'));
-              ref.read(courseProvider.notifier).setStartLine(nx1, ny1, nx2, ny2);
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('Enregistrer'),
-          )
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openFinishLineEditDialog(BuildContext context, WidgetRef ref, LineSegment finishLine) async {
-    final x1 = TextEditingController(text: finishLine.p1x.toString());
-    final y1 = TextEditingController(text: finishLine.p1y.toString());
-    final x2 = TextEditingController(text: finishLine.p2x.toString());
-    final y2 = TextEditingController(text: finishLine.p2y.toString());
-    final formKey = GlobalKey<FormState>();
-    
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Modifier ligne d\'arrivée'),
-        content: Form(
-          key: formKey,
-          child: SizedBox(
-            width: 340,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Position marque 1:'),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Expanded(child: _numField(label: 'X1', controller: x1)), 
-                  const SizedBox(width: 8), 
-                  Expanded(child: _numField(label: 'Y1', controller: y1))
-                ]),
-                const SizedBox(height: 16),
-                const Text('Position marque 2:'),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Expanded(child: _numField(label: 'X2', controller: x2)), 
-                  const SizedBox(width: 8), 
-                  Expanded(child: _numField(label: 'Y2', controller: y2))
-                ]),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
-          FilledButton(
-            onPressed: () {
-              if (!(formKey.currentState?.validate() ?? false)) return;
-              final nx1 = double.parse(x1.text.replaceAll(',', '.'));
-              final ny1 = double.parse(y1.text.replaceAll(',', '.'));
-              final nx2 = double.parse(x2.text.replaceAll(',', '.'));
-              final ny2 = double.parse(y2.text.replaceAll(',', '.'));
-              ref.read(courseProvider.notifier).setFinishLine(nx1, ny1, nx2, ny2);
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('Enregistrer'),
-          )
-        ],
-      ),
-    );
-  }
 
 
 
-  Future<void> _openBuoyDialog(BuildContext context, WidgetRef ref, {required BuoyRole role, Buoy? existing}) async {
-    final xCtrl = TextEditingController(text: existing?.x.toString() ?? '0');
-    final yCtrl = TextEditingController(text: existing?.y.toString() ?? '0');
-    final passageCtrl = TextEditingController(text: existing?.passageOrder?.toString() ?? '');
-    final formKey = GlobalKey<FormState>();
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: Text(existing == null ? _titleForRole(role) : 'Modifier ${_titleForRole(role)}'),
-          content: Form(
-            key: formKey,
-            child: SizedBox(
-              width: 320,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(children: [Expanded(child: _numField(label: 'X', controller: xCtrl)), const SizedBox(width: 12), Expanded(child: _numField(label: 'Y', controller: yCtrl))]),
-                  const SizedBox(height: 12),
-                  if (role == BuoyRole.regular)
-                    _numField(label: 'Passage #', controller: passageCtrl, requiredField: false),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Annuler')),
-            FilledButton(
-              onPressed: () {
-                if (!(formKey.currentState?.validate() ?? false)) return;
-                final x = double.parse(xCtrl.text.replaceAll(',', '.'));
-                final y = double.parse(yCtrl.text.replaceAll(',', '.'));
-                final passage = passageCtrl.text.trim().isEmpty ? null : int.parse(passageCtrl.text.trim());
-                final notifier = ref.read(courseProvider.notifier);
-                if (existing == null) {
-                  notifier.addBuoy(x, y, passageOrder: passage, role: role);
-                } else {
-                  notifier.updateBuoy(existing.id, x: x, y: y, passageOrder: passage, role: role);
-                }
-                Navigator.of(ctx).pop();
-              },
-              child: Text(existing == null ? 'Ajouter' : 'Enregistrer'),
-            )
-          ],
-        );
-      },
-    );
-  }
+
+
 
   Future<void> _confirmClearCourse(BuildContext context, WidgetRef ref) async {
     final confirm = await showDialog<bool>(
@@ -642,23 +314,7 @@ class CourseMenuButton extends ConsumerWidget {
     }
   }
 
-  Widget _numField({required String label, required TextEditingController controller, bool requiredField = true}) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-      decoration: InputDecoration(labelText: label, isDense: true, border: const OutlineInputBorder()),
-      validator: (v) {
-        final txt = v?.trim() ?? '';
-        if (txt.isEmpty) {
-          if (!requiredField) return null; // Peut être vide si facultatif
-          return 'Requis';
-        }
-        final parsed = double.tryParse(txt.replaceAll(',', '.'));
-        if (parsed == null) return 'Nombre invalide';
-        return null;
-      },
-    );
-  }
+
 }
 
 enum _CourseAction { 
