@@ -1,5 +1,3 @@
-/// Custom painter widget for course & wind depiction.
-/// See ARCHITECTURE_DOCS.md (section: course_canvas.dart).
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +12,8 @@ import '../../../charts/domain/services/wind_trend_analyzer.dart';
 import '../../domain/models/geographic_position.dart';
 import '../../providers/coordinate_system_provider.dart';
 import 'coordinate_system_config.dart';
+import '../../../../data/datasources/maps/providers/map_providers.dart';
+import '../../../../data/datasources/maps/models/map_tile_set.dart';
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
 class CourseCanvas extends ConsumerWidget {
@@ -27,6 +27,10 @@ class CourseCanvas extends ConsumerWidget {
     final vmcUp = ref.watch(vmcUpwindProvider); // Pour laylines (angle optimal de près)
     final windTrend = ref.watch(windTrendSnapshotProvider); // Analyse des tendances de vent
     final coordinateService = ref.watch(coordinateSystemProvider);
+    final maps = ref.watch(mapManagerProvider); // Cartes téléchargées
+    
+    // Note: Pour l'instant, on affiche des rectangles colorés pour les cartes
+    // Les vraies images de tuiles seront intégrées dans une version future
     
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
       return const Center(
@@ -56,6 +60,7 @@ class CourseCanvas extends ConsumerWidget {
                   vmcUp?.angleDeg,
                   windTrend,
                   coordinateService,
+                  maps,
                 ),
               ),
             ),
@@ -81,7 +86,9 @@ class _CoursePainter extends CustomPainter {
     this.upwindOptimalAngle,
     this.windTrend,
     this.coordinateService,
+    this.maps,
   );
+  
   final CourseState state;
   final RoutePlan route;
   final double windDirDeg; // 0 = Nord (haut), 90 = Est (droite)
@@ -89,6 +96,7 @@ class _CoursePainter extends CustomPainter {
   final double? upwindOptimalAngle; // angle (°) par rapport au vent pour meilleure VMG près
   final WindTrendSnapshot windTrend; // Analyse des tendances de vent
   final CoordinateSystemService coordinateService;
+  final List<MapTileSet> maps; // Cartes téléchargées
 
   static const double margin = 24.0; // logical px margin inside canvas
   static const double buoyRadius = 8.0;
@@ -177,6 +185,9 @@ class _CoursePainter extends CustomPainter {
       ..color = Colors.blueGrey.withOpacity(0.04)
       ..style = PaintingStyle.fill;
     canvas.drawRect(Offset.zero & size, bg);
+
+    // Dessiner les cartes en arrière-plan
+    _drawMaps(canvas, size);
 
     _drawGrid(canvas, size);
 
@@ -685,6 +696,71 @@ class _CoursePainter extends CustomPainter {
     tp.paint(canvas, position);
   }
 
+  /// Dessine les cartes téléchargées en arrière-plan
+  void _drawMaps(Canvas canvas, Size size) {
+    for (int i = 0; i < maps.length; i++) {
+      final map = maps[i];
+      if (map.status == MapDownloadStatus.completed) {
+        // Pour l'instant, dessiner un rectangle coloré pour indiquer la zone de la carte
+        _drawMapPlaceholder(canvas, size, map);
+      }
+    }
+  }
+
+  /// Dessine un placeholder coloré pour les cartes (temporaire)
+  void _drawMapPlaceholder(Canvas canvas, Size size, MapTileSet map) {
+    final mapBounds = map.bounds;
+    
+    // Convertir les coordonnées géographiques de la carte vers les coordonnées d'écran
+    final topLeftGeo = GeographicPosition(
+      latitude: mapBounds.maxLatitude, 
+      longitude: mapBounds.minLongitude
+    );
+    final bottomRightGeo = GeographicPosition(
+      latitude: mapBounds.minLatitude, 
+      longitude: mapBounds.maxLongitude
+    );
+    
+    try {
+      final topLeftLocal = coordinateService.toLocal(topLeftGeo);
+      final bottomRightLocal = coordinateService.toLocal(bottomRightGeo);
+      
+      final topLeft = _project(topLeftLocal.x, topLeftLocal.y, size);
+      final bottomRight = _project(bottomRightLocal.x, bottomRightLocal.y, size);
+      
+      final rect = Rect.fromPoints(topLeft, bottomRight);
+      
+      // Fond bleu semi-transparent pour la zone de carte
+      final fillPaint = Paint()
+        ..color = Colors.blue.withOpacity(0.1)
+        ..style = PaintingStyle.fill;
+      
+      // Bordure bleue pour délimiter la zone
+      final borderPaint = Paint()
+        ..color = Colors.blue.withOpacity(0.8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0;
+      
+      canvas.drawRect(rect, fillPaint);
+      canvas.drawRect(rect, borderPaint);
+      
+      // Label de la carte
+      final center = rect.center;
+      _drawText(
+        canvas, 
+        'Carte: ${map.id}',
+        center + const Offset(-30, -8),
+        fontSize: 10,
+        color: Colors.blue.shade800,
+      );
+    } catch (e) {
+      // Si la conversion échoue, ignorer cette carte
+      print('Erreur lors de la conversion des coordonnées de la carte ${map.id}: $e');
+    }
+  }
+  
+
+
   @override
   bool shouldRepaint(covariant _CoursePainter oldDelegate) {
     return oldDelegate.state != state ||
@@ -693,7 +769,8 @@ class _CoursePainter extends CustomPainter {
         oldDelegate.windSpeed != windSpeed ||
         oldDelegate.upwindOptimalAngle != upwindOptimalAngle ||
         oldDelegate.windTrend != windTrend ||
-        oldDelegate.coordinateService.config.origin != coordinateService.config.origin;
+        oldDelegate.coordinateService.config.origin != coordinateService.config.origin ||
+        oldDelegate.maps != maps;
   }
 }
 
