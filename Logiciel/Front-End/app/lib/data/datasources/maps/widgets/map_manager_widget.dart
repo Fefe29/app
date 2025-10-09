@@ -74,7 +74,7 @@ class MapManagerWidget extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Téléchargez des cartes OpenStreetMap pour afficher le contexte géographique de vos parcours',
+            'Téléchargez des cartes OpenSeaMap pour afficher le contexte nautique de vos parcours',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.grey[500],

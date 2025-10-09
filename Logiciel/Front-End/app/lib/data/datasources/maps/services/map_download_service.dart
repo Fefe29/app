@@ -1,4 +1,4 @@
-/// Service de téléchargement de cartes OpenStreetMap
+/// Service de téléchargement de cartes OpenSeaMap
 library;
 
 import 'dart:async';

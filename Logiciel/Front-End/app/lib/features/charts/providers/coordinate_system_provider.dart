@@ -72,7 +72,7 @@ class CoordinateSystemNotifier extends Notifier<CoordinateSystemService> {
       config: const CoordinateSystemConfig(
         origin: GeographicPosition(latitude: 43.535, longitude: 6.999),
         name: 'Carte téléchargée',
-        description: 'Zone des tuiles OpenStreetMap téléchargées',
+        description: 'Zone des tuiles OpenSeaMap téléchargées',
       ),
     );
   }

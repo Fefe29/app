@@ -16,6 +16,9 @@ import '../../providers/coordinate_system_provider.dart';
 import 'coordinate_system_config.dart';
 import '../../../../data/datasources/maps/providers/map_providers.dart';
 import '../../../../data/datasources/maps/models/map_tile_set.dart';
+import '../../../../data/datasources/maps/models/map_layers.dart';
+import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart';
+import 'multi_layer_tile_painter.dart';
 import 'tile_image_service.dart';
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
@@ -30,15 +33,15 @@ class CourseCanvas extends ConsumerWidget {
     final vmcUp = ref.watch(vmcUpwindProvider); // Pour laylines (angle optimal de près)
     final windTrend = ref.watch(windTrendSnapshotProvider); // Analyse des tendances de vent
     final coordinateService = ref.watch(coordinateSystemProvider);
-    final maps = ref.watch(mapManagerProvider); // Cartes téléchargées
+    final activeMap = ref.watch(activeMapProvider); // Carte active sélectionnée
+    final displayMaps = ref.watch(mapDisplayProvider); // Affichage activé/désactivé
     
-    // DEBUG: Vérification des cartes disponibles
-    print('TILES DEBUG - Nombre de cartes: ${maps.length}');
-    for (var i = 0; i < maps.length; i++) {
-      print('TILES DEBUG - Carte $i: id=${maps[i].id}, status=${maps[i].status}, name=${maps[i].name}');
+    // DEBUG: Vérification de la carte active
+    if (displayMaps && activeMap != null) {
+      print('TILES DEBUG - Carte active: id=${activeMap.id}, name=${activeMap.name}');
+    } else {
+      print('TILES DEBUG - Aucune carte active (displayMaps: $displayMaps, activeMap: ${activeMap?.id})');
     }
-    final completedMaps = maps.where((map) => map.status == MapDownloadStatus.completed).toList();
-    print('TILES DEBUG - Cartes complétées: ${completedMaps.length}');
     
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
       return const Center(
@@ -57,31 +60,34 @@ class CourseCanvas extends ConsumerWidget {
       builder: (context, constraints) {
         return Stack(
           children: [
-            // Chargement et affichage des tuiles de cartes - VERSION DIRECTE POUR TEST
-            FutureBuilder<List<LoadedTile>>(
-              future: _loadTilesDirectly(),
-              builder: (context, snapshot) {
-                print('TILES DEBUG - FutureBuilder: hasData=${snapshot.hasData}, hasError=${snapshot.hasError}');
-                if (snapshot.hasError) {
-                  print('TILES DEBUG - Erreur: ${snapshot.error}');
-                }
-                if (snapshot.hasData) {
-                  print('TILES DEBUG - ${snapshot.data!.length} tuiles chargées pour rendu');
-                  return CustomPaint(
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
-                    painter: _TilePainter(
-                      snapshot.data!,
-                      coordinateService,
-                      constraints,
-                    ),
+            // Affichage des tuiles multi-couches (OSM + OpenSeaMap)
+            if (displayMaps && activeMap != null)
+              FutureBuilder<List<LayeredTile>>(
+                future: _loadMultiLayerTilesForMap(activeMap),
+                builder: (context, snapshot) {
+                  print('MULTI-LAYER DEBUG - FutureBuilder pour ${activeMap.name}: hasData=${snapshot.hasData}, hasError=${snapshot.hasError}');
+                  if (snapshot.hasError) {
+                    print('MULTI-LAYER DEBUG - Erreur: ${snapshot.error}');
+                  }
+                  if (snapshot.hasData) {
+                    print('MULTI-LAYER DEBUG - ${snapshot.data!.length} tuiles multi-couches chargées pour rendu de ${activeMap.name}');
+                    return CustomPaint(
+                      size: Size(constraints.maxWidth, constraints.maxHeight),
+                      painter: MultiLayerTilePainter(
+                        snapshot.data!,
+                        coordinateService,
+                        constraints,
+                        course,
+                        MapLayersConfig.defaultConfig, // Configuration des couches
+                      ),
+                    );
+                  }
+                  // Pendant le chargement : message simple
+                  return const Center(
+                    child: Text('Chargement des tuiles multi-couches...', style: TextStyle(color: Colors.white)),
                   );
-                }
-                // Pendant le chargement : message simple
-                return const Center(
-                  child: Text('Chargement des tuiles...', style: TextStyle(color: Colors.white)),
-                );
-              },
-            ),
+                },
+              ),
             // Canvas principal avec le parcours
             RepaintBoundary(
               child: CustomPaint(
@@ -94,7 +100,6 @@ class CourseCanvas extends ConsumerWidget {
                   vmcUp?.angleDeg,
                   windTrend,
                   coordinateService,
-                  maps,
                 ),
               ),
             ),
@@ -110,12 +115,27 @@ class CourseCanvas extends ConsumerWidget {
     );
   }
 
+  Future<List<LayeredTile>> _loadMultiLayerTilesForMap(MapTileSet map) async {
+    print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap appelée pour: ${map.id}');
+    // Utiliser le bon mapId qui existe
+    const existingMapId = 'map_1760001674733_43.535_6.999';
+    final mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps/$existingMapId';
+    print('MULTI-LAYER DEBUG - Chemin des tuiles: $mapPath');
+    final tiles = await MultiLayerTileService.preloadLayeredTiles(
+      mapId: existingMapId,
+      mapPath: mapPath,
+      config: MapLayersConfig.defaultConfig,
+    );
+    print('MULTI-LAYER DEBUG - ${tiles.length} tuiles multi-couches chargées pour $existingMapId');
+    return tiles;
+  }
+
   Future<List<LoadedTile>> _loadTilesForMap(MapTileSet map) async {
     print('TILES DEBUG - _loadTilesForMap appelée pour: ${map.id}');
-    // Construire le chemin vers les tuiles de cette carte
-    final mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps/${map.id}';
-    print('TILES DEBUG - Chemin des tuiles: $mapPath');
-    final tiles = await TileImageService.preloadMapTiles(map.id, mapPath);
+    // Construire le chemin de base (sans le mapId car preloadMapTiles l'ajoute)
+    const mapBasePath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
+    print('TILES DEBUG - Chemin de base: $mapBasePath');
+    final tiles = await TileImageService.preloadMapTiles(map.id, mapBasePath);
     print('TILES DEBUG - ${tiles.length} tuiles chargées pour ${map.id}');
     return tiles;
   }
@@ -133,11 +153,83 @@ class CourseCanvas extends ConsumerWidget {
 }
 
 class _TilePainter extends CustomPainter {
-  _TilePainter(this.tiles, this.coordinateService, this.constraints);
+  _TilePainter(this.tiles, this.coordinateService, this.constraints, this.courseState);
   
   final List<LoadedTile> tiles;
   final CoordinateSystemService coordinateService;
   final BoxConstraints constraints;
+  final CourseState courseState; // Pour calculer les bounds comme _CoursePainter
+
+  // Calculer les bounds exactement comme dans _CoursePainter
+  late final _Bounds _bounds = _computeBounds();
+
+  _Bounds _computeBounds() {
+    final xs = <double>[];
+    final ys = <double>[];
+    
+    // Convert geographic positions to local coordinates for display
+    final converter = CoordinateConverter(origin: coordinateService.config.origin);
+    
+    for (final b in courseState.buoys) {
+      LocalPosition localPos;
+      if (b.tempLocalPos != null) {
+        // Legacy format - use temporary local position
+        localPos = b.tempLocalPos!;
+      } else {
+        // Geographic format - convert to local
+        localPos = converter.geographicToLocal(b.position);
+      }
+      xs.add(localPos.x);
+      ys.add(localPos.y);
+    }
+    
+    for (final l in [courseState.startLine, courseState.finishLine]) {
+      if (l != null) {
+        LocalPosition p1, p2;
+        if (l.tempLocalP1 != null && l.tempLocalP2 != null) {
+          // Legacy format
+          p1 = l.tempLocalP1!;
+          p2 = l.tempLocalP2!;
+        } else {
+          // Geographic format
+          p1 = converter.geographicToLocal(l.point1);
+          p2 = converter.geographicToLocal(l.point2);
+        }
+        xs.addAll([p1.x, p2.x]);
+        ys.addAll([p1.y, p2.y]);
+      }
+    }
+    
+    // Ajouter les coordonnées des tuiles pour élargir la vue si nécessaire
+    for (final tile in tiles) {
+      final geoPos = _tileToGeoPosition(tile.x, tile.y, tile.zoom);
+      final localPos = coordinateService.toLocal(geoPos);
+      xs.add(localPos.x);
+      ys.add(localPos.y);
+    }
+    
+    if (xs.isEmpty || ys.isEmpty) {
+      return const _Bounds(0, 100, 0, 100); // default square
+    }
+    final minX = xs.reduce(math.min);
+    final maxX = xs.reduce(math.max);
+    final minY = ys.reduce(math.min);
+    final maxY = ys.reduce(math.max);
+    // Guard against zero span
+    var spanX = (maxX - minX).abs() < 1e-6 ? 100 : maxX - minX;
+    var spanY = (maxY - minY).abs() < 1e-6 ? 100 : maxY - minY;
+
+    // Pour assurer une échelle cohérente (1:1), on force la bounding box à être carrée.
+    if (spanX > spanY) {
+      final delta = spanX - spanY;
+      // Étendre Y de part et d'autre pour rester centré
+      return _Bounds(minX, minX + spanX, minY - delta / 2, minY + spanY + delta / 2);
+    } else if (spanY > spanX) {
+      final delta = spanY - spanX;
+      return _Bounds(minX - delta / 2, minX + spanX + delta / 2, minY, minY + spanY);
+    }
+    return _Bounds(minX, minX + spanX, minY, minY + spanY);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -150,33 +242,33 @@ class _TilePainter extends CustomPainter {
     print('TILES DEBUG - Dessin tuile ${tile.x},${tile.y} zoom=${tile.zoom}');
     
     try {
-      // Positionnement simple des tuiles : grille 3x5 centrée
-      // Nos tuiles vont de x=17021 à 17023 (3 tuiles) et y=11969 à 11973 (5 tuiles)
-      final minX = 17021;
-      final minY = 11969;
-      final relativeX = tile.x - minX; // 0, 1, 2
-      final relativeY = tile.y - minY; // 0, 1, 2, 3, 4
+      // Convertir les coordonnées de tuile en position géographique réelle
+      final geoPos = _tileToGeoPosition(tile.x, tile.y, tile.zoom);
+      print('TILES DEBUG - Tuile ${tile.x},${tile.y} -> Geo: ${geoPos.latitude.toStringAsFixed(5)}°N, ${geoPos.longitude.toStringAsFixed(5)}°E');
       
-      const tileSize = 180.0; // Taille réduite pour bien voir
+      // Convertir en coordonnées locales puis écran avec le même système que les bouées
+      final localPos = coordinateService.toLocal(geoPos);
+      print('TILES DEBUG - Tuile ${tile.x},${tile.y} -> Local: (${localPos.x.toStringAsFixed(1)}, ${localPos.y.toStringAsFixed(1)})');
       
-      // Centrer la grille sur l'écran
-      final gridWidth = 3 * tileSize;
-      final gridHeight = 5 * tileSize;
-      final startX = (size.width - gridWidth) / 2;
-      final startY = (size.height - gridHeight) / 2;
+      // Utiliser la même méthode de projection que les bouées dans _CoursePainter
+      final screenPos = _projectLikeCourse(localPos.x, localPos.y, size);
+      print('TILES DEBUG - Tuile ${tile.x},${tile.y} -> Screen: ${screenPos.dx.toStringAsFixed(1)}, ${screenPos.dy.toStringAsFixed(1)}');
       
-      final rect = Rect.fromLTWH(
-        startX + relativeX * tileSize,
-        startY + relativeY * tileSize,
-        tileSize,
-        tileSize,
+      // Calculer la taille de tuile appropriée - augmentée pour couvrir le terrain réel
+      // Une tuile OSM niveau 15 couvre environ 1.2km x 1.2km à cette latitude
+      const realTileSize = 1200.0; // Taille réelle d'une tuile en mètres (niveau 15)
+      final screenTileSize = _calculateScreenTileSize(realTileSize, size);
+      
+      final rect = Rect.fromCenter(
+        center: screenPos,
+        width: screenTileSize,
+        height: screenTileSize,
       );
       
-      print('TILES DEBUG - Tuile ${tile.x},${tile.y} -> relative ($relativeX,$relativeY) -> rect: $rect');
-      
-      // Dessiner l'image de la tuile
+      // Dessiner l'image de la tuile avec opacity réduite pour ne pas masquer les éléments du parcours
       final paint = Paint()
-        ..filterQuality = FilterQuality.medium;
+        ..filterQuality = FilterQuality.medium
+        ..color = Colors.white.withOpacity(0.9); // Transparence légère pour voir le fond de carte
       
       canvas.drawImageRect(
         tile.image,
@@ -185,11 +277,47 @@ class _TilePainter extends CustomPainter {
         paint,
       );
       
-      print('TILES DEBUG - Tuile ${tile.x},${tile.y} dessinée avec succès');
+      // Bordure très subtile pour délimiter les tuiles (optionnelle)
+      final borderPaint = Paint()
+        ..color = Colors.black.withOpacity(0.05)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.3;
+      canvas.drawRect(rect, borderPaint);
+      
+      print('TILES DEBUG - Tuile ${tile.x},${tile.y} dessinée avec succès à ${rect}');
       
     } catch (e) {
       print('TILES DEBUG - Erreur lors du dessin de la tuile ${tile.x},${tile.y}: $e');
     }
+  }
+
+  /// Projection identique à celle de _CoursePainter
+  Offset _projectLikeCourse(double x, double y, Size size) {
+    // Utiliser exactement le même algorithme que _CoursePainter._project
+    const margin = 24.0; // logical px margin inside canvas
+    final availW = size.width - 2 * margin;
+    final availH = size.height - 2 * margin;
+    final spanX = _bounds.maxX - _bounds.minX;
+    final spanY = _bounds.maxY - _bounds.minY;
+    final scale = math.min(availW / spanX, availH / spanY);
+    // Centrage si l'espace disponible n'est pas carré
+    final offsetX = (size.width - spanX * scale) / 2;
+    final offsetY = (size.height - spanY * scale) / 2;
+    final px = offsetX + (x - _bounds.minX) * scale;
+    // y croissant vers le haut dans notre repère logique -> inverser
+    final py = size.height - offsetY - (y - _bounds.minY) * scale;
+    return Offset(px, py);
+  }
+
+  /// Calcule la taille à l'écran d'une tuile selon l'échelle de projection
+  double _calculateScreenTileSize(double realSizeMeters, Size size) {
+    const margin = 24.0;
+    final availW = size.width - 2 * margin;
+    final availH = size.height - 2 * margin;
+    final spanX = _bounds.maxX - _bounds.minX;
+    final spanY = _bounds.maxY - _bounds.minY;
+    final scale = math.min(availW / spanX, availH / spanY);
+    return realSizeMeters * scale;
   }
 
   /// Convertit les coordonnées de tuile en position géographique
@@ -239,7 +367,6 @@ class _CoursePainter extends CustomPainter {
     this.upwindOptimalAngle,
     this.windTrend,
     this.coordinateService,
-    this.maps,
   );
   
   final CourseState state;
@@ -249,7 +376,6 @@ class _CoursePainter extends CustomPainter {
   final double? upwindOptimalAngle; // angle (°) par rapport au vent pour meilleure VMG près
   final WindTrendSnapshot windTrend; // Analyse des tendances de vent
   final CoordinateSystemService coordinateService;
-  final List<MapTileSet> maps; // Cartes téléchargées
 
   static const double margin = 24.0; // logical px margin inside canvas
   static const double buoyRadius = 8.0;
@@ -862,8 +988,7 @@ class _CoursePainter extends CustomPainter {
         oldDelegate.windSpeed != windSpeed ||
         oldDelegate.upwindOptimalAngle != upwindOptimalAngle ||
         oldDelegate.windTrend != windTrend ||
-        oldDelegate.coordinateService.config.origin != coordinateService.config.origin ||
-        oldDelegate.maps != maps;
+        oldDelegate.coordinateService.config.origin != coordinateService.config.origin;
   }
 }
 

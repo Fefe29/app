@@ -6,15 +6,12 @@ import '../../domain/models/course.dart';
 import '../../providers/course_providers.dart';
 import 'geographic_buoy_dialog.dart';
 import 'geographic_line_dialog.dart';
-import '../../../../data/datasources/maps/widgets/map_download_dialog.dart';
-import '../../../../data/datasources/maps/providers/map_providers.dart';
 
 enum _CourseAction {
   newBuoy,
   setStartLine,
   setFinishLine,
   modifications,
-  downloadMap,
   clearCourse,
 }
 
@@ -42,9 +39,6 @@ class CourseMenuButton extends ConsumerWidget {
           case _CourseAction.modifications:
             await _openModificationsMenu(context, ref, course);
             break;
-          case _CourseAction.downloadMap:
-            await _openMapDownloadDialog(context, ref);
-            break;
           case _CourseAction.clearCourse:
             await _confirmClearCourse(context, ref);
             break;
@@ -55,17 +49,6 @@ class CourseMenuButton extends ConsumerWidget {
         const PopupMenuItem(value: _CourseAction.setStartLine, child: Text('Ligne de départ')),
         const PopupMenuItem(value: _CourseAction.setFinishLine, child: Text('Ligne d\'arrivée')),
         const PopupMenuItem(value: _CourseAction.modifications, child: Text('Modification')),
-        const PopupMenuDivider(),
-        const PopupMenuItem(
-          value: _CourseAction.downloadMap,
-          child: Row(
-            children: [
-              Icon(Icons.map_outlined, size: 16),
-              SizedBox(width: 8),
-              Text('Télécharger carte'),
-            ],
-          ),
-        ),
         const PopupMenuDivider(),
         PopupMenuItem(
           enabled: course.buoys.isNotEmpty || course.startLine != null || course.finishLine != null,
@@ -283,16 +266,6 @@ class CourseMenuButton extends ConsumerWidget {
           break;
       }
     }
-  }
-
-  /// Ouverture du dialog de téléchargement de carte
-  Future<void> _openMapDownloadDialog(BuildContext context, WidgetRef ref) async {
-    final courseBounds = ref.read(courseBoundsProvider);
-    
-    await showDialog(
-      context: context,
-      builder: (context) => MapDownloadDialog(initialBounds: courseBounds),
-    );
   }
 
   Future<void> _confirmClearCourse(BuildContext context, WidgetRef ref) async {

@@ -173,3 +173,60 @@ final mapCoversCourseProvider = Provider.family<bool, String>((ref, mapId) {
          courseBounds.minLongitude >= map.bounds.minLongitude &&
          courseBounds.maxLongitude <= map.bounds.maxLongitude;
 });
+
+/// Notifier pour la carte sélectionnée
+class SelectedMapNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void select(String? mapId) {
+    state = mapId;
+  }
+}
+
+/// Notifier pour l'affichage des cartes
+class MapDisplayNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void toggle(bool show) {
+    state = show;
+  }
+}
+
+/// Provider pour la carte actuellement sélectionnée
+final selectedMapProvider = NotifierProvider<SelectedMapNotifier, String?>(
+  SelectedMapNotifier.new,
+);
+
+/// Provider pour l'affichage des cartes (activé/désactivé)
+final mapDisplayProvider = NotifierProvider<MapDisplayNotifier, bool>(
+  MapDisplayNotifier.new,
+);
+
+/// Provider pour la carte active à afficher
+final activeMapProvider = Provider<MapTileSet?>((ref) {
+  final selectedMapId = ref.watch(selectedMapProvider);
+  final maps = ref.watch(mapManagerProvider);
+  final displayMaps = ref.watch(mapDisplayProvider);
+  
+  if (!displayMaps || selectedMapId == null) return null;
+  
+  try {
+    return maps.firstWhere(
+      (map) => map.id == selectedMapId && map.status == MapDownloadStatus.completed,
+    );
+  } catch (e) {
+    // Si la carte sélectionnée n'est pas trouvée, sélectionner automatiquement la première disponible
+    final availableMaps = maps.where((map) => map.status == MapDownloadStatus.completed);
+    if (availableMaps.isNotEmpty) {
+      // Mise à jour asynchrone de la sélection
+      Future.microtask(() {
+        ref.read(selectedMapProvider.notifier).select(availableMaps.first.id);
+      });
+      return availableMaps.first;
+    }
+  }
+  
+  return null;
+});

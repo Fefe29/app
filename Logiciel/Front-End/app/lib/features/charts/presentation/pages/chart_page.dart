@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
 import '../widgets/course_canvas.dart';
 import '../widgets/course_menu.dart';
+import '../widgets/map_toolbar_button.dart';
 import '../../providers/wind_trend_provider.dart';
 
 
@@ -94,6 +95,8 @@ class _HeaderStatus extends ConsumerWidget {
 						),
 					),
 					const Spacer(),
+					const MapToolbarButton(),
+					const SizedBox(width: 8),
 					TextButton.icon(
 						onPressed: () {
 							// TODO: import fichier / asset
