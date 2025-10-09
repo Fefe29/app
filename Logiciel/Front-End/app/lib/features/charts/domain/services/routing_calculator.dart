@@ -4,6 +4,7 @@ import 'package:kornog/common/utils/angle_utils.dart';
 import '../../domain/models/course.dart';
 import '../../domain/models/geographic_position.dart';
 import '../../providers/coordinate_system_provider.dart';
+import '../../providers/mercator_coordinate_system_provider.dart';
 import 'wind_trend_analyzer.dart';
 
 /// Type de segment parcouru par le routage.
@@ -66,7 +67,7 @@ class RoutingCalculator {
   double? optimalUpwindAngle; // angle TWA optimum (ex: 40°)
   double? currentTwaSigned; // TWA signé courant (-180..180) provenant télémétrie
   PolarData? polarData; // données de polaire pour calculs de vitesse
-  CoordinateSystemService coordinateService; // Service pour conversion géographique ↔ locale
+  MercatorCoordinateSystemService mercatorService; // Service Mercator pour conversion géographique ↔ locale
 
   RoutingCalculator({
     this.windDirDeg, 
@@ -74,32 +75,21 @@ class RoutingCalculator {
     this.optimalUpwindAngle, 
     this.currentTwaSigned,
     this.polarData,
-    required this.coordinateService,
+    required this.mercatorService,
   });
 
-  /// Convertit une bouée en coordonnées locales pour les calculs
+  /// Convertit une bouée en coordonnées locales Mercator pour les calculs
   math.Point<double> _buoyToLocalPoint(Buoy buoy) {
-    // Si la bouée utilise encore les coordonnées legacy, les utiliser
-    if (buoy.tempLocalPos != null) {
-      return math.Point(buoy.tempLocalPos!.x, buoy.tempLocalPos!.y);
-    }
-    // Sinon, convertir les coordonnées géographiques en locales
-    final localPos = coordinateService.toLocal(buoy.position);
+    // Utiliser directement la projection Mercator
+    final localPos = mercatorService.toLocal(buoy.position);
     return math.Point(localPos.x, localPos.y);
   }
 
-  /// Convertit une ligne en points locaux pour les calculs
+  /// Convertit une ligne en points locaux Mercator pour les calculs
   (math.Point<double>, math.Point<double>) _lineToLocalPoints(LineSegment line) {
-    // Si la ligne utilise encore les coordonnées legacy, les utiliser
-    if (line.tempLocalP1 != null && line.tempLocalP2 != null) {
-      return (
-        math.Point(line.tempLocalP1!.x, line.tempLocalP1!.y),
-        math.Point(line.tempLocalP2!.x, line.tempLocalP2!.y),
-      );
-    }
-    // Sinon, convertir les coordonnées géographiques en locales
-    final localP1 = coordinateService.toLocal(line.point1);
-    final localP2 = coordinateService.toLocal(line.point2);
+    // Utiliser directement la projection Mercator
+    final localP1 = mercatorService.toLocal(line.point1);
+    final localP2 = mercatorService.toLocal(line.point2);
     return (
       math.Point(localP1.x, localP1.y),
       math.Point(localP2.x, localP2.y),

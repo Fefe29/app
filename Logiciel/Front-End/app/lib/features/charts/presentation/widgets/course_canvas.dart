@@ -13,6 +13,7 @@ import '../../../charts/providers/wind_trend_provider.dart';
 import '../../../charts/domain/services/wind_trend_analyzer.dart';
 import '../../domain/models/geographic_position.dart';
 import '../../providers/coordinate_system_provider.dart';
+import '../../providers/mercator_coordinate_system_provider.dart';
 import 'coordinate_system_config.dart';
 import '../../../../data/datasources/maps/providers/map_providers.dart';
 import '../../../../data/datasources/maps/models/map_tile_set.dart';
@@ -32,7 +33,7 @@ class CourseCanvas extends ConsumerWidget {
     final wind = ref.watch(windSampleProvider);
     final vmcUp = ref.watch(vmcUpwindProvider); // Pour laylines (angle optimal de près)
     final windTrend = ref.watch(windTrendSnapshotProvider); // Analyse des tendances de vent
-    final coordinateService = ref.watch(coordinateSystemProvider);
+    final mercatorService = ref.watch(mercatorCoordinateSystemProvider);
     final activeMap = ref.watch(activeMapProvider); // Carte active sélectionnée
     final displayMaps = ref.watch(mapDisplayProvider); // Affichage activé/désactivé
     
@@ -75,7 +76,7 @@ class CourseCanvas extends ConsumerWidget {
                       size: Size(constraints.maxWidth, constraints.maxHeight),
                       painter: MultiLayerTilePainter(
                         snapshot.data!,
-                        coordinateService,
+                        mercatorService,
                         constraints,
                         course,
                         MapLayersConfig.defaultConfig, // Configuration des couches
@@ -99,7 +100,7 @@ class CourseCanvas extends ConsumerWidget {
                   wind.speed,
                   vmcUp?.angleDeg,
                   windTrend,
-                  coordinateService,
+                  mercatorService,
                 ),
               ),
             ),
@@ -152,211 +153,7 @@ class CourseCanvas extends ConsumerWidget {
   }
 }
 
-class _TilePainter extends CustomPainter {
-  _TilePainter(this.tiles, this.coordinateService, this.constraints, this.courseState);
-  
-  final List<LoadedTile> tiles;
-  final CoordinateSystemService coordinateService;
-  final BoxConstraints constraints;
-  final CourseState courseState; // Pour calculer les bounds comme _CoursePainter
-
-  // Calculer les bounds exactement comme dans _CoursePainter
-  late final _Bounds _bounds = _computeBounds();
-
-  _Bounds _computeBounds() {
-    final xs = <double>[];
-    final ys = <double>[];
-    
-    // Convert geographic positions to local coordinates for display
-    final converter = CoordinateConverter(origin: coordinateService.config.origin);
-    
-    for (final b in courseState.buoys) {
-      LocalPosition localPos;
-      if (b.tempLocalPos != null) {
-        // Legacy format - use temporary local position
-        localPos = b.tempLocalPos!;
-      } else {
-        // Geographic format - convert to local
-        localPos = converter.geographicToLocal(b.position);
-      }
-      xs.add(localPos.x);
-      ys.add(localPos.y);
-    }
-    
-    for (final l in [courseState.startLine, courseState.finishLine]) {
-      if (l != null) {
-        LocalPosition p1, p2;
-        if (l.tempLocalP1 != null && l.tempLocalP2 != null) {
-          // Legacy format
-          p1 = l.tempLocalP1!;
-          p2 = l.tempLocalP2!;
-        } else {
-          // Geographic format
-          p1 = converter.geographicToLocal(l.point1);
-          p2 = converter.geographicToLocal(l.point2);
-        }
-        xs.addAll([p1.x, p2.x]);
-        ys.addAll([p1.y, p2.y]);
-      }
-    }
-    
-    // Ajouter les coordonnées des tuiles pour élargir la vue si nécessaire
-    for (final tile in tiles) {
-      final geoPos = _tileToGeoPosition(tile.x, tile.y, tile.zoom);
-      final localPos = coordinateService.toLocal(geoPos);
-      xs.add(localPos.x);
-      ys.add(localPos.y);
-    }
-    
-    if (xs.isEmpty || ys.isEmpty) {
-      return const _Bounds(0, 100, 0, 100); // default square
-    }
-    final minX = xs.reduce(math.min);
-    final maxX = xs.reduce(math.max);
-    final minY = ys.reduce(math.min);
-    final maxY = ys.reduce(math.max);
-    // Guard against zero span
-    var spanX = (maxX - minX).abs() < 1e-6 ? 100 : maxX - minX;
-    var spanY = (maxY - minY).abs() < 1e-6 ? 100 : maxY - minY;
-
-    // Pour assurer une échelle cohérente (1:1), on force la bounding box à être carrée.
-    if (spanX > spanY) {
-      final delta = spanX - spanY;
-      // Étendre Y de part et d'autre pour rester centré
-      return _Bounds(minX, minX + spanX, minY - delta / 2, minY + spanY + delta / 2);
-    } else if (spanY > spanX) {
-      final delta = spanY - spanX;
-      return _Bounds(minX - delta / 2, minX + spanX + delta / 2, minY, minY + spanY);
-    }
-    return _Bounds(minX, minX + spanX, minY, minY + spanY);
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    for (final tile in tiles) {
-      _drawTile(canvas, size, tile);
-    }
-  }
-
-  void _drawTile(Canvas canvas, Size size, LoadedTile tile) {
-    print('TILES DEBUG - Dessin tuile ${tile.x},${tile.y} zoom=${tile.zoom}');
-    
-    try {
-      // Convertir les coordonnées de tuile en position géographique réelle
-      final geoPos = _tileToGeoPosition(tile.x, tile.y, tile.zoom);
-      print('TILES DEBUG - Tuile ${tile.x},${tile.y} -> Geo: ${geoPos.latitude.toStringAsFixed(5)}°N, ${geoPos.longitude.toStringAsFixed(5)}°E');
-      
-      // Convertir en coordonnées locales puis écran avec le même système que les bouées
-      final localPos = coordinateService.toLocal(geoPos);
-      print('TILES DEBUG - Tuile ${tile.x},${tile.y} -> Local: (${localPos.x.toStringAsFixed(1)}, ${localPos.y.toStringAsFixed(1)})');
-      
-      // Utiliser la même méthode de projection que les bouées dans _CoursePainter
-      final screenPos = _projectLikeCourse(localPos.x, localPos.y, size);
-      print('TILES DEBUG - Tuile ${tile.x},${tile.y} -> Screen: ${screenPos.dx.toStringAsFixed(1)}, ${screenPos.dy.toStringAsFixed(1)}');
-      
-      // Calculer la taille de tuile appropriée - augmentée pour couvrir le terrain réel
-      // Une tuile OSM niveau 15 couvre environ 1.2km x 1.2km à cette latitude
-      const realTileSize = 1200.0; // Taille réelle d'une tuile en mètres (niveau 15)
-      final screenTileSize = _calculateScreenTileSize(realTileSize, size);
-      
-      final rect = Rect.fromCenter(
-        center: screenPos,
-        width: screenTileSize,
-        height: screenTileSize,
-      );
-      
-      // Dessiner l'image de la tuile avec opacity réduite pour ne pas masquer les éléments du parcours
-      final paint = Paint()
-        ..filterQuality = FilterQuality.medium
-        ..color = Colors.white.withOpacity(0.9); // Transparence légère pour voir le fond de carte
-      
-      canvas.drawImageRect(
-        tile.image,
-        Rect.fromLTWH(0, 0, tile.image.width.toDouble(), tile.image.height.toDouble()),
-        rect,
-        paint,
-      );
-      
-      // Bordure très subtile pour délimiter les tuiles (optionnelle)
-      final borderPaint = Paint()
-        ..color = Colors.black.withOpacity(0.05)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.3;
-      canvas.drawRect(rect, borderPaint);
-      
-      print('TILES DEBUG - Tuile ${tile.x},${tile.y} dessinée avec succès à ${rect}');
-      
-    } catch (e) {
-      print('TILES DEBUG - Erreur lors du dessin de la tuile ${tile.x},${tile.y}: $e');
-    }
-  }
-
-  /// Projection identique à celle de _CoursePainter
-  Offset _projectLikeCourse(double x, double y, Size size) {
-    // Utiliser exactement le même algorithme que _CoursePainter._project
-    const margin = 24.0; // logical px margin inside canvas
-    final availW = size.width - 2 * margin;
-    final availH = size.height - 2 * margin;
-    final spanX = _bounds.maxX - _bounds.minX;
-    final spanY = _bounds.maxY - _bounds.minY;
-    final scale = math.min(availW / spanX, availH / spanY);
-    // Centrage si l'espace disponible n'est pas carré
-    final offsetX = (size.width - spanX * scale) / 2;
-    final offsetY = (size.height - spanY * scale) / 2;
-    final px = offsetX + (x - _bounds.minX) * scale;
-    // y croissant vers le haut dans notre repère logique -> inverser
-    final py = size.height - offsetY - (y - _bounds.minY) * scale;
-    return Offset(px, py);
-  }
-
-  /// Calcule la taille à l'écran d'une tuile selon l'échelle de projection
-  double _calculateScreenTileSize(double realSizeMeters, Size size) {
-    const margin = 24.0;
-    final availW = size.width - 2 * margin;
-    final availH = size.height - 2 * margin;
-    final spanX = _bounds.maxX - _bounds.minX;
-    final spanY = _bounds.maxY - _bounds.minY;
-    final scale = math.min(availW / spanX, availH / spanY);
-    return realSizeMeters * scale;
-  }
-
-  /// Convertit les coordonnées de tuile en position géographique
-  GeographicPosition _tileToGeoPosition(int tileX, int tileY, int zoom) {
-    final n = 1 << zoom;
-    final lon = tileX / n * 360.0 - 180.0;
-    final latRad = math.atan((math.exp(math.pi * (1 - 2 * tileY / n)) - math.exp(-math.pi * (1 - 2 * tileY / n))) / 2);
-    final lat = latRad * 180.0 / math.pi;
-    
-    return GeographicPosition(latitude: lat, longitude: lon);
-  }
-
-  /// Calcule la taille d'une tuile à l'écran
-  double _calculateTileScreenSize(int zoom, Size size) {
-    const baseTileSize = 256.0;
-    final scaleFactor = size.width / 1000.0;
-    return baseTileSize * scaleFactor / (1 << (15 - zoom));
-  }
-
-  Offset _project(double x, double y, Size size) {
-    // Projection simple centrée pour les tuiles
-    const margin = 24.0;
-    final centerX = size.width / 2;
-    final centerY = size.height / 2;
-    
-    // Facteur d'échelle basé sur la taille de l'écran
-    final scale = math.min(size.width, size.height) / 1000.0;
-    
-    final px = centerX + x * scale;
-    final py = centerY - y * scale; // y inversé
-    
-    return Offset(px, py);
-  }
-
-  @override
-  bool shouldRepaint(covariant _TilePainter oldDelegate) {
-    return oldDelegate.tiles != tiles;
-  }
-}
+/// La classe _TilePainter legacy a été remplacée par MultiLayerTilePainter avec projection Mercator
 
 class _CoursePainter extends CustomPainter {
   _CoursePainter(
@@ -366,7 +163,7 @@ class _CoursePainter extends CustomPainter {
     this.windSpeed,
     this.upwindOptimalAngle,
     this.windTrend,
-    this.coordinateService,
+    this.mercatorService,
   );
   
   final CourseState state;
@@ -375,7 +172,7 @@ class _CoursePainter extends CustomPainter {
   final double windSpeed; // nds
   final double? upwindOptimalAngle; // angle (°) par rapport au vent pour meilleure VMG près
   final WindTrendSnapshot windTrend; // Analyse des tendances de vent
-  final CoordinateSystemService coordinateService;
+  final MercatorCoordinateSystemService mercatorService;
 
   static const double margin = 24.0; // logical px margin inside canvas
   static const double buoyRadius = 8.0;
@@ -386,34 +183,17 @@ class _CoursePainter extends CustomPainter {
     final xs = <double>[];
     final ys = <double>[];
     
-    // Convert geographic positions to local coordinates for display
-    final converter = CoordinateConverter(origin: coordinateService.config.origin);
-    
+    // Utiliser la projection Mercator pour toutes les conversions
     for (final b in state.buoys) {
-      LocalPosition localPos;
-      if (b.tempLocalPos != null) {
-        // Legacy format - use temporary local position
-        localPos = b.tempLocalPos!;
-      } else {
-        // Geographic format - convert to local
-        localPos = converter.geographicToLocal(b.position);
-      }
+      final localPos = mercatorService.toLocal(b.position);
       xs.add(localPos.x);
       ys.add(localPos.y);
     }
     
     for (final l in [state.startLine, state.finishLine]) {
       if (l != null) {
-        LocalPosition p1, p2;
-        if (l.tempLocalP1 != null && l.tempLocalP2 != null) {
-          // Legacy format
-          p1 = l.tempLocalP1!;
-          p2 = l.tempLocalP2!;
-        } else {
-          // Geographic format
-          p1 = converter.geographicToLocal(l.point1);
-          p2 = converter.geographicToLocal(l.point2);
-        }
+        final p1 = mercatorService.toLocal(l.point1);
+        final p2 = mercatorService.toLocal(l.point2);
         xs.addAll([p1.x, p2.x]);
         ys.addAll([p1.y, p2.y]);
       }
@@ -495,9 +275,9 @@ class _CoursePainter extends CustomPainter {
   void _drawLines(Canvas canvas, Size size) {
     for (final line in [state.startLine, state.finishLine]) {
       if (line == null) continue;
-      // Convert geographic coordinates to local for projection
-      final localP1 = coordinateService.toLocal(line.point1);
-      final localP2 = coordinateService.toLocal(line.point2);
+      // Convert geographic coordinates to local using Mercator projection
+      final localP1 = mercatorService.toLocal(line.point1);
+      final localP2 = mercatorService.toLocal(line.point2);
       final p1 = _project(localP1.x, localP1.y, size);
       final p2 = _project(localP2.x, localP2.y, size);
       final paint = Paint()
@@ -519,8 +299,8 @@ class _CoursePainter extends CustomPainter {
 
   void _drawBuoys(Canvas canvas, Size size) {
     for (final b in state.buoys) {
-      // Convert geographic coordinates to local for projection
-      final localPos = coordinateService.toLocal(b.position);
+      // Convert geographic coordinates to local using Mercator projection
+      final localPos = mercatorService.toLocal(b.position);
       final p = _project(localPos.x, localPos.y, size);
       final colors = _colorsForRole(b.role);
       final fill = Paint()
@@ -623,7 +403,7 @@ class _CoursePainter extends CustomPainter {
     // Analyse simplifiée du parcours selon la direction générale du vent
     for (int i = 0; i < regularBuoys.length; i++) {
       final buoy = regularBuoys[i];
-      final buoyLocal = coordinateService.toLocal(buoy.position);
+      final buoyLocal = mercatorService.toLocal(buoy.position);
       
       // Analyser le type de bord pour atteindre cette bouée
       final legType = _analyzeLegTowardsBuoy(buoy, i == 0 ? null : regularBuoys[i - 1]);
@@ -661,9 +441,9 @@ class _CoursePainter extends CustomPainter {
       startPos = previousBuoy.position;
     }
     
-    // Calculer le bearing requis et le TWA
-    final startLocal = coordinateService.toLocal(startPos);
-    final endLocal = coordinateService.toLocal(targetBuoy.position);
+    // Calculer le bearing requis et le TWA avec projection Mercator
+    final startLocal = mercatorService.toLocal(startPos);
+    final endLocal = mercatorService.toLocal(targetBuoy.position);
     
     final dx = endLocal.x - startLocal.x;
     final dy = endLocal.y - startLocal.y;
@@ -947,10 +727,9 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawBoundsInfo(Canvas canvas, Size size) {
-    // Convert bounds back to geographic coordinates for display
-    final converter = CoordinateConverter(origin: coordinateService.config.origin);
-    final southWest = converter.localToGeographic(LocalPosition(x: _bounds.minX, y: _bounds.minY));
-    final northEast = converter.localToGeographic(LocalPosition(x: _bounds.maxX, y: _bounds.maxY));
+    // Convert bounds back to geographic coordinates using Mercator
+    final southWest = mercatorService.toGeographic(LocalPosition(x: _bounds.minX, y: _bounds.minY));
+    final northEast = mercatorService.toGeographic(LocalPosition(x: _bounds.maxX, y: _bounds.maxY));
     
     final localTxt = 'Locale: X:[${_bounds.minX.toStringAsFixed(1)}m ; ${_bounds.maxX.toStringAsFixed(1)}m]  '
         'Y:[${_bounds.minY.toStringAsFixed(1)}m ; ${_bounds.maxY.toStringAsFixed(1)}m]';
@@ -988,7 +767,7 @@ class _CoursePainter extends CustomPainter {
         oldDelegate.windSpeed != windSpeed ||
         oldDelegate.upwindOptimalAngle != upwindOptimalAngle ||
         oldDelegate.windTrend != windTrend ||
-        oldDelegate.coordinateService.config.origin != coordinateService.config.origin;
+        oldDelegate.mercatorService.config.origin != mercatorService.config.origin;
   }
 }
 
