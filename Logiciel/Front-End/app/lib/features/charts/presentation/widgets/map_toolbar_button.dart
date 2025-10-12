@@ -6,6 +6,8 @@ import '../../../../data/datasources/maps/models/map_tile_set.dart';
 import '../../../../data/datasources/maps/models/map_bounds.dart';
 import '../../../../data/datasources/maps/providers/map_providers.dart';
 import '../../../../data/datasources/maps/widgets/map_download_dialog.dart';
+import '../../../../data/datasources/gribs/grib_downloader.dart';
+import 'grib_layers_panel.dart';
 
 class MapToolbarButton extends ConsumerStatefulWidget {
   const MapToolbarButton({super.key});
@@ -23,137 +25,153 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
     final selectedMapId = ref.watch(selectedMapProvider);
     final showMaps = ref.watch(mapDisplayProvider);
     
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.map_outlined, size: 16),
-      tooltip: 'Gestion des cartes',
-      offset: const Offset(0, 40),
-      itemBuilder: (context) => [
-        // En-tête avec titre
-        PopupMenuItem(
-          enabled: false,
-          child: Row(
-            children: [
-              const Icon(Icons.map, color: Colors.blue, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Cartes Marines',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        
-        // Option télécharger nouvelle carte
-        PopupMenuItem(
-          value: 'download',
-          child: const Row(
-            children: [
-              Icon(Icons.download, size: 16, color: Colors.green),
-              SizedBox(width: 12),
-              Text('Télécharger une carte'),
-            ],
-          ),
-        ),
-        
-        const PopupMenuDivider(),
-        
-        // Option affichage des cartes
-        PopupMenuItem(
-          enabled: false,
-          child: Row(
-            children: [
-              const Text('Afficher les cartes'),
-              const Spacer(),
-              Switch(
-                value: showMaps,
-                onChanged: (value) {
-                  ref.read(mapDisplayProvider.notifier).toggle(value);
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        ),
-        
-        if (maps.isNotEmpty) ...[
-          const PopupMenuDivider(),
-          
-          // Titre section sélection carte
-          PopupMenuItem(
-            enabled: false,
-            child: Text(
-              'Carte active',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          
-          // Liste des cartes disponibles
-          ...maps.where((map) => map.status == MapDownloadStatus.completed).map((map) {
-            return CheckedPopupMenuItem<String>(
-              value: map.id,
-              checked: selectedMapId == map.id,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      children: [
+        // Bouton carte marine (menu popup)
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.map_outlined, size: 16),
+          tooltip: 'Gestion des cartes',
+          offset: const Offset(0, 40),
+          itemBuilder: (context) => [
+            // En-tête avec titre
+            PopupMenuItem(
+              enabled: false,
+              child: Row(
                 children: [
+                  const Icon(Icons.map, color: Colors.blue, size: 20),
+                  const SizedBox(width: 8),
                   Text(
-                    map.name,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    '${map.formattedSize} • Zoom ${map.zoomLevel}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                    'Cartes Marines',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
-            );
-          }).toList(),
-          
-          if (maps.where((map) => map.status == MapDownloadStatus.completed).isNotEmpty) ...[
+            ),
             const PopupMenuDivider(),
             
-            // Option gérer les cartes
+            // Option télécharger nouvelle carte
             PopupMenuItem(
-              value: 'manage',
+              value: 'download',
               child: const Row(
                 children: [
-                  Icon(Icons.settings, size: 16, color: Colors.orange),
+                  Icon(Icons.download, size: 16, color: Colors.green),
                   SizedBox(width: 12),
-                  Text('Gérer les cartes'),
+                  Text('Télécharger une carte'),
                 ],
               ),
             ),
-          ],
-        ] else ...[
-          // Message si aucune carte
-          PopupMenuItem(
-            enabled: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Aucune carte téléchargée',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
+            
+            const PopupMenuDivider(),
+            
+            // Option affichage des cartes
+            PopupMenuItem(
+              enabled: false,
+              child: Row(
+                children: [
+                  const Text('Afficher les cartes'),
+                  const Spacer(),
+                  Switch(
+                    value: showMaps,
+                    onChanged: (value) {
+                      ref.read(mapDisplayProvider.notifier).toggle(value);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            
+            if (maps.isNotEmpty) ...[
+              const PopupMenuDivider(),
+              
+              // Titre section sélection carte
+              PopupMenuItem(
+                enabled: false,
+                child: Text(
+                  'Carte active',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              
+              // Liste des cartes disponibles
+              ...maps.where((map) => map.status == MapDownloadStatus.completed).map((map) {
+                return CheckedPopupMenuItem<String>(
+                  value: map.id,
+                  checked: selectedMapId == map.id,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        map.name,
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        '${map.formattedSize} • Zoom ${map.zoomLevel}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              
+              if (maps.where((map) => map.status == MapDownloadStatus.completed).isNotEmpty) ...[
+                const PopupMenuDivider(),
+                
+                // Option gérer les cartes
+                PopupMenuItem(
+                  value: 'manage',
+                  child: const Row(
+                    children: [
+                      Icon(Icons.settings, size: 16, color: Colors.orange),
+                      SizedBox(width: 12),
+                      Text('Gérer les cartes'),
+                    ],
+                  ),
+                ),
+              ],
+            ] else ...[
+              // Message si aucune carte
+              PopupMenuItem(
+                enabled: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Aucune carte téléchargée',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+          onSelected: _handleMenuSelection,
+        ),
+        // Bouton météo GRIB à côté
+        IconButton(
+          icon: const Icon(Icons.cloud_outlined, size: 18),
+          tooltip: 'Couches météo',
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              builder: (_) => const GribLayersPanel(),
+            );
+          },
+        ),
       ],
-      onSelected: _handleMenuSelection,
     );
   }
 
