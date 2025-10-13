@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
 import '../widgets/course_menu.dart';
+import '../widgets/course_canvas.dart';
 import '../widgets/map_toolbar_button.dart';
 import '../../providers/wind_trend_provider.dart';
 import '../../../mapview/map_view.dart';
@@ -21,18 +22,38 @@ class ChartsPage extends ConsumerWidget {
 			loading: () => const Center(child: CircularProgressIndicator()),
 			error: (e, _) => Center(child: Text('Erreur chargement polaires: $e')),
 			data: (table) {
-				return Column(
-					children: [
-						_HeaderStatus(table: table),
-						const Divider(height: 1),
-						const Expanded(
-						child: Padding(
-							padding: EdgeInsets.all(8.0),
-							child: MapView(),
-						),
-					),
-					],
-				);
+								 return Column(
+										 children: [
+												 _HeaderStatus(table: table),
+												 const Divider(height: 1),
+												 // Ajout du widget CourseCanvas au-dessus de la carte
+																										 Expanded(
+																											 child: Stack(
+																												 children: [
+																													 CourseCanvas(),
+																													 Positioned(
+																														 top: 16,
+																														 right: 16,
+																														 child: FloatingActionButton(
+																															 onPressed: () {
+																																 ScaffoldMessenger.of(context).showSnackBar(
+																																	 const SnackBar(content: Text('Bouton action !')),
+																																 );
+																															 },
+																															 child: const Icon(Icons.add),
+																														 ),
+																													 ),
+																												 ],
+																											 ),
+																										 ),
+												 const Expanded(
+													 child: Padding(
+														 padding: EdgeInsets.all(8.0),
+														 child: MapView(),
+													 ),
+												 ),
+										 ],
+								 );
 			},
 		);
 	}

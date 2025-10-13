@@ -63,6 +63,7 @@ class MercatorCoordinateSystemService {
 }
 
 // Provider
+
 class MercatorCoordinateSystemNotifier extends Notifier<MercatorCoordinateSystemService> {
   @override
   MercatorCoordinateSystemService build() {
@@ -70,6 +71,16 @@ class MercatorCoordinateSystemNotifier extends Notifier<MercatorCoordinateSystem
       config: CoordinateSystemConfig(
         name: 'MercatorLocal',
         origin: const GeographicPosition(latitude: 43.5350, longitude: 6.9990),
+      ),
+    );
+  }
+
+  /// Permet de changer dynamiquement l'origine du système de coordonnées
+  void setOrigin(GeographicPosition newOrigin) {
+    state = MercatorCoordinateSystemService(
+      config: CoordinateSystemConfig(
+        name: state.config.name,
+        origin: newOrigin,
       ),
     );
   }
