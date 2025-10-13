@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../features/charts/providers/mercator_coordinate_system_provider.dart';
 import '../../../features/charts/domain/models/geographic_position.dart';
-import '../../../features/charts/providers/coordinate_system_provider.dart'; // pour LocalPosition
 import 'grib_overlay_models.dart';
 
 typedef ColorMap = Color Function(double v);
@@ -26,13 +25,14 @@ ColorMap makeLinearColormap({
   };
 }
 
-/// Peint la grille GRIB comme rectangles semi-transparents par-dessus la carte
 class GribRasterPainter extends CustomPainter {
   final ScalarGrid grid;
   final MercatorCoordinateSystemService mercator;
   final double opacity;       // 0..1
   final ColorMap colormap;
-  final int samplingStride;   // échantillonnage (1 = chaque cellule, 2 = 1 sur 2, etc.)
+  final int samplingStride;   // 1 = chaque cellule
+  final dynamic localBoundsOverride; // objet avec minX,maxX,minY,maxY (duck-typed)
+  final bool debugDrawCoverage;
 
   GribRasterPainter({
     required this.grid,
@@ -40,14 +40,18 @@ class GribRasterPainter extends CustomPainter {
     required this.opacity,
     required this.colormap,
     this.samplingStride = 2,
+    this.localBoundsOverride,
+    this.debugDrawCoverage = false,
   });
 
   static const double margin = 24.0;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Mapping "local -> écran" cohérent avec _CoursePainter
-    final bounds = _estimateLocalBounds();
+    // 1) Définir le cadre local (identique au CoursePainter si fourni)
+    final bounds = _resolveLocalBounds();
+
+    // 2) Calcule mapping local -> écran
     final availW = size.width - 2 * margin;
     final availH = size.height - 2 * margin;
     final spanX = bounds.maxX - bounds.minX;
@@ -58,15 +62,21 @@ class GribRasterPainter extends CustomPainter {
 
     final paint = Paint()..style = PaintingStyle.fill;
 
+    // 3) Gestion des GRIBs où la latitude décroît (dlat négatif)
+    final dlon = grid.dlon;
+    final dlat = grid.dlat;
+    final lonIncreasing = dlon > 0;
+    final latIncreasing = dlat > 0;
+
     for (int jy = 0; jy < grid.ny - 1; jy += samplingStride) {
       for (int ix = 0; ix < grid.nx - 1; ix += samplingStride) {
-        // cellule lon/lat
-        final lon0 = grid.lon0 + ix * grid.dlon;
-        final lat0 = grid.lat0 + jy * grid.dlat;
-        final lon1 = lon0 + grid.dlon * samplingStride;
-        final lat1 = lat0 + grid.dlat * samplingStride;
+        // Cellule (lon/lat) en tenant compte du sens
+        final lon0 = grid.lon0 + (lonIncreasing ? ix : -ix) * dlon;
+        final lon1 = grid.lon0 + (lonIncreasing ? (ix + samplingStride) : -(ix + samplingStride)) * dlon;
+        final lat0 = grid.lat0 + (latIncreasing ? jy : -jy) * dlat;
+        final lat1 = grid.lat0 + (latIncreasing ? (jy + samplingStride) : -(jy + samplingStride)) * dlat;
 
-        // 4 coins en local via mercator.toLocal(GeographicPosition)
+        // 4 coins → local
         final p00 = mercator.toLocal(GeographicPosition(latitude: lat0, longitude: lon0));
         final p11 = mercator.toLocal(GeographicPosition(latitude: lat1, longitude: lon1));
 
@@ -83,22 +93,50 @@ class GribRasterPainter extends CustomPainter {
         if (rect.width <= 0 || rect.height <= 0) continue;
 
         // valeur au centre
-        final vcLon = (lon0 + lon1) * 0.5;
-        final vcLat = (lat0 + lat1) * 0.5;
-        final v = grid.sampleBilinear(vcLon, vcLat);
+        final lonC = (lon0 + lon1) * 0.5;
+        final latC = (lat0 + lat1) * 0.5;
+        final v = grid.sampleBilinear(lonC, latC);
         if (v.isNaN) continue;
 
         paint.color = colormap(v).withOpacity(opacity);
         canvas.drawRect(rect, paint);
       }
     }
+
+    // 4) Debug : dessine le cadre de couverture pour vérifier l’alignement
+    if (debugDrawCoverage) {
+      final border = Paint()
+        ..color = Colors.white.withOpacity(0.6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      final pMin = Offset(
+        offsetX + (bounds.minX - bounds.minX) * scale,
+        size.height - offsetY - (bounds.minY - bounds.minY) * scale,
+      );
+      final pMax = Offset(
+        offsetX + (bounds.maxX - bounds.minX) * scale,
+        size.height - offsetY - (bounds.maxY - bounds.minY) * scale,
+      );
+      final r = Rect.fromPoints(
+        Offset(pMin.dx, pMax.dy),
+        Offset(pMax.dx, pMin.dy),
+      );
+      canvas.drawRect(r, border);
+    }
   }
 
-  /// calcule un "cadre local" autour de l'origine mercator, en coordonnées locales
-  _LocalBounds _estimateLocalBounds() {
-    // origin est géographique -> convertissons-le en local (x,y)
+  _LocalBounds _resolveLocalBounds() {
+    if (localBoundsOverride != null) {
+      return _LocalBounds(
+        localBoundsOverride.minX,
+        localBoundsOverride.maxX,
+        localBoundsOverride.minY,
+        localBoundsOverride.maxY,
+      );
+    }
+    // Fallback : 10 km autour de l’origine projetée
     final originLocal = mercator.toLocal(mercator.config.origin);
-    const span = 10_000.0; // 10 km (à ajuster selon ton usage/zoom)
+    const span = 10_000.0;
     return _LocalBounds(
       originLocal.x - span, originLocal.x + span,
       originLocal.y - span, originLocal.y + span,
@@ -111,7 +149,9 @@ class GribRasterPainter extends CustomPainter {
         old.opacity != opacity ||
         old.mercator.config.origin != mercator.config.origin ||
         old.samplingStride != samplingStride ||
-        old.colormap != colormap;
+        old.colormap != colormap ||
+        old.localBoundsOverride != localBoundsOverride ||
+        old.debugDrawCoverage != debugDrawCoverage;
   }
 }
 
