@@ -6,8 +6,8 @@ import '../../domain/models/geographic_position.dart';
 import '../../providers/coordinate_system_provider.dart';
 import '../../providers/mercator_coordinate_system_provider.dart';
 import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart';
-import '../../../../data/datasources/maps/models/map_layers.dart';
 import '../../domain/models/course.dart';
+import '../../../../data/datasources/maps/models/map_layer.dart';
 
 class MultiLayerTilePainter extends CustomPainter {
   MultiLayerTilePainter(

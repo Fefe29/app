@@ -6,10 +6,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
-import '../widgets/course_canvas.dart';
 import '../widgets/course_menu.dart';
 import '../widgets/map_toolbar_button.dart';
 import '../../providers/wind_trend_provider.dart';
+import '../../../mapview/map_view.dart';
 
 
 class ChartsPage extends ConsumerWidget {
@@ -25,10 +25,12 @@ class ChartsPage extends ConsumerWidget {
 					children: [
 						_HeaderStatus(table: table),
 						const Divider(height: 1),
-						const Expanded(child: Padding(
+						const Expanded(
+						child: Padding(
 							padding: EdgeInsets.all(8.0),
-							child: CourseCanvas(),
-						)),
+							child: MapView(),
+						),
+					),
 					],
 				);
 			},

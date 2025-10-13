@@ -17,10 +17,15 @@ import '../../providers/mercator_coordinate_system_provider.dart';
 import 'coordinate_system_config.dart';
 import '../../../../data/datasources/maps/providers/map_providers.dart';
 import '../../../../data/datasources/maps/models/map_tile_set.dart';
-import '../../../../data/datasources/maps/models/map_layers.dart';
+import '../../../../data/datasources/maps/providers/map_layer.dart';
 import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart';
 import 'multi_layer_tile_painter.dart';
 import 'tile_image_service.dart';
+import '../../../../data/datasources/gribs/grib_overlay_models.dart';
+import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
+import '../../../../data/datasources/gribs/grib_raster_painter.dart';
+
+
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
 class CourseCanvas extends ConsumerWidget {
@@ -36,7 +41,7 @@ class CourseCanvas extends ConsumerWidget {
     final mercatorService = ref.watch(mercatorCoordinateSystemProvider);
     final activeMap = ref.watch(activeMapProvider); // Carte active sélectionnée
     final displayMaps = ref.watch(mapDisplayProvider); // Affichage activé/désactivé
-    
+    final grid = ref.watch(currentGribGridProvider);
     // DEBUG: Vérification de la carte active
     if (displayMaps && activeMap != null) {
       print('TILES DEBUG - Carte active: id=${activeMap.id}, name=${activeMap.name}');
@@ -89,6 +94,25 @@ class CourseCanvas extends ConsumerWidget {
                   );
                 },
               ),
+            //  GRIB overlay (si grid chargé)
+            if (grid != null)
+              RepaintBoundary(
+                child: CustomPaint(
+                  size: Size(constraints.maxWidth, constraints.maxHeight),
+                  painter: GribRasterPainter(
+                    grid: grid,
+                    mercator: mercatorService,
+                    opacity: ref.watch(gribOpacityProvider),
+                    colormap: makeLinearColormap(
+                      vmin: ref.watch(gribVminProvider),
+                      vmax: ref.watch(gribVmaxProvider),
+                      stops: const [Colors.blue, Colors.cyan, Colors.yellow, Colors.red],
+                    ),
+                    samplingStride: 2,
+                  ),
+                ),
+              ),
+
             // Canvas principal avec le parcours
             RepaintBoundary(
               child: CustomPaint(
@@ -119,8 +143,6 @@ class CourseCanvas extends ConsumerWidget {
   Future<List<LayeredTile>> _loadMultiLayerTilesForMap(MapTileSet map) async {
     print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap appelée pour: ${map.id}');
     // Utiliser le bon mapId qui existe
-    const existingMapId = 'map_1760001674733_43.535_6.999';
-    final mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps/$existingMapId';
     print('MULTI-LAYER DEBUG - Chemin des tuiles: $mapPath');
     final tiles = await MultiLayerTileService.preloadLayeredTiles(
       mapId: existingMapId,
