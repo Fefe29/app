@@ -1,6 +1,15 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/datasources/gribs/grib_downloader.dart';
-import 'package:flutter/material.dart';
+
+/// Notifier pour afficher/masquer les GRIBs sur la carte
+class GribVisibilityNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+  void setVisible(bool v) => state = v;
+}
+
+final gribVisibilityProvider = NotifierProvider<GribVisibilityNotifier, bool>(GribVisibilityNotifier.new);
 
 class GribLayerSelection {
   final GribModel model;

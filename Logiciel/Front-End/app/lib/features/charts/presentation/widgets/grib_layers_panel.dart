@@ -1,7 +1,10 @@
+import '../../providers/grib_layers_provider.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/datasources/gribs/grib_downloader.dart';
 import '../../../../data/datasources/gribs/grib_download_controller.dart';
+
 
 class GribLayersPanel extends ConsumerStatefulWidget {
   const GribLayersPanel({super.key});
@@ -25,6 +28,49 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
 
   @override
   Widget build(BuildContext context) {
+    // Pour la gestion des dossiers GRIBs
+    Future<void> _showGribManagerDialog() async {
+      final repoDir = Directory(
+        '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/gribs/repositories',
+      );
+      final dirs = repoDir.existsSync()
+          ? repoDir.listSync().whereType<Directory>().toList()
+          : <Directory>[];
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Gestion des dossiers GRIBs'),
+          content: SizedBox(
+            width: 350,
+            child: dirs.isEmpty
+                ? const Text('Aucun dossier GRIB trouvé.')
+                : ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final d in dirs)
+                        ListTile(
+                          title: Text(d.path.split('/').last),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () async {
+                              await d.delete(recursive: true);
+                              Navigator.of(ctx).pop();
+                              setState(() {}); // refresh
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Fermer'),
+            ),
+          ],
+        ),
+      );
+    }
     final selectedVars = _selected[_selectedModel] ?? <GribVariable>{};
     final dlState = ref.watch(gribDownloadControllerProvider);
     final isBusy = dlState.isLoading;
@@ -35,6 +81,26 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Switch d'affichage des GRIBs
+            Row(
+              children: [
+                const Text('Afficher les GRIBs'),
+                const SizedBox(width: 8),
+                Switch(
+                  value: ref.watch(gribVisibilityProvider),
+                  onChanged: (v) => ref.read(gribVisibilityProvider.notifier).setVisible(v),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Bouton de gestion des dossiers GRIBs
+            ElevatedButton.icon(
+              icon: const Icon(Icons.folder_delete),
+              label: const Text('Gérer les dossiers GRIBs'),
+              onPressed: _showGribManagerDialog,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade100),
+            ),
+            const SizedBox(height: 16),
             const Text('Téléchargement météo GRIB',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),

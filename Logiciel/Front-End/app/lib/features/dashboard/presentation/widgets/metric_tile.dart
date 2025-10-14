@@ -47,9 +47,9 @@ class _MetricTileState extends ConsumerState<MetricTile>
     final valueText = _lastValue ?? '--';
     final unitText  = _lastUnit ?? '';
 
-    final catTint = _categoryColor(_category, cs);
-    final bgColor = catTint.withOpacity(.18);
-    final borderColor = catTint.withOpacity(.55);
+  // Fond gris clair pour toutes les tuiles
+  final bgColor = Colors.grey[200]!;
+  final borderColor = Colors.grey[400]!;
 
     return RepaintBoundary(
       child: Card(
@@ -130,16 +130,8 @@ class _MetricTileState extends ConsumerState<MetricTile>
 }
 
 Color _categoryColor(String cat, ColorScheme cs) {
-  switch (cat) {
-    case 'nav':
-      return cs.primary.withOpacity(.12);
-    case 'wind':
-      return Colors.teal.withOpacity(.18);
-    case 'env':
-      return Colors.blueGrey.withOpacity(.16);
-    default:
-      return cs.secondary.withOpacity(.14);
-  }
+  // Désormais inutilisé, mais conservé pour compatibilité éventuelle
+  return Colors.grey[200]!;
 }
 
 // (Ancienne classe _Badge retirée car design refondu)
@@ -168,7 +160,7 @@ class _StableValue extends StatelessWidget {
               TextSpan(
                 text: value,
                 style: const TextStyle(
-                  fontSize: 54,
+                  fontSize: 100,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -1.4,
                 ),
@@ -182,7 +174,7 @@ class _StableValue extends StatelessWidget {
                         child: Text(
                           unit,
                           style: TextStyle(
-                            fontSize: 20,
+                            fontSize: 26,
                             fontWeight: FontWeight.w500,
                             color: colorScheme.onSurfaceVariant,
                             letterSpacing: .7,
