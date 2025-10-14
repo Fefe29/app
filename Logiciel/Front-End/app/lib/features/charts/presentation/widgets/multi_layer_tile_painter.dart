@@ -29,6 +29,10 @@ class MultiLayerTilePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (tiles.isEmpty) return;
 
+    // Limite le dessin à la taille du widget
+    canvas.save();
+    canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
+
     for (final tile in tiles) {
       // 1) Coins géographiques slippy (OSM) : NW = (x,y), SE = (x+1, y+1)
       final (latNW, lonNW) = _tileXyToLatLon(tile.x, tile.y, tile.zoom);
@@ -46,7 +50,20 @@ class MultiLayerTilePainter extends CustomPainter {
       final topLeft = view.project(nwLocal.x, nwLocal.y, size);     // NW
       final bottomRight = view.project(seLocal.x, seLocal.y, size); // SE
 
+      // Calcul du rectangle d'affichage de la tuile (dans le widget)
       final rect = Rect.fromPoints(topLeft, bottomRight);
+      final widgetRect = Rect.fromLTWH(0, 0, size.width, size.height);
+      final visibleRect = rect.intersect(widgetRect);
+      if (visibleRect.isEmpty) continue;
+
+      // Calcul du sous-rectangle source à afficher (dans l'image tuile)
+      // On suppose que l'image couvre rect, donc on prend la portion visible
+      final src = _subImageRect(
+        rect,
+        visibleRect,
+        tile.baseImage?.width.toDouble() ?? 256.0,
+        tile.baseImage?.height.toDouble() ?? 256.0,
+      );
 
       // 4) Dessin des couches
       // Base raster (OSM)
@@ -56,8 +73,8 @@ class MultiLayerTilePainter extends CustomPainter {
           ..filterQuality = FilterQuality.high;
         canvas.drawImageRect(
           tile.baseImage!,
-          _fullImageRect(tile.baseImage),
-          rect,
+          src,
+          visibleRect,
           paint,
         );
       }
@@ -70,19 +87,30 @@ class MultiLayerTilePainter extends CustomPainter {
           ..blendMode = BlendMode.srcOver;
         canvas.drawImageRect(
           tile.nauticalImage!,
-          _fullImageRect(tile.nauticalImage),
-          rect,
+          src,
+          visibleRect,
           paint,
         );
       }
-
       // // Debug optionnel : cadre des tuiles
       // final dbg = Paint()
       //   ..style = PaintingStyle.stroke
       //   ..color = Colors.white24
       //   ..strokeWidth = 1;
-      // canvas.drawRect(rect, dbg);
+      // canvas.drawRect(visibleRect, dbg);
     }
+    canvas.restore();
+  }
+
+  /// Calcule le sous-rectangle source à afficher dans l'image tuile
+  /// [tileRect] = zone de la tuile sur le widget, [visibleRect] = portion visible dans le widget
+  /// [imgW], [imgH] = taille de l'image tuile
+  Rect _subImageRect(Rect tileRect, Rect visibleRect, double imgW, double imgH) {
+    final left = ((visibleRect.left - tileRect.left) / tileRect.width).clamp(0.0, 1.0) * imgW;
+    final top = ((visibleRect.top - tileRect.top) / tileRect.height).clamp(0.0, 1.0) * imgH;
+    final right = ((visibleRect.right - tileRect.left) / tileRect.width).clamp(0.0, 1.0) * imgW;
+    final bottom = ((visibleRect.bottom - tileRect.top) / tileRect.height).clamp(0.0, 1.0) * imgH;
+    return Rect.fromLTRB(left, top, right, bottom);
   }
 
   Rect _fullImageRect(ui.Image? img) {
