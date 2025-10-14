@@ -279,7 +279,7 @@ class CourseNotifier extends Notifier<CourseState> {
         // Bouée 1 - Marque au vent (500m au nord)
         Buoy(
           id: 1, 
-          position: const GeographicPosition(latitude: 43.545, longitude: 7.00050), 
+          position: const GeographicPosition(latitude: 43.548, longitude: 7.000), 
           passageOrder: 1, 
           role: BuoyRole.regular
         ),
@@ -294,14 +294,14 @@ class CourseNotifier extends Notifier<CourseState> {
         // Comité - Extrémité bâbord de la ligne de départ  
         Buoy(
           id: 3, 
-          position: const GeographicPosition(latitude: 43.5400, longitude: 7.0180), 
+          position: const GeographicPosition(latitude: 43.5430, longitude: 7.0180), 
           role: BuoyRole.committee
         ),
         
         // Bouée 2 - Marque sous le vent bâbord (600m au sud-ouest)
         Buoy(
           id: 4, 
-          position: const GeographicPosition(latitude: 43.53806, longitude: 7.0090), 
+          position: const GeographicPosition(latitude: 43.53606, longitude: 7.010), 
           passageOrder: 2, 
           role: BuoyRole.regular
         ),
@@ -309,7 +309,7 @@ class CourseNotifier extends Notifier<CourseState> {
         // Bouée 3 - Marque sous le vent tribord (600m au sud-est)
         Buoy(
           id: 5, 
-          position: const GeographicPosition(latitude: 43.53806, longitude: 7.0210), 
+          position: const GeographicPosition(latitude: 43.53606, longitude: 7.0210), 
           passageOrder: 3, 
           role: BuoyRole.regular
         ),
@@ -320,10 +320,10 @@ class CourseNotifier extends Notifier<CourseState> {
         point2: const GeographicPosition(latitude: 43.543, longitude: 7.0180), // Comité (bâbord)
         type: LineType.start,
       ),
-      // Ligne d'arrivée parallèle à la ligne de départ (200m au sud)
+      // Ligne d'arrivée
       finishLine: LineSegment(
-        point1: const GeographicPosition(latitude: 43.539, longitude: 7.0130), 
-        point2: const GeographicPosition(latitude: 43.5393, longitude: 7.0170),
+        point1: const GeographicPosition(latitude: 43.539, longitude: 7.020), 
+        point2: const GeographicPosition(latitude: 43.539, longitude: 7.023),
         type: LineType.finish,
       ),
     );
