@@ -425,7 +425,7 @@ class _CoursePainter extends CustomPainter {
   void _drawRoute(Canvas canvas, Size size) {
     if (route.isEmpty) return;
     final pathPaint = Paint()
-      ..color = Colors.cyanAccent.shade400
+      ..color = Colors.black
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round
@@ -436,7 +436,7 @@ class _CoursePainter extends CustomPainter {
       final p2 = _project(leg.endX, leg.endY, size);
       canvas.drawLine(p1, p2, pathPaint);
       final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
-      _drawText(canvas, _shortLabel(leg), mid + const Offset(4, -10), fontSize: 10, color: Colors.cyan.shade900);
+  _drawText(canvas, _shortLabel(leg), mid + const Offset(4, -10), fontSize: 10, color: Colors.black);
     }
   }
 
