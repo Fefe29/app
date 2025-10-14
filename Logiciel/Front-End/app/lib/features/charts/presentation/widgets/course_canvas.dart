@@ -155,6 +155,7 @@ class CourseCanvas extends ConsumerWidget {
                   course,
                   mercatorService: mercatorService,
                   view: view,
+                  size: Size(constraints.maxWidth, constraints.maxHeight),
                 ),
                 builder: (context, snapshot) {
                   // ignore: avoid_print
@@ -216,6 +217,7 @@ class CourseCanvas extends ConsumerWidget {
     CourseState course, {
     required MercatorCoordinateSystemService mercatorService,
     required ViewTransform view,
+    required Size size,
   }) async {
     // ignore: avoid_print
     print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap: ${map.id}');
@@ -224,21 +226,41 @@ class CourseCanvas extends ConsumerWidget {
     // ignore: avoid_print
     print('MULTI-LAYER DEBUG - Chemin des tuiles: $mapPath');
 
-    // BBox géographique dérivée de la vue logique (attention orientation Y)
-    final geoTopLeft = mercatorService.toGeographic(LocalPosition(x: view.minX, y: view.maxY));
-    final geoBottomRight = mercatorService.toGeographic(LocalPosition(x: view.maxX, y: view.minY));
+    // BBox géographique couvrant tout le widget (projetée depuis les 4 coins du widget en pixels)
+    // On projette (0,0), (size.width,0), (0,size.height), (size.width,size.height) en coordonnées locales, puis en géographiques
+    List<Offset> widgetCornersPx = [
+      Offset(0, 0),
+      Offset(size.width, 0),
+      Offset(0, size.height),
+      Offset(size.width, size.height),
+    ];
+    // Inverse de view.project : (px, py) -> (x, y)
+    List<LocalPosition> localCorners = widgetCornersPx.map((pt) {
+      final x = ((pt.dx - view.offsetX) / view.scale) + view.minX;
+      final y = ((size.height - pt.dy - view.offsetY) / view.scale) + view.minY;
+      return LocalPosition(x: x, y: y);
+    }).toList();
+    final geoCorners = localCorners.map((lp) => mercatorService.toGeographic(lp)).toList();
+    double minLat = geoCorners.first.latitude, maxLat = geoCorners.first.latitude;
+    double minLon = geoCorners.first.longitude, maxLon = geoCorners.first.longitude;
+    for (final g in geoCorners) {
+      if (g.latitude < minLat) minLat = g.latitude;
+      if (g.latitude > maxLat) maxLat = g.latitude;
+      if (g.longitude < minLon) minLon = g.longitude;
+      if (g.longitude > maxLon) maxLon = g.longitude;
+    }
 
     final zoom = map.zoomLevel;
-    int tileXmin = _lon2tile(geoTopLeft.longitude, zoom);
-    int tileXmax = _lon2tile(geoBottomRight.longitude, zoom);
-    int tileYmin = _lat2tile(geoTopLeft.latitude, zoom);
-    int tileYmax = _lat2tile(geoBottomRight.latitude, zoom);
+    int tileXmin = _lon2tile(minLon, zoom);
+    int tileXmax = _lon2tile(maxLon, zoom);
+    int tileYmin = _lat2tile(maxLat, zoom); // attention: Y inversé en tuiles
+    int tileYmax = _lat2tile(minLat, zoom);
 
     if (tileXmin > tileXmax) { final t = tileXmin; tileXmin = tileXmax; tileXmax = t; }
     if (tileYmin > tileYmax) { final t = tileYmin; tileYmin = tileYmax; tileYmax = t; }
 
     // ignore: avoid_print
-    print('MULTI-LAYER DEBUG - Tiles widget: X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] z=$zoom');
+    print('MULTI-LAYER DEBUG - Tiles widget (full): X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] z=$zoom');
 
     final tiles = <LayeredTile>[];
     final foundFiles = <String>[];
