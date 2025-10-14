@@ -22,9 +22,34 @@ import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart
 import 'multi_layer_tile_painter.dart';
 import 'tile_image_service.dart';
 
+/// -------------------------
+/// Vue & projection partagées
+/// -------------------------
+class ViewTransform {
+  const ViewTransform({
+    required this.minX, required this.maxX,
+    required this.minY, required this.maxY,
+    required this.scale, required this.offsetX, required this.offsetY,
+  });
+
+  final double minX, maxX, minY, maxY;
+  final double scale, offsetX, offsetY;
+
+  Offset project(double x, double y, Size size) {
+    final px = offsetX + (x - minX) * scale;
+    final py = size.height - offsetY - (y - minY) * scale; // Y logique vers le haut
+    return Offset(px, py);
+  }
+
+  double get spanX => maxX - minX;
+  double get spanY => maxY - minY;
+}
+
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
 class CourseCanvas extends ConsumerWidget {
   const CourseCanvas({super.key});
+
+  static const double _margin = 24.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,14 +61,16 @@ class CourseCanvas extends ConsumerWidget {
     final mercatorService = ref.watch(mercatorCoordinateSystemProvider);
     final activeMap = ref.watch(activeMapProvider); // Carte active sélectionnée
     final displayMaps = ref.watch(mapDisplayProvider); // Affichage activé/désactivé
-    
+
     // DEBUG: Vérification de la carte active
     if (displayMaps && activeMap != null) {
+      // ignore: avoid_print
       print('TILES DEBUG - Carte active: id=${activeMap.id}, name=${activeMap.name}');
     } else {
+      // ignore: avoid_print
       print('TILES DEBUG - Aucune carte active (displayMaps: $displayMaps, activeMap: ${activeMap?.id})');
     }
-    
+
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
       return const Center(
         child: Column(
@@ -56,55 +83,123 @@ class CourseCanvas extends ConsumerWidget {
         ),
       );
     }
-    
+
     return LayoutBuilder(
       builder: (context, constraints) {
+        // -------------------------
+        // 1) Calcule la bbox logique commune en coordonnées locales (Mercator)
+        // -------------------------
+        final localPoints = <Offset>[];
+        for (final b in course.buoys) {
+          final l = mercatorService.toLocal(b.position);
+          localPoints.add(Offset(l.x, l.y));
+        }
+        for (final line in [course.startLine, course.finishLine]) {
+          if (line != null) {
+            final p1 = mercatorService.toLocal(line.point1);
+            final p2 = mercatorService.toLocal(line.point2);
+            localPoints.addAll([Offset(p1.x, p1.y), Offset(p2.x, p2.y)]);
+          }
+        }
+
+        // Fallback si rien : carré 100x100
+        double minX = double.infinity, maxX = double.negativeInfinity;
+        double minY = double.infinity, maxY = double.negativeInfinity;
+        if (localPoints.isEmpty) {
+          minX = 0; maxX = 100; minY = 0; maxY = 100;
+        } else {
+          for (final o in localPoints) {
+            minX = math.min(minX, o.dx);
+            maxX = math.max(maxX, o.dx);
+            minY = math.min(minY, o.dy);
+            maxY = math.max(maxY, o.dy);
+          }
+        }
+
+        // Forcer une bbox carrée (mêmes règles que l’ancien _CoursePainter)
+        var spanX = (maxX - minX).abs() < 1e-6 ? 100 : (maxX - minX);
+        var spanY = (maxY - minY).abs() < 1e-6 ? 100 : (maxY - minY);
+        if (spanX > spanY) {
+          final delta = spanX - spanY;
+          minY -= delta / 2; maxY += delta / 2;
+          spanY = spanX;
+        } else if (spanY > spanX) {
+          final delta = spanY - spanX;
+          minX -= delta / 2; maxX += delta / 2;
+          spanX = spanY;
+        }
+
+        final availW = constraints.maxWidth - 2 * _margin;
+        final availH = constraints.maxHeight - 2 * _margin;
+        final scale = math.min(availW / spanX, availH / spanY);
+        final offsetX = (constraints.maxWidth - spanX * scale) / 2;
+        final offsetY = (constraints.maxHeight - spanY * scale) / 2;
+
+        final view = ViewTransform(
+          minX: minX,
+          maxX: maxX,
+          minY: minY,
+          maxY: maxY,
+          scale: scale,
+          offsetX: offsetX,
+          offsetY: offsetY,
+        );
+
         return Stack(
           children: [
-            // Affichage des tuiles multi-couches (OSM + OpenSeaMap)
+            // -------- Tuiles multi-couches (même projection + même vue) --------
             if (displayMaps && activeMap != null)
               FutureBuilder<List<LayeredTile>>(
-                future: _loadMultiLayerTilesForMap(activeMap, course, constraints: constraints),
+                future: _loadMultiLayerTilesForMap(
+                  activeMap,
+                  course,
+                  mercatorService: mercatorService,
+                  view: view,
+                ),
                 builder: (context, snapshot) {
-                  print('MULTI-LAYER DEBUG - FutureBuilder pour \\${activeMap.name}: hasData=\\${snapshot.hasData}, hasError=\\${snapshot.hasError}');
+                  // ignore: avoid_print
+                  print('MULTI-LAYER DEBUG - FutureBuilder ${activeMap.name}: hasData=${snapshot.hasData}, hasError=${snapshot.hasError}');
                   if (snapshot.hasError) {
-                    print('MULTI-LAYER DEBUG - Erreur: \\${snapshot.error}');
+                    // ignore: avoid_print
+                    print('MULTI-LAYER DEBUG - Erreur: ${snapshot.error}');
                   }
                   if (snapshot.hasData) {
-                    print('MULTI-LAYER DEBUG - \\${snapshot.data!.length} tuiles multi-couches chargées pour rendu de \\${activeMap.name}');
+                    // ignore: avoid_print
+                    print('MULTI-LAYER DEBUG - ${snapshot.data!.length} tuiles multi-couches chargées pour ${activeMap.name}');
                     return CustomPaint(
                       size: Size(constraints.maxWidth, constraints.maxHeight),
                       painter: MultiLayerTilePainter(
                         snapshot.data!,
                         mercatorService,
-                        constraints,
-                        course,
-                        MapLayersConfig.defaultConfig, // Configuration des couches
+                        view,
+                        MapLayersConfig.defaultConfig,
                       ),
                     );
                   }
-                  // Pendant le chargement : message simple
                   return const Center(
                     child: Text('Chargement des tuiles multi-couches...', style: TextStyle(color: Colors.white)),
                   );
                 },
               ),
-            // Canvas principal avec le parcours
+
+            // -------- Canvas parcours (utilise la même vue) --------
             RepaintBoundary(
               child: CustomPaint(
                 size: Size(constraints.maxWidth, constraints.maxHeight),
                 painter: _CoursePainter(
-                  course,
-                  route,
-                  wind.directionDeg,
-                  wind.speed,
-                  vmcUp?.angleDeg,
-                  windTrend,
-                  mercatorService,
+                  state: course,
+                  route: route,
+                  windDirDeg: wind.directionDeg,
+                  windSpeed: wind.speed,
+                  upwindOptimalAngle: vmcUp?.angleDeg,
+                  windTrend: windTrend,
+                  mercatorService: mercatorService,
+                  view: view,
                 ),
               ),
             ),
-            // Coordinate system info overlay
+
+            // Overlay
             const Positioned(
               top: 8,
               right: 8,
@@ -116,95 +211,41 @@ class CourseCanvas extends ConsumerWidget {
     );
   }
 
-  Future<List<LayeredTile>> _loadMultiLayerTilesForMap(MapTileSet map, CourseState course, {BoxConstraints? constraints}) async {
-    print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap appelée pour: ${map.id}');
+  Future<List<LayeredTile>> _loadMultiLayerTilesForMap(
+    MapTileSet map,
+    CourseState course, {
+    required MercatorCoordinateSystemService mercatorService,
+    required ViewTransform view,
+  }) async {
+    // ignore: avoid_print
+    print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap: ${map.id}');
     final mapBasePath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
     final mapPath = '$mapBasePath/${map.id}';
+    // ignore: avoid_print
     print('MULTI-LAYER DEBUG - Chemin des tuiles: $mapPath');
 
-    // 1. Calculer la bounding box logique qui correspond à tout le widget
-    // On utilise la même logique de centrage/échelle que dans _CoursePainter._project
-    // On récupère les bounds du parcours pour la projection
-    final positions = <GeographicPosition>[];
-    for (final b in course.buoys) positions.add(b.position);
-    for (final l in [course.startLine, course.finishLine]) {
-      if (l != null) {
-        positions.add(l.point1);
-        positions.add(l.point2);
-      }
-    }
-    if (positions.isEmpty || constraints == null) {
-      // Fallback: charger toutes les tuiles
-      final tiles = await MultiLayerTileService.preloadLayeredTiles(
-        mapId: map.id,
-        mapPath: mapPath,
-        config: MapLayersConfig.defaultConfig,
-      );
-      print('MULTI-LAYER DEBUG - ${tiles.length} tuiles multi-couches chargées (fallback) pour ${map.id}');
-      return tiles;
-    }
-    // Calcul des bounds locaux du parcours
-    final mercatorService = MercatorCoordinateSystemService(config: MercatorCoordinateSystemConfig(
-      origin: map.bounds.center,
-      name: map.name,
-    ));
-    double minX = double.infinity, maxX = double.negativeInfinity;
-    double minY = double.infinity, maxY = double.negativeInfinity;
-    for (final pos in positions) {
-      final local = mercatorService.toLocal(pos);
-      minX = math.min(minX, local.x);
-      maxX = math.max(maxX, local.x);
-      minY = math.min(minY, local.y);
-      maxY = math.max(maxY, local.y);
-    }
-    // Appliquer la logique de _CoursePainter pour obtenir une bounding box carrée
-    var spanX = (maxX - minX).abs() < 1e-6 ? 100 : maxX - minX;
-    var spanY = (maxY - minY).abs() < 1e-6 ? 100 : maxY - minY;
-    double boxMinX = minX, boxMaxX = maxX, boxMinY = minY, boxMaxY = maxY;
-    if (spanX > spanY) {
-      final delta = spanX - spanY;
-      boxMinY = minY - delta / 2;
-      boxMaxY = maxY + delta / 2;
-    } else if (spanY > spanX) {
-      final delta = spanY - spanX;
-      boxMinX = minX - delta / 2;
-      boxMaxX = maxX + delta / 2;
-    }
-    // Calcul de l'échelle et du centrage
-    const margin = 24.0;
-    final availW = constraints.maxWidth - 2 * margin;
-    final availH = constraints.maxHeight - 2 * margin;
-    final scale = math.min(availW / (boxMaxX - boxMinX), availH / (boxMaxY - boxMinY));
-    final offsetX = (constraints.maxWidth - (boxMaxX - boxMinX) * scale) / 2;
-    final offsetY = (constraints.maxHeight - (boxMaxY - boxMinY) * scale) / 2;
-    // Les coins du widget en coordonnées locales
-    Offset screenToLocal(double px, double py) {
-      final x = ((px - offsetX) / scale) + boxMinX;
-      final y = ((constraints.maxHeight - py - offsetY) / scale) + boxMinY;
-      return Offset(x, y);
-    }
-    final localTopLeft = screenToLocal(0, 0);
-    final localBottomRight = screenToLocal(constraints.maxWidth, constraints.maxHeight);
-    // Convertir en géographique
-    final geoTopLeft = mercatorService.toGeographic(LocalPosition(x: localTopLeft.dx, y: localTopLeft.dy));
-    final geoBottomRight = mercatorService.toGeographic(LocalPosition(x: localBottomRight.dx, y: localBottomRight.dy));
-    // Calculer la plage de tuiles à charger
+    // BBox géographique dérivée de la vue logique (attention orientation Y)
+    final geoTopLeft = mercatorService.toGeographic(LocalPosition(x: view.minX, y: view.maxY));
+    final geoBottomRight = mercatorService.toGeographic(LocalPosition(x: view.maxX, y: view.minY));
+
     final zoom = map.zoomLevel;
     int tileXmin = _lon2tile(geoTopLeft.longitude, zoom);
     int tileXmax = _lon2tile(geoBottomRight.longitude, zoom);
     int tileYmin = _lat2tile(geoTopLeft.latitude, zoom);
     int tileYmax = _lat2tile(geoBottomRight.latitude, zoom);
-    // Sécuriser l'ordre
-    if (tileXmin > tileXmax) { final tmp = tileXmin; tileXmin = tileXmax; tileXmax = tmp; }
-    if (tileYmin > tileYmax) { final tmp = tileYmin; tileYmin = tileYmax; tileYmax = tmp; }
-    print('MULTI-LAYER DEBUG - Tiles à charger (widget): X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] zoom=$zoom');
-    // Charger les tuiles
+
+    if (tileXmin > tileXmax) { final t = tileXmin; tileXmin = tileXmax; tileXmax = t; }
+    if (tileYmin > tileYmax) { final t = tileYmin; tileYmin = tileYmax; tileYmax = t; }
+
+    // ignore: avoid_print
+    print('MULTI-LAYER DEBUG - Tiles widget: X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] z=$zoom');
+
     final tiles = <LayeredTile>[];
     final foundFiles = <String>[];
+
     for (int x = tileXmin; x <= tileXmax; x++) {
       for (int y = tileYmin; y <= tileYmax; y++) {
         final filePath = '$mapPath/${x}_${y}_$zoom.png';
-        print('MULTI-LAYER DEBUG - Recherche tuile: $filePath');
         final file = File(filePath);
         if (await file.exists()) {
           foundFiles.add(filePath);
@@ -219,13 +260,20 @@ class CourseCanvas extends ConsumerWidget {
         }
       }
     }
-    print('MULTI-LAYER DEBUG - Fichiers de tuiles trouvés (${foundFiles.length}):');
-    for (final f in foundFiles) print('  $f');
-    print('MULTI-LAYER DEBUG - ${tiles.length} tuiles multi-couches chargées pour ${map.id} (zone widget)');
+
+    // ignore: avoid_print
+    print('MULTI-LAYER DEBUG - Fichiers trouvés (${foundFiles.length})');
+    for (final f in foundFiles) {
+      // ignore: avoid_print
+      print('  $f');
+    }
+    // ignore: avoid_print
+    print('MULTI-LAYER DEBUG - ${tiles.length} layered tiles chargées');
+
     return tiles;
   }
 
-  // Conversion latitude/longitude vers numéro de tuile OSM
+  // Conversion latitude/longitude vers numéro de tuile OSM (slippy)
   int _lon2tile(double lon, int zoom) {
     return ((lon + 180.0) / 360.0 * (1 << zoom)).floor();
   }
@@ -234,41 +282,44 @@ class CourseCanvas extends ConsumerWidget {
     return ((1.0 - math.log(math.tan(rad) + 1.0 / math.cos(rad)) / math.pi) / 2.0 * (1 << zoom)).floor();
   }
 
+  // ------ Anciennes fonctions de test direct conservées au besoin ------
   Future<List<LoadedTile>> _loadTilesForMap(MapTileSet map) async {
-    print('TILES DEBUG - _loadTilesForMap appelée pour: ${map.id}');
-    // Construire le chemin de base (sans le mapId car preloadMapTiles l'ajoute)
+    // ignore: avoid_print
+    print('TILES DEBUG - _loadTilesForMap: ${map.id}');
     const mapBasePath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
-    print('TILES DEBUG - Chemin de base: $mapBasePath');
     final tiles = await TileImageService.preloadMapTiles(map.id, mapBasePath);
+    // ignore: avoid_print
     print('TILES DEBUG - ${tiles.length} tuiles chargées pour ${map.id}');
     return tiles;
   }
 
   Future<List<LoadedTile>> _loadTilesDirectly() async {
-    print('TILES DEBUG - _loadTilesDirectly appelée');
-    // Chargement direct des tuiles téléchargées
+    // ignore: avoid_print
+    print('TILES DEBUG - _loadTilesDirectly');
     const mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
     const mapId = 'map_1759955517334_43.535_6.999';
-    print('TILES DEBUG - Chargement direct: $mapPath/$mapId');
     final tiles = await TileImageService.preloadMapTiles(mapId, mapPath);
+    // ignore: avoid_print
     print('TILES DEBUG - ${tiles.length} tuiles chargées directement');
     return tiles;
   }
 }
 
-/// La classe _TilePainter legacy a été remplacée par MultiLayerTilePainter avec projection Mercator
-
+/// ----------------------------------------
+/// Painter parcours (utilise la vue partagée)
+/// ----------------------------------------
 class _CoursePainter extends CustomPainter {
-  _CoursePainter(
-    this.state,
-    this.route,
-    this.windDirDeg,
-    this.windSpeed,
-    this.upwindOptimalAngle,
-    this.windTrend,
-    this.mercatorService,
-  );
-  
+  _CoursePainter({
+    required this.state,
+    required this.route,
+    required this.windDirDeg,
+    required this.windSpeed,
+    required this.upwindOptimalAngle,
+    required this.windTrend,
+    required this.mercatorService,
+    required this.view,
+  });
+
   final CourseState state;
   final RoutePlan route;
   final double windDirDeg; // 0 = Nord (haut), 90 = Est (droite)
@@ -276,70 +327,12 @@ class _CoursePainter extends CustomPainter {
   final double? upwindOptimalAngle; // angle (°) par rapport au vent pour meilleure VMG près
   final WindTrendSnapshot windTrend; // Analyse des tendances de vent
   final MercatorCoordinateSystemService mercatorService;
+  final ViewTransform view;
 
   static const double margin = 24.0; // logical px margin inside canvas
   static const double buoyRadius = 8.0;
 
-  late final _Bounds _bounds = _computeBounds();
-
-  _Bounds _computeBounds() {
-    final xs = <double>[];
-    final ys = <double>[];
-    
-    // Utiliser la projection Mercator pour toutes les conversions
-    for (final b in state.buoys) {
-      final localPos = mercatorService.toLocal(b.position);
-      xs.add(localPos.x);
-      ys.add(localPos.y);
-    }
-    
-    for (final l in [state.startLine, state.finishLine]) {
-      if (l != null) {
-        final p1 = mercatorService.toLocal(l.point1);
-        final p2 = mercatorService.toLocal(l.point2);
-        xs.addAll([p1.x, p2.x]);
-        ys.addAll([p1.y, p2.y]);
-      }
-    }
-    
-    if (xs.isEmpty || ys.isEmpty) {
-      return const _Bounds(0, 100, 0, 100); // default square
-    }
-    final minX = xs.reduce(math.min);
-    final maxX = xs.reduce(math.max);
-    final minY = ys.reduce(math.min);
-    final maxY = ys.reduce(math.max);
-    // Guard against zero span
-    var spanX = (maxX - minX).abs() < 1e-6 ? 100 : maxX - minX;
-    var spanY = (maxY - minY).abs() < 1e-6 ? 100 : maxY - minY;
-
-    // Pour assurer une échelle cohérente (1:1), on force la bounding box à être carrée.
-    if (spanX > spanY) {
-      final delta = spanX - spanY;
-      // Étendre Y de part et d'autre pour rester centré
-      return _Bounds(minX, minX + spanX, minY - delta / 2, minY + spanY + delta / 2);
-    } else if (spanY > spanX) {
-      final delta = spanY - spanX;
-      return _Bounds(minX - delta / 2, minX + spanX + delta / 2, minY, minY + spanY);
-    }
-    return _Bounds(minX, minX + spanX, minY, minY + spanY);
-  }
-
-  Offset _project(double x, double y, Size size) {
-    // Nous voulons un facteur d'échelle unique pour X et Y afin de conserver les angles.
-    final availW = size.width - 2 * margin;
-    final availH = size.height - 2 * margin;
-    final spanX = _bounds.maxX - _bounds.minX;
-    final spanY = _bounds.maxY - _bounds.minY;
-    final scale = math.min(availW / spanX, availH / spanY);
-    // Centrage si l'espace disponible n'est pas carré
-    final offsetX = (size.width - spanX * scale) / 2;
-    final offsetY = (size.height - spanY * scale) / 2;
-    final px = offsetX + (x - _bounds.minX) * scale;
-    // y croissant vers le haut dans notre repère logique -> inverser
-    final py = size.height - offsetY - (y - _bounds.minY) * scale;
-    return Offset(px, py);
-  }
+  Offset _project(double x, double y, Size size) => view.project(x, y, size);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -347,8 +340,6 @@ class _CoursePainter extends CustomPainter {
       ..color = Colors.blueGrey.withOpacity(0.04)
       ..style = PaintingStyle.fill;
     canvas.drawRect(Offset.zero & size, bg);
-
-        // Les cartes sont maintenant dessinées par _TilePainter en arrière-plan
 
     _drawGrid(canvas, size);
     _drawLines(canvas, size);
@@ -361,11 +352,9 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawGrid(Canvas canvas, Size size) {
-    const gridStep = 50.0; // logical units after projection (approx)
     final paint = Paint()
       ..color = Colors.grey.withOpacity(0.2)
       ..strokeWidth = 1;
-    // We'll draw an approximate grid in screen space every 60 px
     for (double x = margin; x < size.width - margin; x += 60) {
       canvas.drawLine(Offset(x, margin), Offset(x, size.height - margin), paint);
     }
@@ -377,7 +366,6 @@ class _CoursePainter extends CustomPainter {
   void _drawLines(Canvas canvas, Size size) {
     for (final line in [state.startLine, state.finishLine]) {
       if (line == null) continue;
-      // Convert geographic coordinates to local using Mercator projection
       final localP1 = mercatorService.toLocal(line.point1);
       final localP2 = mercatorService.toLocal(line.point2);
       final p1 = _project(localP1.x, localP1.y, size);
@@ -387,7 +375,6 @@ class _CoursePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..color = line.type == LineType.start ? Colors.greenAccent.shade400 : Colors.redAccent.shade400;
       canvas.drawLine(p1, p2, paint);
-      // Label at midpoint
       final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
       _drawText(
         canvas,
@@ -401,17 +388,11 @@ class _CoursePainter extends CustomPainter {
 
   void _drawBuoys(Canvas canvas, Size size) {
     for (final b in state.buoys) {
-      // Convert geographic coordinates to local using Mercator projection
       final localPos = mercatorService.toLocal(b.position);
       final p = _project(localPos.x, localPos.y, size);
       final colors = _colorsForRole(b.role);
-      final fill = Paint()
-        ..style = PaintingStyle.fill
-        ..color = colors.background;
-      final stroke = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = colors.border;
+      final fill = Paint()..style = PaintingStyle.fill..color = colors.background;
+      final stroke = Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = colors.border;
       canvas.drawCircle(p, buoyRadius, fill);
       canvas.drawCircle(p, buoyRadius, stroke);
       final label = _labelForBuoy(b);
@@ -427,40 +408,34 @@ class _CoursePainter extends CustomPainter {
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
+
     for (final leg in route.legs) {
       final p1 = _project(leg.startX, leg.startY, size);
       final p2 = _project(leg.endX, leg.endY, size);
       canvas.drawLine(p1, p2, pathPaint);
-      // Optionnel : petit marqueur
       final mid = Offset((p1.dx + p2.dx) / 2, (p1.dy + p2.dy) / 2);
-      
-      // Afficher seulement le nom du segment
       _drawText(canvas, _shortLabel(leg), mid + const Offset(4, -10), fontSize: 10, color: Colors.cyan.shade900);
     }
   }
 
   void _drawWind(Canvas canvas, Size size) {
-    // Flèche montrant la direction VERS laquelle souffle le vent (sens inverse de la provenance).
-    // Direction FROM = windDirDeg. Direction TO = windDirDeg + 180°.
-    const arrowLen = 50.0; // Réduit de 70 à 50
+    const arrowLen = 50.0;
     final toDir = (windDirDeg + 180.0) % 360.0;
     final angleRad = toDir * math.pi / 180.0;
-    // Vecteur écran (0°=Nord => vers le haut => y négatif) donc : x=sin, y=-cos
     final vx = math.sin(angleRad);
     final vy = -math.cos(angleRad);
 
-    final base = Offset(size.width - margin - 120, margin + 10); // Décalé plus à gauche
+    final base = Offset(size.width - margin - 120, margin + 10);
     final tip = base + Offset(vx, vy) * arrowLen;
 
     final shaft = Paint()
-      ..color = Colors.black // Changé en noir
-      ..strokeWidth = 3 // Réduit de 4 à 3
+      ..color = Colors.black
+      ..strokeWidth = 3
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(base, tip, shaft);
 
-    // Triangle tête pointant vers la DESTINATION du vent.
-    final headSize = 10.0; // Réduit de 12 à 10
+    final headSize = 10.0;
     final ortho = Offset(-vy, vx);
     final headP1 = tip;
     final headP2 = tip - Offset(vx, vy) * headSize + ortho * (headSize * 0.6);
@@ -470,24 +445,20 @@ class _CoursePainter extends CustomPainter {
       ..lineTo(headP2.dx, headP2.dy)
       ..lineTo(headP3.dx, headP3.dy)
       ..close();
-    final headPaint = Paint()
-      ..color = Colors.black // Changé en noir
-      ..style = PaintingStyle.fill;
+    final headPaint = Paint()..color = Colors.black..style = PaintingStyle.fill;
     canvas.drawPath(headPath, headPaint);
     canvas.drawPath(headPath, shaft);
 
     final label = 'Vent→  from ${windDirDeg.toStringAsFixed(0)}°  ${windSpeed.toStringAsFixed(1)} nds';
-    _drawText(canvas, label, base + const Offset(-180, 8), fontSize: 12, color: Colors.black87); // Ajusté position et couleur
+    _drawText(canvas, label, base + const Offset(-180, 8), fontSize: 12, color: Colors.black87);
   }
 
   void _drawLaylines(Canvas canvas, Size size) {
-    if (upwindOptimalAngle == null || windDirDeg == null) return;
-    
-    // Pour l'instant, analyse simplifiée : laylines de près sur premières bouées, portant sur dernières
+    if (upwindOptimalAngle == null) return;
+
     final regularBuoys = state.buoys.where((b) => b.role == BuoyRole.regular).toList();
     if (regularBuoys.isEmpty) return;
-    
-    // Trier par passageOrder puis par id
+
     regularBuoys.sort((a, b) {
       final ao = a.passageOrder;
       final bo = b.passageOrder;
@@ -501,39 +472,29 @@ class _CoursePainter extends CustomPainter {
       }
       return a.id.compareTo(b.id);
     });
-    
-    // Analyse simplifiée du parcours selon la direction générale du vent
+
     for (int i = 0; i < regularBuoys.length; i++) {
       final buoy = regularBuoys[i];
       final buoyLocal = mercatorService.toLocal(buoy.position);
-      
-      // Analyser le type de bord pour atteindre cette bouée
       final legType = _analyzeLegTowardsBuoy(buoy, i == 0 ? null : regularBuoys[i - 1]);
-      
       if (legType == 'PRÈS') {
-        // Si on fait du près pour atteindre cette bouée → laylines de près depuis cette bouée
         _drawUpwindLaylines(canvas, size, buoyLocal.x, buoyLocal.y, 'B${buoy.id}');
       } else if (legType == 'PORTANT') {
-        // Si on fait du portant pour atteindre cette bouée → laylines de portant depuis cette bouée
         _drawDownwindLaylines(canvas, size, buoyLocal.x, buoyLocal.y, 'B${buoy.id}');
       }
     }
   }
-  
-  /// Analyse le type de bord nécessaire pour atteindre une bouée
+
   String? _analyzeLegTowardsBuoy(Buoy targetBuoy, Buoy? previousBuoy) {
-    if (windDirDeg == null || upwindOptimalAngle == null) return null;
-    
-    // Déterminer le point de départ
+    if (upwindOptimalAngle == null) return null;
+
     GeographicPosition startPos;
     if (previousBuoy == null) {
-      // Premier bord : depuis la ligne de départ ou point arbitraire
       if (state.startLine != null) {
         final lat = (state.startLine!.point1.latitude + state.startLine!.point2.latitude) / 2;
         final lon = (state.startLine!.point1.longitude + state.startLine!.point2.longitude) / 2;
         startPos = GeographicPosition(latitude: lat, longitude: lon);
       } else {
-        // Point arbitraire au sud de la bouée
         startPos = GeographicPosition(
           latitude: targetBuoy.position.latitude - 0.01,
           longitude: targetBuoy.position.longitude,
@@ -542,54 +503,42 @@ class _CoursePainter extends CustomPainter {
     } else {
       startPos = previousBuoy.position;
     }
-    
-    // Calculer le bearing requis et le TWA avec projection Mercator
+
     final startLocal = mercatorService.toLocal(startPos);
     final endLocal = mercatorService.toLocal(targetBuoy.position);
-    
+
     final dx = endLocal.x - startLocal.x;
     final dy = endLocal.y - startLocal.y;
     final dist = math.sqrt(dx * dx + dy * dy);
-    
     if (dist < 1e-6) return null;
-    
-    // Heading géographique (0=N, 90=E)
+
     final headingRad = math.atan2(dx, dy);
     double headingDeg = (headingRad * 180 / math.pi) % 360;
     if (headingDeg < 0) headingDeg += 360;
-    
-    // Calculer le TWA théorique
-    double theoreticalTWA = (headingDeg - windDirDeg!) % 360;
-    if (theoreticalTWA > 180) theoreticalTWA -= 360;
-    if (theoreticalTWA < -180) theoreticalTWA += 360;
-    
-    final absTWA = theoreticalTWA.abs();
-    
-    // Déterminer le type de bord
+
+    double twa = (headingDeg - windDirDeg) % 360;
+    if (twa > 180) twa -= 360;
+    if (twa < -180) twa += 360;
+    final absTWA = twa.abs();
+
     if (absTWA < upwindOptimalAngle!) {
       return 'PRÈS';
     } else if (absTWA > 150) {
       return 'PORTANT';
     }
-    return null; // Pas de laylines pour le travers
+    return null;
   }
 
-
-
-  /// Dessine les laylines de près depuis une bouée
+  /// Laylines de près
   void _drawUpwindLaylines(Canvas canvas, Size size, double ox, double oy, String buoyLabel) {
-    // windDirDeg représente la DIRECTION D'OU PROVIENT le vent (FROM). Pour remonter au vent,
-    // les laylines montrent la DIRECTION DE NAVIGATION du bateau (cap + 180° par rapport au vent).
-    // Caps de navigation au près = (windDirDeg + 180°) +/- upwindOptimalAngle.
-    final heading1 = (windDirDeg! + 180.0 - upwindOptimalAngle!) % 360.0; // tack bâbord 
-    final heading2 = (windDirDeg! + 180.0 + upwindOptimalAngle!) % 360.0; // tack tribord
+    final heading1 = (windDirDeg + 180.0 - upwindOptimalAngle!) % 360.0; // bâbord
+    final heading2 = (windDirDeg + 180.0 + upwindOptimalAngle!) % 360.0; // tribord
 
-    final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.minY);
-    final length = maxSpan * 1.2; // un peu plus grand que le terrain
+    final maxSpan = math.max(view.spanX, view.spanY);
+    final length = maxSpan * 1.2;
 
-    void drawUpwindLay(double headingDeg, Color color, String side) {
+  void drawLay(double headingDeg, Color color, String side, [double labelT = 0.6]) {
       final rad = headingDeg * math.pi / 180.0;
-      // Convertir heading (0=N) en vecteur coordonnées logiques (Y vers le haut) : x=sin, y=cos
       final vx = math.sin(rad);
       final vy = math.cos(rad);
       final ex = ox + vx * length;
@@ -600,9 +549,8 @@ class _CoursePainter extends CustomPainter {
         ..color = color
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
-      // Trait en pointillés léger
-      const dash = 10.0;
-      const gap = 6.0;
+
+      const dash = 10.0, gap = 6.0;
       final total = (p2 - p1).distance;
       if (total > 0) {
         final dir = (p2 - p1) / total;
@@ -613,40 +561,29 @@ class _CoursePainter extends CustomPainter {
           canvas.drawLine(s, e, paint);
           dist += dash + gap;
         }
-        
-        // Afficher l'angle de la layline
-        final midPoint = p1 + dir * (total * 0.6); // Position à 60% de la ligne
+        final mid = p1 + dir * (total * labelT);
         final displayAngle = (headingDeg + 180) % 360;
-        _drawText(
-          canvas,
-          '${displayAngle.toStringAsFixed(0)}° $side ($buoyLabel)',
-          midPoint + const Offset(5, -10),
-          fontSize: 9,
-          color: color.withOpacity(0.9),
-        );
+        _drawText(canvas, '${displayAngle.toStringAsFixed(0)}° $side ($buoyLabel)', mid + const Offset(5, -10),
+            fontSize: 9, color: color.withOpacity(0.9));
       }
     }
 
-    drawUpwindLay(heading1, Colors.lightGreenAccent.shade400, 'Bb');  // Bâbord
-    drawUpwindLay(heading2, Colors.lightGreenAccent.shade700, 'Tb');  // Tribord
+    drawLay(heading1, Colors.lightGreenAccent.shade400, 'Bb');
+    drawLay(heading2, Colors.lightGreenAccent.shade700, 'Tb');
   }
 
-  /// Dessine les laylines de portant depuis une bouée
+  /// Laylines de portant (bug corrigé : longueur)
   void _drawDownwindLaylines(Canvas canvas, Size size, double ox, double oy, String buoyLabel) {
-    // Angle optimal de portant (typiquement 140-160° TWA)
     const optimalDownwindAngle = 150.0;
-    
-    // Caps au portant optimaux inversés (navigation depuis la bouée de portant VERS le haut)
-    // Avec inversion tribord/bâbord et ajout de 180° pour corriger le sens
-    final downwindHeading1 = (windDirDeg! + 180.0 + optimalDownwindAngle) % 360.0; // tribord portant inversé -> bâbord
-    final downwindHeading2 = (windDirDeg! + 180.0 - optimalDownwindAngle) % 360.0; // bâbord portant inversé -> tribord
-    
-    final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.maxY);
-    final length = maxSpan * 1.2; // un peu plus grand que le terrain
-    
-    void drawDownwindLay(double headingDeg, Color color, String side) {
+    final downwindHeading1 = (windDirDeg + 180.0 + optimalDownwindAngle) % 360.0; // tribord portant inversé -> bâbord
+    final downwindHeading2 = (windDirDeg + 180.0 - optimalDownwindAngle) % 360.0; // bâbord portant inversé -> tribord
+
+    // BUG FIX: maxSpan utilisait maxY - maxY
+    final maxSpan = math.max(view.spanX, view.spanY);
+    final length = maxSpan * 1.2;
+
+  void drawLay(double headingDeg, Color color, String side, [double labelT = 0.4]) {
       final rad = headingDeg * math.pi / 180.0;
-      // Convertir heading (0=N) en vecteur coordonnées logiques (Y vers le haut) : x=sin, y=cos
       final vx = math.sin(rad);
       final vy = math.cos(rad);
       final ex = ox + vx * length;
@@ -657,9 +594,8 @@ class _CoursePainter extends CustomPainter {
         ..color = color
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
-      // Trait en pointillés avec un pattern différent pour le portant
-      const dash = 8.0;
-      const gap = 8.0;
+
+      const dash = 8.0, gap = 8.0;
       final total = (p2 - p1).distance;
       if (total > 0) {
         final dir = (p2 - p1) / total;
@@ -670,22 +606,15 @@ class _CoursePainter extends CustomPainter {
           canvas.drawLine(s, e, paint);
           dist += dash + gap;
         }
-        
-        // Afficher l'angle de la layline (avec correction de 180° car on remonte)
-        final midPoint = p1 + dir * (total * 0.4); // Position à 40% pour éviter chevauchement avec près
-        final displayAngle = headingDeg; // Pas de +180 car déjà corrigé dans le calcul du cap
-        _drawText(
-          canvas,
-          '${displayAngle.toStringAsFixed(0)}° $side ($buoyLabel)',
-          midPoint + const Offset(5, 8),
-          fontSize: 9,
-          color: color.withOpacity(0.9),
-        );
+        final mid = p1 + dir * (total * labelT);
+        final displayAngle = headingDeg; // déjà corrigé
+        _drawText(canvas, '${displayAngle.toStringAsFixed(0)}° $side ($buoyLabel)', mid + const Offset(5, 8),
+            fontSize: 9, color: color.withOpacity(0.9));
       }
     }
-    
-    drawDownwindLay(downwindHeading1, Colors.orangeAccent.shade400, 'Bb↑');  // Bâbord portant remontant (inversé)
-    drawDownwindLay(downwindHeading2, Colors.orangeAccent.shade700, 'Tb↑');  // Tribord portant remontant (inversé)
+
+    drawLay(downwindHeading1, Colors.orangeAccent.shade400, 'Bb↑');
+    drawLay(downwindHeading2, Colors.orangeAccent.shade700, 'Tb↑');
   }
 
   String _shortLabel(RouteLeg leg) {
@@ -739,15 +668,13 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawWindTrendInfo(Canvas canvas, Size size) {
-    // Affichage dans le coin supérieur gauche
     const margin = 12.0;
     const lineHeight = 16.0;
-    
-    // Couleur et style selon la tendance détectée
+
     Color trendColor;
     String trendIcon;
     String trendLabel;
-    
+
     switch (windTrend.trend) {
       case WindTrendDirection.veeringRight:
         trendColor = Colors.green.shade700;
@@ -770,12 +697,11 @@ class _CoursePainter extends CustomPainter {
         trendLabel = 'STABLE';
         break;
     }
-    
-    // Fond semi-transparent
+
     final background = Paint()
       ..color = Colors.black.withOpacity(0.7)
       ..style = PaintingStyle.fill;
-    
+
     const boxWidth = 180.0;
     const boxHeight = 70.0;
     final rect = RRect.fromRectAndRadius(
@@ -783,66 +709,39 @@ class _CoursePainter extends CustomPainter {
       const Radius.circular(6),
     );
     canvas.drawRRect(rect, background);
-    
-    // Titre
-    _drawText(
-      canvas, 
-      '📊 ANALYSE VENT',
-      const Offset(margin + 8, margin + 8),
-      fontSize: 11,
-      color: Colors.white70,
-    );
-    
-    // Tendance principale avec icône
-    _drawText(
-      canvas,
-      '$trendIcon $trendLabel',
-      const Offset(margin + 8, margin + 8 + lineHeight),
-      fontSize: 13,
-      color: trendColor,
-    );
-    
-    // Pente et fiabilité
-    final slopeText = windTrend.linearSlopeDegPerMin >= 0 
+
+    _drawText(canvas, '📊 ANALYSE VENT', const Offset(margin + 8, margin + 8),
+        fontSize: 11, color: Colors.white70);
+
+    _drawText(canvas, '$trendIcon $trendLabel', const Offset(margin + 8, margin + 8 + lineHeight),
+        fontSize: 13, color: trendColor);
+
+    final slopeText = windTrend.linearSlopeDegPerMin >= 0
         ? '+${windTrend.linearSlopeDegPerMin.toStringAsFixed(1)}°/min'
         : '${windTrend.linearSlopeDegPerMin.toStringAsFixed(1)}°/min';
-    
-    _drawText(
-      canvas,
-      'Pente: $slopeText',
-      const Offset(margin + 8, margin + 8 + lineHeight * 2),
-      fontSize: 10,
-      color: Colors.white70,
-    );
-    
-    // Fiabilité
+
+    _drawText(canvas, 'Pente: $slopeText', const Offset(margin + 8, margin + 8 + lineHeight * 2),
+        fontSize: 10, color: Colors.white70);
+
     final reliability = windTrend.isReliable ? '✓ Fiable' : '⚠ Peu fiable';
     final reliabilityColor = windTrend.isReliable ? Colors.green.shade400 : Colors.orange.shade400;
-    
-    _drawText(
-      canvas,
-      '$reliability (${windTrend.supportPoints}pts)',
-      const Offset(margin + 8, margin + 8 + lineHeight * 3),
-      fontSize: 10,
-      color: reliabilityColor,
-    );
+
+    _drawText(canvas, '$reliability (${windTrend.supportPoints}pts)',
+        const Offset(margin + 8, margin + 8 + lineHeight * 3),
+        fontSize: 10, color: reliabilityColor);
   }
 
   void _drawBoundsInfo(Canvas canvas, Size size) {
-    // Convert bounds back to geographic coordinates using Mercator
-    final southWest = mercatorService.toGeographic(LocalPosition(x: _bounds.minX, y: _bounds.minY));
-    final northEast = mercatorService.toGeographic(LocalPosition(x: _bounds.maxX, y: _bounds.maxY));
-    
-    final localTxt = 'Locale: X:[${_bounds.minX.toStringAsFixed(1)}m ; ${_bounds.maxX.toStringAsFixed(1)}m]  '
-        'Y:[${_bounds.minY.toStringAsFixed(1)}m ; ${_bounds.maxY.toStringAsFixed(1)}m]';
-    
+    final southWest = mercatorService.toGeographic(LocalPosition(x: view.minX, y: view.minY));
+    final northEast = mercatorService.toGeographic(LocalPosition(x: view.maxX, y: view.maxY));
+
+    final localTxt = 'Locale: X:[${view.minX.toStringAsFixed(1)}m ; ${view.maxX.toStringAsFixed(1)}m]  '
+        'Y:[${view.minY.toStringAsFixed(1)}m ; ${view.maxY.toStringAsFixed(1)}m]';
+
     final geoTxt = 'Géo: Lat:[${southWest.latitude.toStringAsFixed(4)}° ; ${northEast.latitude.toStringAsFixed(4)}°]  '
         'Lon:[${southWest.longitude.toStringAsFixed(4)}° ; ${northEast.longitude.toStringAsFixed(4)}°]';
-    
-    // Local coordinates
+
     _drawText(canvas, localTxt, Offset(8, size.height - 34), fontSize: 10, color: Colors.blueGrey);
-    
-    // Geographic coordinates  
     _drawText(canvas, geoTxt, Offset(8, size.height - 18), fontSize: 10, color: Colors.green.shade600);
   }
 
@@ -855,85 +754,51 @@ class _CoursePainter extends CustomPainter {
     tp.paint(canvas, position);
   }
 
-
-
-
-  
-
-
   @override
-  bool shouldRepaint(covariant _CoursePainter oldDelegate) {
-    return oldDelegate.state != state ||
-        oldDelegate.route != route ||
-        oldDelegate.windDirDeg != windDirDeg ||
-        oldDelegate.windSpeed != windSpeed ||
-        oldDelegate.upwindOptimalAngle != upwindOptimalAngle ||
-        oldDelegate.windTrend != windTrend ||
-        oldDelegate.mercatorService.config.origin != mercatorService.config.origin;
+  bool shouldRepaint(covariant _CoursePainter old) {
+    return old.state != state ||
+        old.route != route ||
+        old.windDirDeg != windDirDeg ||
+        old.windSpeed != windSpeed ||
+        old.upwindOptimalAngle != upwindOptimalAngle ||
+        old.windTrend != windTrend ||
+        old.mercatorService.config.origin != mercatorService.config.origin ||
+        old.view.minX != view.minX || old.view.maxX != view.maxX ||
+        old.view.minY != view.minY || old.view.maxY != view.maxY ||
+        old.view.scale != view.scale || old.view.offsetX != view.offsetX || old.view.offsetY != view.offsetY;
   }
 }
 
-/// Painter pour afficher des rectangles bleus placeholder quand les tuiles ne sont pas disponibles
+/// Painter placeholder inchangé
 class _MapPlaceholderPainter extends CustomPainter {
   const _MapPlaceholderPainter(this.coordinateService);
-  
   final CoordinateSystemService coordinateService;
-  
+
   @override
   void paint(Canvas canvas, Size size) {
-    print('TILES DEBUG - _MapPlaceholderPainter.paint appelé');
-    
-    // Dessiner une grille de rectangles bleus 256x256 comme placeholder
-    final paint = Paint()
-      ..color = Colors.blue.withAlpha(100)
-      ..style = PaintingStyle.fill;
-    
-    final borderPaint = Paint()
-      ..color = Colors.blue.withAlpha(180)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    
-    // Grille 3x3 de rectangles 256x256
+    final paint = Paint()..color = Colors.blue.withAlpha(100)..style = PaintingStyle.fill;
+    final borderPaint = Paint()..color = Colors.blue.withAlpha(180)..style = PaintingStyle.stroke..strokeWidth = 1;
+
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
-        final rect = Rect.fromLTWH(
-          i * 256.0, 
-          j * 256.0, 
-          256.0, 
-          256.0
-        );
-        
-        // Seulement si le rectangle est visible dans l'écran
-        if (rect.right > 0 && rect.bottom > 0 && 
-            rect.left < size.width && rect.top < size.height) {
+        final rect = Rect.fromLTWH(i * 256.0, j * 256.0, 256.0, 256.0);
+        if (rect.right > 0 && rect.bottom > 0 && rect.left < size.width && rect.top < size.height) {
           canvas.drawRect(rect, paint);
           canvas.drawRect(rect, borderPaint);
         }
       }
     }
-    
-    // Texte informatif
+
     final textPainter = TextPainter(
-      text: const TextSpan(
-        text: 'Chargement des tuiles...',
-        style: TextStyle(color: Colors.white, fontSize: 16),
-      ),
+      text: const TextSpan(text: 'Chargement des tuiles...', style: TextStyle(color: Colors.white, fontSize: 16)),
       textDirection: TextDirection.ltr,
     );
     textPainter.layout();
     textPainter.paint(canvas, Offset(20, size.height - 50));
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _Bounds {
-  const _Bounds(this.minX, this.maxX, this.minY, this.maxY);
-  final double minX;
-  final double maxX;
-  final double minY;
-  final double maxY;
 }
 
 class _RoleColors {
