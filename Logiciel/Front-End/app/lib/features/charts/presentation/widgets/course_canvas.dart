@@ -21,40 +21,6 @@ import '../../../../data/datasources/maps/models/map_layers.dart';
 import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart';
 import 'multi_layer_tile_painter.dart';
 import 'tile_image_service.dart';
-import '../../../charts/providers/zoom_provider.dart';
-
-/// Utilitaire pour centraliser le calcul de bounding box, scale et offset
-class CanvasTransform {
-  final double minX, maxX, minY, maxY, margin, width, height, userZoom;
-  late final double spanX = (maxX - minX).abs() < 1e-6 ? 100 : maxX - minX;
-  late final double spanY = (maxY - minY).abs() < 1e-6 ? 100 : maxY - minY;
-  late final double scale = userZoom * (width - 2 * margin) / (spanX > spanY ? spanX : spanY);
-  late final double offsetX = (width - (maxX - minX) * scale) / 2;
-  late final double offsetY = (height - (maxY - minY) * scale) / 2;
-
-  CanvasTransform({
-    required this.minX,
-    required this.maxX,
-    required this.minY,
-    required this.maxY,
-    required this.margin,
-    required this.width,
-    required this.height,
-    this.userZoom = 1.0,
-  });
-
-  Offset project(double x, double y) {
-    final px = offsetX + (x - minX) * scale;
-    final py = height - offsetY - (y - minY) * scale;
-    return Offset(px, py);
-  }
-
-  Offset screenToLocal(double px, double py) {
-    final x = ((px - offsetX) / scale) + minX;
-    final y = ((height - py - offsetY) / scale) + minY;
-    return Offset(x, y);
-  }
-}
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
 class CourseCanvas extends ConsumerWidget {
@@ -93,18 +59,19 @@ class CourseCanvas extends ConsumerWidget {
     
     return LayoutBuilder(
       builder: (context, constraints) {
-        final userZoom = ref.watch(zoomProvider);
         return Stack(
           children: [
             // Affichage des tuiles multi-couches (OSM + OpenSeaMap)
             if (displayMaps && activeMap != null)
               FutureBuilder<List<LayeredTile>>(
-                future: _loadMultiLayerTilesForMap(activeMap, course, constraints: constraints, userZoom: userZoom),
+                future: _loadMultiLayerTilesForMap(activeMap, course, constraints: constraints),
                 builder: (context, snapshot) {
+                  print('MULTI-LAYER DEBUG - FutureBuilder pour \\${activeMap.name}: hasData=\\${snapshot.hasData}, hasError=\\${snapshot.hasError}');
                   if (snapshot.hasError) {
                     print('MULTI-LAYER DEBUG - Erreur: \\${snapshot.error}');
                   }
                   if (snapshot.hasData) {
+                    print('MULTI-LAYER DEBUG - \\${snapshot.data!.length} tuiles multi-couches chargées pour rendu de \\${activeMap.name}');
                     return CustomPaint(
                       size: Size(constraints.maxWidth, constraints.maxHeight),
                       painter: MultiLayerTilePainter(
@@ -112,11 +79,11 @@ class CourseCanvas extends ConsumerWidget {
                         mercatorService,
                         constraints,
                         course,
-                        MapLayersConfig.defaultConfig,
-                        userZoom: userZoom,
+                        MapLayersConfig.defaultConfig, // Configuration des couches
                       ),
                     );
                   }
+                  // Pendant le chargement : message simple
                   return const Center(
                     child: Text('Chargement des tuiles multi-couches...', style: TextStyle(color: Colors.white)),
                   );
@@ -134,15 +101,8 @@ class CourseCanvas extends ConsumerWidget {
                   vmcUp?.angleDeg,
                   windTrend,
                   mercatorService,
-                  userZoom: userZoom,
                 ),
               ),
-            ),
-            // Contrôles de zoom
-            Positioned(
-              bottom: 16,
-              right: 16,
-              child: _ZoomControls(),
             ),
             // Coordinate system info overlay
             const Positioned(
@@ -156,7 +116,7 @@ class CourseCanvas extends ConsumerWidget {
     );
   }
 
-  Future<List<LayeredTile>> _loadMultiLayerTilesForMap(MapTileSet map, CourseState course, {BoxConstraints? constraints, double userZoom = 1.0}) async {
+  Future<List<LayeredTile>> _loadMultiLayerTilesForMap(MapTileSet map, CourseState course, {BoxConstraints? constraints}) async {
     print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap appelée pour: ${map.id}');
     final mapBasePath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
     final mapPath = '$mapBasePath/${map.id}';
@@ -210,20 +170,21 @@ class CourseCanvas extends ConsumerWidget {
       boxMinX = minX - delta / 2;
       boxMaxX = maxX + delta / 2;
     }
-    // Utilise la classe factorisée pour le calcul de la transformation
+    // Calcul de l'échelle et du centrage
     const margin = 24.0;
-    final transform = CanvasTransform(
-      minX: boxMinX,
-      maxX: boxMaxX,
-      minY: boxMinY,
-      maxY: boxMaxY,
-      margin: margin,
-      width: constraints.maxWidth,
-      height: constraints.maxHeight,
-      userZoom: userZoom,
-    );
-    final localTopLeft = transform.screenToLocal(0, 0);
-    final localBottomRight = transform.screenToLocal(constraints.maxWidth, constraints.maxHeight);
+    final availW = constraints.maxWidth - 2 * margin;
+    final availH = constraints.maxHeight - 2 * margin;
+    final scale = math.min(availW / (boxMaxX - boxMinX), availH / (boxMaxY - boxMinY));
+    final offsetX = (constraints.maxWidth - (boxMaxX - boxMinX) * scale) / 2;
+    final offsetY = (constraints.maxHeight - (boxMaxY - boxMinY) * scale) / 2;
+    // Les coins du widget en coordonnées locales
+    Offset screenToLocal(double px, double py) {
+      final x = ((px - offsetX) / scale) + boxMinX;
+      final y = ((constraints.maxHeight - py - offsetY) / scale) + boxMinY;
+      return Offset(x, y);
+    }
+    final localTopLeft = screenToLocal(0, 0);
+    final localBottomRight = screenToLocal(constraints.maxWidth, constraints.maxHeight);
     // Convertir en géographique
     final geoTopLeft = mercatorService.toGeographic(LocalPosition(x: localTopLeft.dx, y: localTopLeft.dy));
     final geoBottomRight = mercatorService.toGeographic(LocalPosition(x: localBottomRight.dx, y: localBottomRight.dy));
@@ -306,7 +267,6 @@ class _CoursePainter extends CustomPainter {
     this.upwindOptimalAngle,
     this.windTrend,
     this.mercatorService,
-    {this.userZoom = 1.0}
   );
   
   final CourseState state;
@@ -318,7 +278,6 @@ class _CoursePainter extends CustomPainter {
   final MercatorCoordinateSystemService mercatorService;
 
   static const double margin = 24.0; // logical px margin inside canvas
-  final double userZoom;
   static const double buoyRadius = 8.0;
 
   late final _Bounds _bounds = _computeBounds();
@@ -366,25 +325,30 @@ class _CoursePainter extends CustomPainter {
     return _Bounds(minX, minX + spanX, minY, minY + spanY);
   }
 
-  late CanvasTransform _transform;
-  Offset _project(double x, double y, Size size) => _transform.project(x, y);
+  Offset _project(double x, double y, Size size) {
+    // Nous voulons un facteur d'échelle unique pour X et Y afin de conserver les angles.
+    final availW = size.width - 2 * margin;
+    final availH = size.height - 2 * margin;
+    final spanX = _bounds.maxX - _bounds.minX;
+    final spanY = _bounds.maxY - _bounds.minY;
+    final scale = math.min(availW / spanX, availH / spanY);
+    // Centrage si l'espace disponible n'est pas carré
+    final offsetX = (size.width - spanX * scale) / 2;
+    final offsetY = (size.height - spanY * scale) / 2;
+    final px = offsetX + (x - _bounds.minX) * scale;
+    // y croissant vers le haut dans notre repère logique -> inverser
+    final py = size.height - offsetY - (y - _bounds.minY) * scale;
+    return Offset(px, py);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    _transform = CanvasTransform(
-      minX: _bounds.minX,
-      maxX: _bounds.maxX,
-      minY: _bounds.minY,
-      maxY: _bounds.maxY,
-      margin: margin,
-      width: size.width,
-      height: size.height,
-      userZoom: userZoom,
-    );
     final bg = Paint()
       ..color = Colors.blueGrey.withOpacity(0.04)
       ..style = PaintingStyle.fill;
     canvas.drawRect(Offset.zero & size, bg);
+
+        // Les cartes sont maintenant dessinées par _TilePainter en arrière-plan
 
     _drawGrid(canvas, size);
     _drawLines(canvas, size);
@@ -395,8 +359,6 @@ class _CoursePainter extends CustomPainter {
     _drawWindTrendInfo(canvas, size);
     _drawBoundsInfo(canvas, size);
   }
-
-
 
   void _drawGrid(Canvas canvas, Size size) {
     const gridStep = 50.0; // logical units after projection (approx)
@@ -908,34 +870,6 @@ class _CoursePainter extends CustomPainter {
         oldDelegate.upwindOptimalAngle != upwindOptimalAngle ||
         oldDelegate.windTrend != windTrend ||
         oldDelegate.mercatorService.config.origin != mercatorService.config.origin;
-  }
-}
-
-
-class _ZoomControls extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final zoom = ref.watch(zoomProvider);
-    return Card(
-      elevation: 2,
-      color: Colors.white.withOpacity(0.85),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.zoom_out),
-            onPressed: () => ref.read(zoomProvider.notifier).zoomOut(),
-            tooltip: 'Zoom -',
-          ),
-          Text('${(zoom * 100).toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
-          IconButton(
-            icon: const Icon(Icons.zoom_in),
-            onPressed: () => ref.read(zoomProvider.notifier).zoomIn(),
-            tooltip: 'Zoom +',
-          ),
-        ],
-      ),
-    );
   }
 }
 
