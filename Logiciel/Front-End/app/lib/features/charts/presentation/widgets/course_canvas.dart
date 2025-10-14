@@ -21,6 +21,40 @@ import '../../../../data/datasources/maps/models/map_layers.dart';
 import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart';
 import 'multi_layer_tile_painter.dart';
 import 'tile_image_service.dart';
+import '../../../charts/providers/zoom_provider.dart';
+
+/// Utilitaire pour centraliser le calcul de bounding box, scale et offset
+class CanvasTransform {
+  final double minX, maxX, minY, maxY, margin, width, height, userZoom;
+  late final double spanX = (maxX - minX).abs() < 1e-6 ? 100 : maxX - minX;
+  late final double spanY = (maxY - minY).abs() < 1e-6 ? 100 : maxY - minY;
+  late final double scale = userZoom * (width - 2 * margin) / (spanX > spanY ? spanX : spanY);
+  late final double offsetX = (width - (maxX - minX) * scale) / 2;
+  late final double offsetY = (height - (maxY - minY) * scale) / 2;
+
+  CanvasTransform({
+    required this.minX,
+    required this.maxX,
+    required this.minY,
+    required this.maxY,
+    required this.margin,
+    required this.width,
+    required this.height,
+    this.userZoom = 1.0,
+  });
+
+  Offset project(double x, double y) {
+    final px = offsetX + (x - minX) * scale;
+    final py = height - offsetY - (y - minY) * scale;
+    return Offset(px, py);
+  }
+
+  Offset screenToLocal(double px, double py) {
+    final x = ((px - offsetX) / scale) + minX;
+    final y = ((height - py - offsetY) / scale) + minY;
+    return Offset(x, y);
+  }
+}
 
 /// Widget displaying the course (buoys + start/finish lines) in plan view.
 class CourseCanvas extends ConsumerWidget {
@@ -59,19 +93,18 @@ class CourseCanvas extends ConsumerWidget {
     
     return LayoutBuilder(
       builder: (context, constraints) {
+        final userZoom = ref.watch(zoomProvider);
         return Stack(
           children: [
             // Affichage des tuiles multi-couches (OSM + OpenSeaMap)
             if (displayMaps && activeMap != null)
               FutureBuilder<List<LayeredTile>>(
-                future: _loadMultiLayerTilesForMap(activeMap),
+                future: _loadMultiLayerTilesForMap(activeMap, course, constraints: constraints, userZoom: userZoom),
                 builder: (context, snapshot) {
-                  print('MULTI-LAYER DEBUG - FutureBuilder pour ${activeMap.name}: hasData=${snapshot.hasData}, hasError=${snapshot.hasError}');
                   if (snapshot.hasError) {
-                    print('MULTI-LAYER DEBUG - Erreur: ${snapshot.error}');
+                    print('MULTI-LAYER DEBUG - Erreur: \\${snapshot.error}');
                   }
                   if (snapshot.hasData) {
-                    print('MULTI-LAYER DEBUG - ${snapshot.data!.length} tuiles multi-couches chargées pour rendu de ${activeMap.name}');
                     return CustomPaint(
                       size: Size(constraints.maxWidth, constraints.maxHeight),
                       painter: MultiLayerTilePainter(
@@ -79,11 +112,11 @@ class CourseCanvas extends ConsumerWidget {
                         mercatorService,
                         constraints,
                         course,
-                        MapLayersConfig.defaultConfig, // Configuration des couches
+                        MapLayersConfig.defaultConfig,
+                        userZoom: userZoom,
                       ),
                     );
                   }
-                  // Pendant le chargement : message simple
                   return const Center(
                     child: Text('Chargement des tuiles multi-couches...', style: TextStyle(color: Colors.white)),
                   );
@@ -101,8 +134,15 @@ class CourseCanvas extends ConsumerWidget {
                   vmcUp?.angleDeg,
                   windTrend,
                   mercatorService,
+                  userZoom: userZoom,
                 ),
               ),
+            ),
+            // Contrôles de zoom
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: _ZoomControls(),
             ),
             // Coordinate system info overlay
             const Positioned(
@@ -116,19 +156,121 @@ class CourseCanvas extends ConsumerWidget {
     );
   }
 
-  Future<List<LayeredTile>> _loadMultiLayerTilesForMap(MapTileSet map) async {
+  Future<List<LayeredTile>> _loadMultiLayerTilesForMap(MapTileSet map, CourseState course, {BoxConstraints? constraints, double userZoom = 1.0}) async {
     print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap appelée pour: ${map.id}');
-    // Utiliser le bon mapId qui existe
-    const existingMapId = 'map_1760001674733_43.535_6.999';
-    final mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps/$existingMapId';
+    final mapBasePath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
+    final mapPath = '$mapBasePath/${map.id}';
     print('MULTI-LAYER DEBUG - Chemin des tuiles: $mapPath');
-    final tiles = await MultiLayerTileService.preloadLayeredTiles(
-      mapId: existingMapId,
-      mapPath: mapPath,
-      config: MapLayersConfig.defaultConfig,
+
+    // 1. Calculer la bounding box logique qui correspond à tout le widget
+    // On utilise la même logique de centrage/échelle que dans _CoursePainter._project
+    // On récupère les bounds du parcours pour la projection
+    final positions = <GeographicPosition>[];
+    for (final b in course.buoys) positions.add(b.position);
+    for (final l in [course.startLine, course.finishLine]) {
+      if (l != null) {
+        positions.add(l.point1);
+        positions.add(l.point2);
+      }
+    }
+    if (positions.isEmpty || constraints == null) {
+      // Fallback: charger toutes les tuiles
+      final tiles = await MultiLayerTileService.preloadLayeredTiles(
+        mapId: map.id,
+        mapPath: mapPath,
+        config: MapLayersConfig.defaultConfig,
+      );
+      print('MULTI-LAYER DEBUG - ${tiles.length} tuiles multi-couches chargées (fallback) pour ${map.id}');
+      return tiles;
+    }
+    // Calcul des bounds locaux du parcours
+    final mercatorService = MercatorCoordinateSystemService(config: MercatorCoordinateSystemConfig(
+      origin: map.bounds.center,
+      name: map.name,
+    ));
+    double minX = double.infinity, maxX = double.negativeInfinity;
+    double minY = double.infinity, maxY = double.negativeInfinity;
+    for (final pos in positions) {
+      final local = mercatorService.toLocal(pos);
+      minX = math.min(minX, local.x);
+      maxX = math.max(maxX, local.x);
+      minY = math.min(minY, local.y);
+      maxY = math.max(maxY, local.y);
+    }
+    // Appliquer la logique de _CoursePainter pour obtenir une bounding box carrée
+    var spanX = (maxX - minX).abs() < 1e-6 ? 100 : maxX - minX;
+    var spanY = (maxY - minY).abs() < 1e-6 ? 100 : maxY - minY;
+    double boxMinX = minX, boxMaxX = maxX, boxMinY = minY, boxMaxY = maxY;
+    if (spanX > spanY) {
+      final delta = spanX - spanY;
+      boxMinY = minY - delta / 2;
+      boxMaxY = maxY + delta / 2;
+    } else if (spanY > spanX) {
+      final delta = spanY - spanX;
+      boxMinX = minX - delta / 2;
+      boxMaxX = maxX + delta / 2;
+    }
+    // Utilise la classe factorisée pour le calcul de la transformation
+    const margin = 24.0;
+    final transform = CanvasTransform(
+      minX: boxMinX,
+      maxX: boxMaxX,
+      minY: boxMinY,
+      maxY: boxMaxY,
+      margin: margin,
+      width: constraints.maxWidth,
+      height: constraints.maxHeight,
+      userZoom: userZoom,
     );
-    print('MULTI-LAYER DEBUG - ${tiles.length} tuiles multi-couches chargées pour $existingMapId');
+    final localTopLeft = transform.screenToLocal(0, 0);
+    final localBottomRight = transform.screenToLocal(constraints.maxWidth, constraints.maxHeight);
+    // Convertir en géographique
+    final geoTopLeft = mercatorService.toGeographic(LocalPosition(x: localTopLeft.dx, y: localTopLeft.dy));
+    final geoBottomRight = mercatorService.toGeographic(LocalPosition(x: localBottomRight.dx, y: localBottomRight.dy));
+    // Calculer la plage de tuiles à charger
+    final zoom = map.zoomLevel;
+    int tileXmin = _lon2tile(geoTopLeft.longitude, zoom);
+    int tileXmax = _lon2tile(geoBottomRight.longitude, zoom);
+    int tileYmin = _lat2tile(geoTopLeft.latitude, zoom);
+    int tileYmax = _lat2tile(geoBottomRight.latitude, zoom);
+    // Sécuriser l'ordre
+    if (tileXmin > tileXmax) { final tmp = tileXmin; tileXmin = tileXmax; tileXmax = tmp; }
+    if (tileYmin > tileYmax) { final tmp = tileYmin; tileYmin = tileYmax; tileYmax = tmp; }
+    print('MULTI-LAYER DEBUG - Tiles à charger (widget): X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] zoom=$zoom');
+    // Charger les tuiles
+    final tiles = <LayeredTile>[];
+    final foundFiles = <String>[];
+    for (int x = tileXmin; x <= tileXmax; x++) {
+      for (int y = tileYmin; y <= tileYmax; y++) {
+        final filePath = '$mapPath/${x}_${y}_$zoom.png';
+        print('MULTI-LAYER DEBUG - Recherche tuile: $filePath');
+        final file = File(filePath);
+        if (await file.exists()) {
+          foundFiles.add(filePath);
+          final layeredTile = await MultiLayerTileService.loadLayeredTile(
+            x: x,
+            y: y,
+            zoom: zoom,
+            config: MapLayersConfig.defaultConfig,
+            localMapPath: mapPath,
+          );
+          tiles.add(layeredTile);
+        }
+      }
+    }
+    print('MULTI-LAYER DEBUG - Fichiers de tuiles trouvés (${foundFiles.length}):');
+    for (final f in foundFiles) print('  $f');
+    print('MULTI-LAYER DEBUG - ${tiles.length} tuiles multi-couches chargées pour ${map.id} (zone widget)');
     return tiles;
+  }
+
+  // Conversion latitude/longitude vers numéro de tuile OSM
+  int _lon2tile(double lon, int zoom) {
+    return ((lon + 180.0) / 360.0 * (1 << zoom)).floor();
+  }
+  int _lat2tile(double lat, int zoom) {
+    final rad = lat * math.pi / 180.0;
+    return ((1.0 - math.log(math.tan(rad) + 1.0 / math.cos(rad)) / math.pi) / 2.0 * (1 << zoom)).floor();
   }
 
   Future<List<LoadedTile>> _loadTilesForMap(MapTileSet map) async {
@@ -164,6 +306,7 @@ class _CoursePainter extends CustomPainter {
     this.upwindOptimalAngle,
     this.windTrend,
     this.mercatorService,
+    {this.userZoom = 1.0}
   );
   
   final CourseState state;
@@ -175,6 +318,7 @@ class _CoursePainter extends CustomPainter {
   final MercatorCoordinateSystemService mercatorService;
 
   static const double margin = 24.0; // logical px margin inside canvas
+  final double userZoom;
   static const double buoyRadius = 8.0;
 
   late final _Bounds _bounds = _computeBounds();
@@ -222,33 +366,27 @@ class _CoursePainter extends CustomPainter {
     return _Bounds(minX, minX + spanX, minY, minY + spanY);
   }
 
-  Offset _project(double x, double y, Size size) {
-    // Nous voulons un facteur d'échelle unique pour X et Y afin de conserver les angles.
-    final availW = size.width - 2 * margin;
-    final availH = size.height - 2 * margin;
-    final spanX = _bounds.maxX - _bounds.minX;
-    final spanY = _bounds.maxY - _bounds.minY;
-    final scale = math.min(availW / spanX, availH / spanY);
-    // Centrage si l'espace disponible n'est pas carré
-    final offsetX = (size.width - spanX * scale) / 2;
-    final offsetY = (size.height - spanY * scale) / 2;
-    final px = offsetX + (x - _bounds.minX) * scale;
-    // y croissant vers le haut dans notre repère logique -> inverser
-    final py = size.height - offsetY - (y - _bounds.minY) * scale;
-    return Offset(px, py);
-  }
+  late CanvasTransform _transform;
+  Offset _project(double x, double y, Size size) => _transform.project(x, y);
 
   @override
   void paint(Canvas canvas, Size size) {
+    _transform = CanvasTransform(
+      minX: _bounds.minX,
+      maxX: _bounds.maxX,
+      minY: _bounds.minY,
+      maxY: _bounds.maxY,
+      margin: margin,
+      width: size.width,
+      height: size.height,
+      userZoom: userZoom,
+    );
     final bg = Paint()
       ..color = Colors.blueGrey.withOpacity(0.04)
       ..style = PaintingStyle.fill;
     canvas.drawRect(Offset.zero & size, bg);
 
-        // Les cartes sont maintenant dessinées par _TilePainter en arrière-plan
-
     _drawGrid(canvas, size);
-
     _drawLines(canvas, size);
     _drawRoute(canvas, size);
     _drawBuoys(canvas, size);
@@ -257,6 +395,8 @@ class _CoursePainter extends CustomPainter {
     _drawWindTrendInfo(canvas, size);
     _drawBoundsInfo(canvas, size);
   }
+
+
 
   void _drawGrid(Canvas canvas, Size size) {
     const gridStep = 50.0; // logical units after projection (approx)
@@ -539,7 +679,7 @@ class _CoursePainter extends CustomPainter {
     final downwindHeading1 = (windDirDeg! + 180.0 + optimalDownwindAngle) % 360.0; // tribord portant inversé -> bâbord
     final downwindHeading2 = (windDirDeg! + 180.0 - optimalDownwindAngle) % 360.0; // bâbord portant inversé -> tribord
     
-    final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.minY);
+    final maxSpan = math.max(_bounds.maxX - _bounds.minX, _bounds.maxY - _bounds.maxY);
     final length = maxSpan * 1.2; // un peu plus grand que le terrain
     
     void drawDownwindLay(double headingDeg, Color color, String side) {
@@ -768,6 +908,34 @@ class _CoursePainter extends CustomPainter {
         oldDelegate.upwindOptimalAngle != upwindOptimalAngle ||
         oldDelegate.windTrend != windTrend ||
         oldDelegate.mercatorService.config.origin != mercatorService.config.origin;
+  }
+}
+
+
+class _ZoomControls extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final zoom = ref.watch(zoomProvider);
+    return Card(
+      elevation: 2,
+      color: Colors.white.withOpacity(0.85),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.zoom_out),
+            onPressed: () => ref.read(zoomProvider.notifier).zoomOut(),
+            tooltip: 'Zoom -',
+          ),
+          Text('${(zoom * 100).toStringAsFixed(0)}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+          IconButton(
+            icon: const Icon(Icons.zoom_in),
+            onPressed: () => ref.read(zoomProvider.notifier).zoomIn(),
+            tooltip: 'Zoom +',
+          ),
+        ],
+      ),
+    );
   }
 }
 

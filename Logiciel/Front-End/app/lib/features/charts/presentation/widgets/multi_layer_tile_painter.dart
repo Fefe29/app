@@ -9,6 +9,9 @@ import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart
 import '../../../../data/datasources/maps/models/map_layers.dart';
 import '../../domain/models/course.dart';
 
+import '../../../charts/providers/zoom_provider.dart';
+import 'course_canvas.dart';
+
 class MultiLayerTilePainter extends CustomPainter {
   MultiLayerTilePainter(
     this.tiles,
@@ -16,13 +19,15 @@ class MultiLayerTilePainter extends CustomPainter {
     this.constraints,
     this.courseState,
     this.config,
+    {this.userZoom = 1.0}
   );
-  
+
   final List<LayeredTile> tiles;
   final MercatorCoordinateSystemService mercatorService;
   final BoxConstraints constraints;
   final CourseState courseState;
   final MapLayersConfig config;
+  final double userZoom;
 
   // Calculer les bounds exactement comme dans _CoursePainter
   late final _Bounds _bounds = _computeBounds();
@@ -94,75 +99,49 @@ class MultiLayerTilePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (tiles.isEmpty) return;
 
-    print('MULTI-LAYER DEBUG - Dessin de ${tiles.length} tuiles multi-couches');
+    // Utilise la transformation factorisée pour la projection
+    final margin = 24.0;
+    final bounds = _computeBounds();
+    final transform = CanvasTransform(
+      minX: bounds.minX,
+      maxX: bounds.maxX,
+      minY: bounds.minY,
+      maxY: bounds.maxY,
+      margin: margin,
+      width: size.width,
+      height: size.height,
+      userZoom: userZoom,
+    );
 
-    final spanX = _bounds.maxX - _bounds.minX;
-    final spanY = _bounds.maxY - _bounds.minY;
-    final availW = size.width - 48.0;
-    final availH = size.height - 48.0;
-    final scale = math.min(availW / spanX, availH / spanY);
-
-    final centerX = size.width / 2;
-    final centerY = size.height / 2;
-    final boundsOffsetX = (_bounds.minX + _bounds.maxX) / 2;
-    final boundsOffsetY = (_bounds.minY + _bounds.maxY) / 2;
-
-    // Organiser les tuiles pour respecter la grille OSM
-    // Calculer la taille réelle d'une tuile en mètres (basé sur le zoom)
-    final zoom = tiles.isNotEmpty ? tiles.first.zoom : 15;
-    final realTileSize = _calculateMercatorTileSize(zoom);
-    final screenTileSize = realTileSize * scale;
-
-    // Dessiner chaque tuile avec projection Mercator unifiée
     for (final tile in tiles) {
-      // Utiliser la conversion Mercator directe pour les coins de la tuile
       final localNW = mercatorService.tileToLocal(tile.x, tile.y, tile.zoom);
       final localSE = mercatorService.tileToLocal(tile.x + 1, tile.y + 1, tile.zoom);
-      
-      // Calculer les positions écran des coins avec la projection Mercator
-      final screenNWx = centerX + (localNW.x - boundsOffsetX) * scale;
-      final screenNWy = centerY - (localNW.y - boundsOffsetY) * scale;
-      final screenSEx = centerX + (localSE.x - boundsOffsetX) * scale;
-      final screenSEy = centerY - (localSE.y - boundsOffsetY) * scale;
-      
-      // Créer le rectangle correctement orienté (left < right, top < bottom)
+      final screenNW = transform.project(localNW.x, localNW.y);
+      final screenSE = transform.project(localSE.x, localSE.y);
       final rect = Rect.fromLTRB(
-        math.min(screenNWx, screenSEx),   // left
-        math.min(screenNWy, screenSEy),   // top 
-        math.max(screenNWx, screenSEx),   // right
-        math.max(screenNWy, screenSEy),   // bottom
+        math.min(screenNW.dx, screenSE.dx),
+        math.min(screenNW.dy, screenSE.dy),
+        math.max(screenNW.dx, screenSE.dx),
+        math.max(screenNW.dy, screenSE.dy),
       );
-
-      print('MERCATOR DEBUG - Tuile ${tile.x},${tile.y}: NW local(${localNW.x.toStringAsFixed(1)},${localNW.y.toStringAsFixed(1)}) -> écran(${screenNWx.toStringAsFixed(1)},${screenNWy.toStringAsFixed(1)})');
-      print('MERCATOR DEBUG - Tuile ${tile.x},${tile.y}: SE local(${localSE.x.toStringAsFixed(1)},${localSE.y.toStringAsFixed(1)}) -> écran(${screenSEx.toStringAsFixed(1)},${screenSEy.toStringAsFixed(1)})');
-      print('MERCATOR DEBUG - Tuile ${tile.x},${tile.y}: Rect=${rect}, taille écran=${size.width}x${size.height}');
-      print('MERCATOR DEBUG - Tuile ${tile.x},${tile.y}: baseImage=${tile.baseImage != null ? '${tile.baseImage!.width}x${tile.baseImage!.height}' : 'null'}');
-
       // Dessiner la couche de base (OSM)
       if (config.baseLayer.enabled && tile.baseImage != null) {
         final paint = Paint()
           ..color = Colors.white.withOpacity(config.baseLayer.opacity)
           ..filterQuality = FilterQuality.high;
-        
         canvas.drawImageRect(
           tile.baseImage!,
           Rect.fromLTWH(0, 0, tile.baseImage!.width.toDouble(), tile.baseImage!.height.toDouble()),
           rect,
           paint,
         );
-        
-        print('MERCATOR DEBUG - Tuile ${tile.x},${tile.y}: Couche base OSM dessinée avec opacité ${config.baseLayer.opacity}');
-      } else {
-        print('MERCATOR DEBUG - Tuile ${tile.x},${tile.y}: Couche base IGNORÉE (enabled=${config.baseLayer.enabled}, image=${tile.baseImage != null})');
       }
-
       // Dessiner la couche nautique (OpenSeaMap) par-dessus
       if (config.nauticalLayer.enabled && tile.nauticalImage != null) {
         final paint = Paint()
           ..color = Colors.white.withOpacity(config.nauticalLayer.opacity)
           ..filterQuality = FilterQuality.high
           ..blendMode = BlendMode.srcOver;
-        
         canvas.drawImageRect(
           tile.nauticalImage!,
           Rect.fromLTWH(0, 0, tile.nauticalImage!.width.toDouble(), tile.nauticalImage!.height.toDouble()),
