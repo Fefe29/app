@@ -317,13 +317,13 @@ class CourseNotifier extends Notifier<CourseState> {
       // Ligne de départ entre viseur et comité (ligne de 400m est-ouest)
       startLine: LineSegment(
         point1: const GeographicPosition(latitude: 43.540, longitude: 7.0120), // Viseur (tribord)
-        point2: const GeographicPosition(latitude: 43.540, longitude: 7.0180), // Comité (bâbord)
+        point2: const GeographicPosition(latitude: 43.543, longitude: 7.0180), // Comité (bâbord)
         type: LineType.start,
       ),
       // Ligne d'arrivée parallèle à la ligne de départ (200m au sud)
       finishLine: LineSegment(
         point1: const GeographicPosition(latitude: 43.539, longitude: 7.0130), 
-        point2: const GeographicPosition(latitude: 43.5390, longitude: 7.0170),
+        point2: const GeographicPosition(latitude: 43.5393, longitude: 7.0170),
         type: LineType.finish,
       ),
     );

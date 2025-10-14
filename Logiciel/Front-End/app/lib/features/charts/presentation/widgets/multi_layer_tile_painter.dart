@@ -69,8 +69,15 @@ class MultiLayerTilePainter extends CustomPainter {
       // Base raster (OSM)
       if (config.baseLayer.enabled && tile.baseImage != null) {
         final paint = Paint()
-          ..color = Colors.white.withOpacity(config.baseLayer.opacity)
-          ..filterQuality = FilterQuality.high;
+          ..color = Colors.white.withOpacity(0.5)
+          ..filterQuality = FilterQuality.high
+          // Filtre doux : laisse passer le vert et le rouge, réduit modérément le bleu
+          ..colorFilter = const ColorFilter.matrix(<double>[
+            0.85, 0.10, 0.05, 0, 0, // R
+            0.10, 0.85, 0.05, 0, 0, // G
+            0.10, 0.10, 0.80, 0, 0, // B
+            0,    0,    0,    1, 0, // A
+          ]);
         canvas.drawImageRect(
           tile.baseImage!,
           src,
@@ -82,9 +89,16 @@ class MultiLayerTilePainter extends CustomPainter {
       // Nautique (OpenSeaMap) au-dessus
       if (config.nauticalLayer.enabled && tile.nauticalImage != null) {
         final paint = Paint()
-          ..color = Colors.white.withOpacity(config.nauticalLayer.opacity)
+          ..color = Colors.white.withOpacity(0.5)
           ..filterQuality = FilterQuality.high
-          ..blendMode = BlendMode.srcOver;
+          ..blendMode = BlendMode.srcOver
+          // Filtre doux : laisse passer le vert et le rouge, réduit modérément le bleu
+          ..colorFilter = const ColorFilter.matrix(<double>[
+            0.85, 0.10, 0.05, 0, 0, // R
+            0.10, 0.85, 0.05, 0, 0, // G
+            0.10, 0.10, 0.80, 0, 0, // B
+            0,    0,    0,    1, 0, // A
+          ]);
         canvas.drawImageRect(
           tile.nauticalImage!,
           src,
