@@ -450,7 +450,10 @@ class _CoursePainter extends CustomPainter {
     // Centré horizontalement, en haut du graph
     const topMargin = 24.0;
     final base = Offset(size.width / 2, topMargin + arrowLen);
-    final tip = base + Offset(vx, vy) * arrowLen;
+    final headSize = 16.0; // taille de la pointe augmentée
+    // Le trait s'arrête juste avant la pointe
+    final tip = base + Offset(vx, vy) * (arrowLen - headSize + 2);
+    final arrowEnd = base + Offset(vx, vy) * arrowLen;
 
     final shaft = Paint()
       ..color = Colors.black
@@ -459,11 +462,10 @@ class _CoursePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(base, tip, shaft);
 
-    final headSize = 16.0; // taille de la pointe augmentée
     final ortho = Offset(-vy, vx);
-    final headP1 = tip;
-    final headP2 = tip - Offset(vx, vy) * headSize + ortho * (headSize * 0.9);
-    final headP3 = tip - Offset(vx, vy) * headSize - ortho * (headSize * 0.9);
+    final headP1 = arrowEnd;
+    final headP2 = arrowEnd - Offset(vx, vy) * headSize + ortho * (headSize * 0.9);
+    final headP3 = arrowEnd - Offset(vx, vy) * headSize - ortho * (headSize * 0.9);
     final headPath = Path()
       ..moveTo(headP1.dx, headP1.dy)
       ..lineTo(headP2.dx, headP2.dy)
