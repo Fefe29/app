@@ -71,6 +71,10 @@ flutter:
 
   assets:
     - assets/polars/j80.csv
+    - assets/sounds/beep_medium.wav
+    - assets/sounds/beep_short.wav
+    - assets/sounds/beep_double_short.wav
+    - assets/sounds/beep_long.wav
 
   # To add assets to your application, add an assets section, like this:
   # assets:
