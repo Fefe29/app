@@ -97,13 +97,7 @@ class _HeaderStatus extends ConsumerWidget {
 					const Spacer(),
 					const MapToolbarButton(),
 					const SizedBox(width: 8),
-					TextButton.icon(
-						onPressed: () {
-							// TODO: import fichier / asset
-						},
-						icon: const Icon(Icons.file_upload_outlined, size: 16),
-						label: const Text('Importer'),
-					)
+// Importer button removed
 				],
 			),
 		);

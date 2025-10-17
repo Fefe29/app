@@ -447,21 +447,23 @@ class _CoursePainter extends CustomPainter {
     final vx = math.sin(angleRad);
     final vy = -math.cos(angleRad);
 
-    final base = Offset(size.width - margin - 120, margin + 10);
+    // Centré horizontalement, en haut du graph
+    const topMargin = 24.0;
+    final base = Offset(size.width / 2, topMargin + arrowLen);
     final tip = base + Offset(vx, vy) * arrowLen;
 
     final shaft = Paint()
       ..color = Colors.black
-      ..strokeWidth = 3
+      ..strokeWidth = 13 // épaisseur fortement augmentée
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(base, tip, shaft);
 
-    final headSize = 10.0;
+    final headSize = 16.0; // taille de la pointe augmentée
     final ortho = Offset(-vy, vx);
     final headP1 = tip;
-    final headP2 = tip - Offset(vx, vy) * headSize + ortho * (headSize * 0.6);
-    final headP3 = tip - Offset(vx, vy) * headSize - ortho * (headSize * 0.6);
+    final headP2 = tip - Offset(vx, vy) * headSize + ortho * (headSize * 0.9);
+    final headP3 = tip - Offset(vx, vy) * headSize - ortho * (headSize * 0.9);
     final headPath = Path()
       ..moveTo(headP1.dx, headP1.dy)
       ..lineTo(headP2.dx, headP2.dy)
@@ -469,10 +471,14 @@ class _CoursePainter extends CustomPainter {
       ..close();
     final headPaint = Paint()..color = Colors.black..style = PaintingStyle.fill;
     canvas.drawPath(headPath, headPaint);
-    canvas.drawPath(headPath, shaft);
-
-    final label = 'Vent→  from ${windDirDeg.toStringAsFixed(0)}°  ${windSpeed.toStringAsFixed(1)} nds';
-    _drawText(canvas, label, base + const Offset(-180, 8), fontSize: 12, color: Colors.black87);
+    // Pour donner un contour plus épais à la pointe
+    final headBorder = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 6
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(headPath, headBorder);
+    // Label supprimé
   }
 
   void _drawLaylines(Canvas canvas, Size size) {

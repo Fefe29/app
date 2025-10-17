@@ -53,18 +53,33 @@ class DashboardPage extends ConsumerWidget {
                     ),
                   );
                 }
+                // On calcule la grille de manière à ce que toutes les tuiles rentrent
+                const padding = 12.0;
+                const spacing = 12.0;
+                final contentWidth = max(0.0, c.maxWidth - 2 * padding);
+                final contentHeight = max(0.0, c.maxHeight - 2 * padding);
+                final rows = (keys.length + cols - 1) ~/ cols; // ceil
+                final tileWidth = cols > 0 ? (contentWidth - (cols - 1) * spacing) / cols : contentWidth;
+                final tileHeight = rows > 0 ? (contentHeight - (rows - 1) * spacing) / rows : contentHeight;
+                final childAspectRatio = tileWidth > 0 && tileHeight > 0 ? tileWidth / tileHeight : 1.0;
+
                 return Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: GridView.builder(
-                    itemCount: keys.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: cols,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                    ),
-                    itemBuilder: (_, i) => MetricTile(
-                      key: ValueKey(keys[i]),   // identité stable => moins de clignotements
-                      metricKey: keys[i],
+                  padding: const EdgeInsets.all(padding),
+                  child: SizedBox(
+                    height: c.maxHeight - 2 * padding,
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: keys.length,
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: cols,
+                        mainAxisSpacing: spacing,
+                        crossAxisSpacing: spacing,
+                        childAspectRatio: childAspectRatio,
+                      ),
+                      itemBuilder: (_, i) => MetricTile(
+                        key: ValueKey(keys[i]), // identité stable => moins de clignotements
+                        metricKey: keys[i],
+                      ),
                     ),
                   ),
                 );
