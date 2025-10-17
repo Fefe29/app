@@ -643,8 +643,8 @@ class _CoursePainter extends CustomPainter {
       }
     }
 
-    drawLay(downwindHeading1, Colors.orangeAccent.shade400, 'Bb↑');
-    drawLay(downwindHeading2, Colors.orangeAccent.shade700, 'Tb↑');
+  drawLay(downwindHeading2, Colors.orangeAccent.shade400, 'Bb↑');
+  drawLay(downwindHeading1, Colors.orangeAccent.shade700, 'Tb↑');
   }
 
   String _shortLabel(RouteLeg leg) {

@@ -569,13 +569,13 @@ class RoutingCalculator {
     
     if (windTrend != null) {
       if (windTrend.trend == WindTrendDirection.backingLeft) {
-        // Bascule à gauche → partir à gauche (bâbord) au portant (même sens qu'au près)
-        startWithLeftJibe = true;
-        jibeReason = "Bascule gauche → partir bâbord";
-      } else if (windTrend.trend == WindTrendDirection.veeringRight) {
-        // Bascule à droite → partir à droite (tribord) au portant (même sens qu'au près)
+        // Bascule à gauche → partir à droite (tribord) au portant (INVERSE du près)
         startWithLeftJibe = false;
-        jibeReason = "Bascule droite → partir tribord";
+        jibeReason = "Bascule gauche → partir tribord (inversé)";
+      } else if (windTrend.trend == WindTrendDirection.veeringRight) {
+        // Bascule à droite → partir à gauche (bâbord) au portant (INVERSE du près)
+        startWithLeftJibe = true;
+        jibeReason = "Bascule droite → partir bâbord (inversé)";
       } else {
         // Pas de bascule → meilleure projection
         double proj1 = (targetVec.x * v1.x + targetVec.y * v1.y);
@@ -624,23 +624,13 @@ class RoutingCalculator {
       wp1x = sx + firstVec.x * fallbackDist;
       wp1y = sy + firstVec.y * fallbackDist;
     } else {
-      // Intersection géométrique exacte
+      // Intersection géométrique exacte : empannage dès la croisée de la layline
       final dx_target = ex - sx;
       final dy_target = ey - sy;
-      
       final t1 = (dx_target * targetLaylineVec.y - dy_target * targetLaylineVec.x) / det;
-      
-      // Limiter t1 pour éviter des distances excessives (plus conservateur au portant)
-      final maxT1 = dist * 1.0; // Maximum 100% de la distance directe (vs 120% au près)
-      final minT1 = dist * 0.2; // Minimum 20% de la distance directe (vs 30% au près)
-      final limitedT1 = t1.clamp(minT1, maxT1);
-      
-      wp1x = sx + firstVec.x * limitedT1;
-      wp1y = sy + firstVec.y * limitedT1;
-      
-      if (t1 != limitedT1) {
-        print('JIBING DEBUG - T1 limité : ${t1.toStringAsFixed(1)} -> ${limitedT1.toStringAsFixed(1)}');
-      }
+      wp1x = sx + firstVec.x * t1;
+      wp1y = sy + firstVec.y * t1;
+      print('JIBING DEBUG - Empannage à l\'intersection des laylines, t1=${t1.toStringAsFixed(2)}');
     }
     
     print('JIBING DEBUG - First leg: ($sx,$sy) -> (${wp1x.toStringAsFixed(1)},${wp1y.toStringAsFixed(1)}) ($firstSide)');
