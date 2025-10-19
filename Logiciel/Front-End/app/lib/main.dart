@@ -5,17 +5,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/router.dart';
 import 'theme/app_theme.dart';
 import 'package:window_manager/window_manager.dart';
+import 'dart:io';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await windowManager.ensureInitialized();
-
-  windowManager.waitUntilReadyToShow().then((_) async {
-    await windowManager.maximize();
-    await windowManager.show();
-    await windowManager.focus();
-  });
-
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    await windowManager.ensureInitialized();
+    windowManager.waitUntilReadyToShow().then((_) async {
+      await windowManager.maximize();
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
   runApp(const ProviderScope(child: App()));
 }
 

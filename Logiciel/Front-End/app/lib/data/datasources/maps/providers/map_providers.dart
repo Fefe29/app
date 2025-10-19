@@ -3,6 +3,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../services/map_download_service.dart';
 import '../models/map_tile_set.dart';
@@ -13,15 +14,35 @@ import '../../../../features/charts/providers/course_providers.dart';
 
 /// Provider pour le répertoire de stockage des cartes
 final mapStorageDirectoryProvider = FutureProvider<String>((ref) async {
-  // Utiliser un chemin local dans le projet
-  const projectPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories';
-  final mapsDir = Directory('$projectPath/downloaded_maps');
-  
-  if (!await mapsDir.exists()) {
-    await mapsDir.create(recursive: true);
+  // Utiliser le bon dossier selon la plateforme
+  if (Platform.isAndroid) {
+    // Demander la permission de stockage
+    final status = await Permission.storage.request();
+    if (!status.isGranted) {
+      throw Exception('Permission de stockage refusée');
+    }
+    final dir = await getApplicationDocumentsDirectory();
+    final mapsDir = Directory('${dir.path}/downloaded_maps');
+    if (!await mapsDir.exists()) {
+      await mapsDir.create(recursive: true);
+    }
+    return mapsDir.path;
+  } else if (Platform.isIOS) {
+    final dir = await getApplicationDocumentsDirectory();
+    final mapsDir = Directory('${dir.path}/downloaded_maps');
+    if (!await mapsDir.exists()) {
+      await mapsDir.create(recursive: true);
+    }
+    return mapsDir.path;
+  } else {
+    // Desktop: garder le chemin local
+    const projectPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories';
+    final mapsDir = Directory('$projectPath/downloaded_maps');
+    if (!await mapsDir.exists()) {
+      await mapsDir.create(recursive: true);
+    }
+    return mapsDir.path;
   }
-  
-  return mapsDir.path;
 });
 
 /// Provider pour le service de téléchargement de cartes
