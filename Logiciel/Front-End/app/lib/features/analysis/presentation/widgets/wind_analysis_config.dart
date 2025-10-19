@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../charts/providers/wind_trend_provider.dart';
 import '../../../charts/domain/services/wind_trend_analyzer.dart';
+import 'wind_indicators_widgets.dart';
 
 /// Widget de configuration compacte pour l'analyse des tendances
 class WindAnalysisConfig extends ConsumerWidget {
@@ -11,10 +12,15 @@ class WindAnalysisConfig extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final analysisWindowSeconds = ref.watch(windAnalysisWindowProvider);
-    final sensitivity = ref.watch(windTrendSensitivityProvider);
-    
-    final analysisMinutes = (analysisWindowSeconds / 60).round();
+  final analysisWindowSeconds = ref.watch(windAnalysisWindowProvider);
+  final sensitivity = ref.watch(windTrendSensitivityProvider);
+  final analysisMinutes = (analysisWindowSeconds / 60).round();
+
+  // TODO: Remplacer ces valeurs par des calculs dynamiques issus des données réelles
+  final double stdTwd = 7.2; // exemple d'écart-type TWD
+  final double stdTws = 1.8; // exemple d'écart-type TWS
+  final double oscAmplitude = 12.0; // exemple amplitude oscillation
+  final double oscPeriod = 180.0; // exemple période oscillation (s)
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -129,6 +135,12 @@ class WindAnalysisConfig extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
+            // Indicateurs avancés (thermomètre de stabilité, compas oscillation)
+            const SizedBox(height: 8),
+            WindStabilityThermometer(stdTwd: stdTwd, stdTws: stdTws),
+            const SizedBox(height: 8),
+            WindOscillationCompassWidget(amplitude: oscAmplitude, period: oscPeriod),
+            const SizedBox(height: 8),
             // Infos en temps réel
             _buildAnalysisInfo(context, ref),
           ],
