@@ -48,17 +48,6 @@ class AnalysisPage extends StatelessWidget {
     return Consumer(
       builder: (context, ref, _) {
         final polarsAsync = ref.watch(polarsJ80Provider);
-        final twsAsync = ref.watch(twsHistoryProvider);
-        // Force de vent réelle (arrondie à la plus proche du tableau)
-        int currentWindForce = 10;
-        twsAsync.whenData((twsList) {
-          if (polarsAsync.hasValue && twsList.isNotEmpty) {
-            final tws = twsList.last.value;
-            // Cherche la force de vent la plus proche
-            final windForces = polarsAsync.value!.windForces;
-            currentWindForce = windForces.reduce((a, b) => (tws - a).abs() < (tws - b).abs() ? a : b);
-          }
-        });
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
@@ -116,20 +105,46 @@ class AnalysisPage extends StatelessWidget {
                                           onChanged: (v) => selectedWindForce.value = v,
                                         ),
                                         const SizedBox(width: 16),
-                                        Text('Force actuelle: $currentWindForce nds', style: const TextStyle(fontSize: 12)),
+                                        // Affichage force actuelle dans un Consumer local
+                                        Consumer(
+                                          builder: (context, ref, _) {
+                                            final twsAsync = ref.watch(twsHistoryProvider);
+                                            int currentWindForce = 10;
+                                            twsAsync.whenData((twsList) {
+                                              if (data.windForces.isNotEmpty && twsList.isNotEmpty) {
+                                                final tws = twsList.last.value;
+                                                currentWindForce = data.windForces.reduce((a, b) => (tws - a).abs() < (tws - b).abs() ? a : b);
+                                              }
+                                            });
+                                            return Text('Force actuelle: $currentWindForce nds', style: const TextStyle(fontSize: 12));
+                                          },
+                                        ),
                                       ],
                                     );
                                   },
                                 ),
                                 const SizedBox(height: 12),
+                                // PolarChart isolé dans un Consumer pour éviter le rebuild global
                                 ValueListenableBuilder<int?>(
                                   valueListenable: selectedWindForce,
                                   builder: (context, value, _) {
-                                    return PolarChart(
-                                      polaires: data.polaires,
-                                      angles: data.angles,
-                                      selectedWindForce: value,
-                                      currentWindForce: currentWindForce,
+                                    return Consumer(
+                                      builder: (context, ref, _) {
+                                        final twsAsync = ref.watch(twsHistoryProvider);
+                                        int currentWindForce = 10;
+                                        twsAsync.whenData((twsList) {
+                                          if (data.windForces.isNotEmpty && twsList.isNotEmpty) {
+                                            final tws = twsList.last.value;
+                                            currentWindForce = data.windForces.reduce((a, b) => (tws - a).abs() < (tws - b).abs() ? a : b);
+                                          }
+                                        });
+                                        return PolarChart(
+                                          polaires: data.polaires,
+                                          angles: data.angles,
+                                          selectedWindForce: value,
+                                          currentWindForce: currentWindForce,
+                                        );
+                                      },
                                     );
                                   },
                                 ),

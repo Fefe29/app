@@ -46,8 +46,11 @@ class _AlarmsPageState extends ConsumerState<AlarmsPage> with SingleTickerProvid
 					color: Theme.of(context).colorScheme.surface,
 					child: TabBar(
 						controller: _tab,
-						tabs: _tabs,
+						tabs: _tabs.map((tab) => Tab(child: Text(tab.text!, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)))).toList(),
 						labelColor: Theme.of(context).colorScheme.primary,
+						indicatorWeight: 4,
+						indicatorColor: Theme.of(context).colorScheme.primary,
+						unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
 					),
 				),
 				Expanded(
@@ -109,14 +112,14 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
 						onChanged: (seq) => seq == null ? null : ref.read(regattaTimerProvider.notifier).selectSequence(seq),
 						items: [
 							for (final seq in RegattaSequence.predefined)
-								DropdownMenuItem(value: seq, child: Text(seq.name)),
+								DropdownMenuItem(value: seq, child: Text(seq.name, style: const TextStyle(fontSize: 18))),
 						],
 					),
 					const SizedBox(height: 12),
 					Center(
 						child: Text(
 							fmt(state.remaining),
-							style: Theme.of(context).textTheme.displayMedium,
+							style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 48, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
 						),
 					),
 					const SizedBox(height: 16),
@@ -124,21 +127,33 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
 						ElevatedButton.icon(
 							onPressed: state.running ? null : () => ref.read(regattaTimerProvider.notifier).start(),
 							icon: const Icon(Icons.play_arrow),
-							label: const Text('Start'),
+							label: const Text('Start', style: TextStyle(fontSize: 18)),
+							style: ElevatedButton.styleFrom(
+								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+							),
 						),
 						ElevatedButton.icon(
 							onPressed: state.running ? () => ref.read(regattaTimerProvider.notifier).stop() : null,
 							icon: const Icon(Icons.pause),
-							label: const Text('Pause'),
+							label: const Text('Pause', style: TextStyle(fontSize: 18)),
+							style: ElevatedButton.styleFrom(
+								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+							),
 						),
 						OutlinedButton.icon(
 							onPressed: () => ref.read(regattaTimerProvider.notifier).reset(),
 							icon: const Icon(Icons.restart_alt),
-							label: const Text('Reset'),
+							label: const Text('Reset', style: TextStyle(fontSize: 18)),
+							style: OutlinedButton.styleFrom(
+								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+							),
 						),
 					]),
 					const SizedBox(height: 16),
-					Text('Repères: ' + state.sequence.marks.map((m) => fmt(m)).join(', ')),
+					Text('Repères: ' + state.sequence.marks.map((m) => fmt(m)).join(', '), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
 					const SizedBox(height: 8),
 					LinearProgressIndicator(
 						value: state.sequence.total == 0 ? 0 : (state.sequence.total - state.remaining) / state.sequence.total,
@@ -164,24 +179,24 @@ class _SleepTab extends ConsumerWidget {
 				crossAxisAlignment: CrossAxisAlignment.start,
 				children: [
 					Row(children: [
-						const Text('Durée sieste:'),
+						const Text('Durée sieste:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
 						const SizedBox(width: 12),
 						DropdownButton<int>(
 							value: st.napDuration.inMinutes,
 							onChanged: (v) => v == null ? null : notifier.setDuration(Duration(minutes: v)),
 							items: const [10, 15, 20, 25, 30, 40, 45, 60]
-									.map((m) => DropdownMenuItem(value: m, child: Text('$m min')))
-									.toList(),
+								.map((m) => DropdownMenuItem(value: m, child: Text('$m min', style: TextStyle(fontSize: 16))))
+								.toList(),
 						),
 					]),
 					const SizedBox(height: 24),
 						if (st.running && st.wakeUpAt != null)
-							Text('Réveil: ${st.wakeUpAt!.hour.toString().padLeft(2,'0')}:${st.wakeUpAt!.minute.toString().padLeft(2,'0')}'),
+							Text('Réveil: ${st.wakeUpAt!.hour.toString().padLeft(2,'0')}:${st.wakeUpAt!.minute.toString().padLeft(2,'0')}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
 					const SizedBox(height: 12),
 					Center(
 						child: Text(
 							st.running ? fmt(remaining) : fmt(st.napDuration),
-							style: Theme.of(context).textTheme.displayMedium,
+							style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 48, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
 						),
 					),
 					const SizedBox(height: 24),
@@ -189,12 +204,20 @@ class _SleepTab extends ConsumerWidget {
 						ElevatedButton.icon(
 							onPressed: st.running ? null : () => notifier.start(),
 							icon: const Icon(Icons.hotel),
-							label: const Text('Démarrer sieste'),
+							label: const Text('Démarrer sieste', style: TextStyle(fontSize: 18)),
+							style: ElevatedButton.styleFrom(
+								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+							),
 						),
 						OutlinedButton.icon(
 							onPressed: st.running ? () => notifier.cancel() : null,
 							icon: const Icon(Icons.close),
-							label: const Text('Annuler'),
+							label: const Text('Annuler', style: TextStyle(fontSize: 18)),
+							style: OutlinedButton.styleFrom(
+								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+							),
 						),
 					]),
 				],
@@ -215,13 +238,13 @@ class _AnchorTab extends ConsumerWidget {
 			child: ListView(
 				children: [
 					SwitchListTile(
-						title: const Text('Alarme active'),
+						title: const Text('Alarme active', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
 						value: st.enabled,
 						onChanged: (v) => n.toggle(v),
-						subtitle: st.triggered ? const Text('⚠️ Dérapage détecté', style: TextStyle(color: Colors.red)) : null,
+						subtitle: st.triggered ? const Text('⚠️ Dérapage détecté', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)) : null,
 					),
 					const SizedBox(height: 12),
-					Text('Rayon: ${st.radiusMeters.toStringAsFixed(0)} m'),
+					Text('Rayon: ${st.radiusMeters.toStringAsFixed(0)} m', style: const TextStyle(fontSize: 16)),
 					Slider(
 						value: st.radiusMeters,
 						min: 10,
@@ -232,16 +255,20 @@ class _AnchorTab extends ConsumerWidget {
 					const SizedBox(height: 12),
 					ElevatedButton.icon(
 						onPressed: () {
-							// Placeholder: récupérer GPS réel ici
-							n.setAnchorPosition(48.0, -4.5);
-						},
+						// Placeholder: récupérer GPS réel ici
+						n.setAnchorPosition(48.0, -4.5);
+					},
 						icon: const Icon(Icons.my_location),
-						label: const Text('Définir position actuelle'),
+						label: const Text('Définir position actuelle', style: TextStyle(fontSize: 18)),
+						style: ElevatedButton.styleFrom(
+							shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+							padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+						),
 					),
 					if (st.anchorLat != null)
 						Padding(
 							padding: const EdgeInsets.only(top: 12),
-							child: Text('Ancre: lat=${st.anchorLat}, lon=${st.anchorLon}'),
+							child: Text('Ancre: lat=${st.anchorLat}, lon=${st.anchorLon}', style: const TextStyle(fontSize: 16)),
 						),
 				],
 			),
@@ -261,12 +288,12 @@ class _OtherAlarmsTab extends ConsumerWidget {
 			padding: const EdgeInsets.all(16),
 			child: ListView(
 				children: [
-					Text('Profondeur', style: Theme.of(context).textTheme.titleMedium),
+					Text('Profondeur', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.bold)),
 					SwitchListTile(
-						title: const Text('Alarme profondeur faible'),
+						title: const Text('Alarme profondeur faible', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
 						value: st.depth.enabled,
 						onChanged: (v) => n.toggleDepth(v),
-						subtitle: st.depth.triggered ? const Text('⚠️ Trop faible', style: TextStyle(color: Colors.red)) : null,
+						subtitle: st.depth.triggered ? const Text('⚠️ Trop faible', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)) : null,
 					),
 					Row(children: [
 						Expanded(
@@ -278,7 +305,7 @@ class _OtherAlarmsTab extends ConsumerWidget {
 								onChanged: st.depth.enabled ? (v) => n.setMinDepth(v) : null,
 							),
 						),
-						SizedBox(width: 60, child: Text('${st.depth.minDepthMeters.toStringAsFixed(1)} m')),
+						SizedBox(width: 60, child: Text('${st.depth.minDepthMeters.toStringAsFixed(1)} m', style: const TextStyle(fontSize: 16))),
 						if (st.depth.triggered)
 							IconButton(
 								tooltip: 'Réinitialiser',
@@ -287,14 +314,14 @@ class _OtherAlarmsTab extends ConsumerWidget {
 							),
 					]),
 					const Divider(height: 32),
-					Text('Wind Shift', style: Theme.of(context).textTheme.titleMedium),
+					Text('Wind Shift', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.bold)),
 					SwitchListTile(
-						title: const Text('Alarme shift'),
+						title: const Text('Alarme shift', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
 						value: st.windShift.enabled,
 						onChanged: (v) => n.toggleWindShift(v),
 						subtitle: st.windShift.triggered
-							? Text('⚠️ Shift Δ=${st.windShift.currentDiffAbs?.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.red))
-							: (st.windShift.currentDiffAbs != null ? Text('Δ=${st.windShift.currentDiffAbs!.toStringAsFixed(1)}°') : null),
+							? Text('⚠️ Shift Δ=${st.windShift.currentDiffAbs?.toStringAsFixed(1)}°', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))
+							: (st.windShift.currentDiffAbs != null ? Text('Δ=${st.windShift.currentDiffAbs!.toStringAsFixed(1)}°', style: const TextStyle(fontSize: 16)) : null),
 					),
 					Row(children: [
 						Expanded(
@@ -306,7 +333,7 @@ class _OtherAlarmsTab extends ConsumerWidget {
 								onChanged: st.windShift.enabled ? (v) => n.setWindShiftThreshold(v) : null,
 							),
 						),
-						SizedBox(width: 60, child: Text('${st.windShift.thresholdDeg.toStringAsFixed(0)}°')),
+						SizedBox(width: 60, child: Text('${st.windShift.thresholdDeg.toStringAsFixed(0)}°', style: const TextStyle(fontSize: 16))),
 						IconButton(
 							tooltip: 'Recalibrer',
 							icon: const Icon(Icons.center_focus_strong),
@@ -323,13 +350,13 @@ class _OtherAlarmsTab extends ConsumerWidget {
 							),
 					]),
 					const Divider(height: 32),
-					Text('Wind Drop / Raise', style: Theme.of(context).textTheme.titleMedium),
+					Text('Wind Drop / Raise', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.bold)),
 					// Drop
 					SwitchListTile(
-						title: const Text('Alarme vent faible (Drop)'),
+						title: const Text('Alarme vent faible (Drop)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
 						value: st.windDrop.enabled,
 						onChanged: (v) => n.toggleWindDrop(v),
-						subtitle: st.windDrop.triggered ? const Text('⚠️ Trop faible', style: TextStyle(color: Colors.red)) : null,
+						subtitle: st.windDrop.triggered ? const Text('⚠️ Trop faible', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)) : null,
 					),
 					Row(children: [
 						Expanded(
@@ -341,16 +368,16 @@ class _OtherAlarmsTab extends ConsumerWidget {
 								onChanged: st.windDrop.enabled ? (v) => n.setWindDropThreshold(v) : null,
 							),
 						),
-						SizedBox(width: 60, child: Text('${st.windDrop.threshold.toStringAsFixed(1)} kn')),
+						SizedBox(width: 60, child: Text('${st.windDrop.threshold.toStringAsFixed(1)} kn', style: const TextStyle(fontSize: 16))),
 						if (st.windDrop.triggered)
 							IconButton(icon: const Icon(Icons.refresh), onPressed: n.resetWindDrop),
 					]),
 					// Raise
 					SwitchListTile(
-						title: const Text('Alarme vent fort (Raise)'),
+						title: const Text('Alarme vent fort (Raise)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
 						value: st.windRaise.enabled,
 						onChanged: (v) => n.toggleWindRaise(v),
-						subtitle: st.windRaise.triggered ? const Text('⚠️ Trop fort', style: TextStyle(color: Colors.red)) : null,
+						subtitle: st.windRaise.triggered ? const Text('⚠️ Trop fort', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)) : null,
 					),
 					Row(children: [
 						Expanded(
@@ -362,7 +389,7 @@ class _OtherAlarmsTab extends ConsumerWidget {
 								onChanged: st.windRaise.enabled ? (v) => n.setWindRaiseThreshold(v) : null,
 							),
 						),
-						SizedBox(width: 60, child: Text('${st.windRaise.threshold.toStringAsFixed(1)} kn')),
+						SizedBox(width: 60, child: Text('${st.windRaise.threshold.toStringAsFixed(1)} kn', style: const TextStyle(fontSize: 16))),
 						if (st.windRaise.triggered)
 							IconButton(icon: const Icon(Icons.refresh), onPressed: n.resetWindRaise),
 					]),
