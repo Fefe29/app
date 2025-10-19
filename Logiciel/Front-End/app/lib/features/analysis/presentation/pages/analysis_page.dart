@@ -6,34 +6,48 @@ import '../../providers/analysis_filters.dart';
 import '../widgets/single_wind_metric_chart.dart';
 import '../widgets/wind_analysis_config.dart';
 
-class AnalysisPage extends ConsumerWidget {
+class AnalysisPage extends StatelessWidget {
   const AnalysisPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final f = ref.watch(analysisFiltersProvider);
-
+  Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        // En-tête avec informations
-        if (f.twd || f.tws || f.twa) _buildAnalysisHeader(context),
-        
-        // Configuration de l'analyse des tendances (visible seulement si TWD/TWA actifs)
-        if (f.twd || f.twa) const WindAnalysisConfig(),
-        
-        // Graphiques individuels pour chaque métrique sélectionnée
-        if (f.twd) const SingleWindMetricChart(metricType: WindMetricType.twd),
-        if (f.twa) const SingleWindMetricChart(metricType: WindMetricType.twa),
-        if (f.tws) const SingleWindMetricChart(metricType: WindMetricType.tws),
-        
-        // Autres graphiques (placeholder pour l'instant)
-        if (f.boatSpeed) _plotCard('Vitesse du bateau', 'Vitesse au fil du temps'),
-        if (f.polars) _plotCard('Polaires', 'Courbes de performance'),
-        
-        // Message d'aide si aucun filtre actif
-        if (!f.twd && !f.tws && !f.twa && !f.boatSpeed && !f.polars)
-          _buildHelpCard(),
+        Consumer(
+          builder: (context, ref, _) {
+            final f = ref.watch(analysisFiltersProvider);
+            if (f.twd || f.tws || f.twa) {
+              return _buildAnalysisHeader(context);
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+        Consumer(
+          builder: (context, ref, _) {
+            final f = ref.watch(analysisFiltersProvider);
+            if (f.twd || f.twa) {
+              return const WindAnalysisConfig();
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+        Consumer(
+          builder: (context, ref, _) {
+            final f = ref.watch(analysisFiltersProvider);
+            return Column(
+              children: [
+                if (f.twd) const SingleWindMetricChart(metricType: WindMetricType.twd),
+                if (f.twa) const SingleWindMetricChart(metricType: WindMetricType.twa),
+                if (f.tws) const SingleWindMetricChart(metricType: WindMetricType.tws),
+                if (f.boatSpeed) _plotCard('Vitesse du bateau', 'Vitesse au fil du temps'),
+                if (f.polars) _plotCard('Polaires', 'Courbes de performance'),
+                if (!f.twd && !f.tws && !f.twa && !f.boatSpeed && !f.polars)
+                  _buildHelpCard(),
+              ],
+            );
+          },
+        ),
       ],
     );
   }
