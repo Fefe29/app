@@ -78,7 +78,7 @@ class CourseCanvas extends ConsumerWidget {
           children: [
             Text('Aucune bouée / ligne'),
             SizedBox(height: 16),
-            CoordinateSystemInfo(),
+            // Bandeau système de coordonnées supprimé
           ],
         ),
       );
@@ -200,12 +200,7 @@ class CourseCanvas extends ConsumerWidget {
               ),
             ),
 
-            // Overlay
-            const Positioned(
-              top: 8,
-              right: 8,
-              child: CoordinateSystemInfo(),
-            ),
+            // Overlay supprimé : plus de bandeau système de coordonnées
           ],
         );
       },
@@ -762,17 +757,13 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawBoundsInfo(Canvas canvas, Size size) {
-    final southWest = mercatorService.toGeographic(LocalPosition(x: view.minX, y: view.minY));
-    final northEast = mercatorService.toGeographic(LocalPosition(x: view.maxX, y: view.maxY));
+  final southWest = mercatorService.toGeographic(LocalPosition(x: view.minX, y: view.minY));
+  final northEast = mercatorService.toGeographic(LocalPosition(x: view.maxX, y: view.maxY));
 
-    final localTxt = 'Locale: X:[${view.minX.toStringAsFixed(1)}m ; ${view.maxX.toStringAsFixed(1)}m]  '
-        'Y:[${view.minY.toStringAsFixed(1)}m ; ${view.maxY.toStringAsFixed(1)}m]';
+  final geoTxt = 'Géo: Lat:[${southWest.latitude.toStringAsFixed(4)}° ; ${northEast.latitude.toStringAsFixed(4)}°]  '
+    'Lon:[${southWest.longitude.toStringAsFixed(4)}° ; ${northEast.longitude.toStringAsFixed(4)}°]';
 
-    final geoTxt = 'Géo: Lat:[${southWest.latitude.toStringAsFixed(4)}° ; ${northEast.latitude.toStringAsFixed(4)}°]  '
-        'Lon:[${southWest.longitude.toStringAsFixed(4)}° ; ${northEast.longitude.toStringAsFixed(4)}°]';
-
-    _drawText(canvas, localTxt, Offset(8, size.height - 34), fontSize: 10, color: Colors.blueGrey);
-    _drawText(canvas, geoTxt, Offset(8, size.height - 18), fontSize: 10, color: Colors.green.shade600);
+  _drawText(canvas, geoTxt, Offset(8, size.height - 18), fontSize: 10, color: Colors.green.shade600);
   }
 
   void _drawText(Canvas canvas, String text, Offset position, {double fontSize = 14, Color color = Colors.black}) {

@@ -67,12 +67,12 @@ class CoordinateSystemService {
 class CoordinateSystemNotifier extends Notifier<CoordinateSystemService> {
   @override
   CoordinateSystemService build() {
-    // Default to downloaded map area (43.535, 6.999)
+    // Default to a neutral coordinate system (no map reference)
     return CoordinateSystemService(
       config: const CoordinateSystemConfig(
-        origin: GeographicPosition(latitude: 43.535, longitude: 6.999),
-        name: 'Carte téléchargée',
-        description: 'Zone des tuiles OpenSeaMap téléchargées',
+        origin: GeographicPosition(latitude: 0.0, longitude: 0.0),
+        name: 'Système par défaut',
+        description: null,
       ),
     );
   }
