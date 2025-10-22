@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="10236dc5-ed7e-44a4-8469-d62f574871c3" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/.vscode/launch.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/Programme complet-20240411.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/Ressources-20240411.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/animaux.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/arrierPlan.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/cigale1.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/class_interface.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/dprint.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/ecosysteme.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/fourmi1.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/interface.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/interface.ui" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD IHM info/terrain.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD_Math_stat/D8.npy" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD_Math_stat/TD.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD_Math_stat/masse.npy" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD_Math_stat/masses.npy" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Autre/TD_Math_stat/test.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/Données artificielles-20240516.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/Données artificielles-20240516/double_sin.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/Données artificielles-20240516/plan.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/Données artificielles-20240516/plateau.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/Données artificielles-20240516/projet.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/Données artificielles-20240516/sin_card.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/Données artificielles-20240516/z_BancArmen_2m.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/Projet_hydro.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet hydro/projet_hydro_1.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Ado_refus.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Bateau.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Calculateur.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Dossier père/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Dossier père/Projet" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Dossier père/Push" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Dossier père/pyuic5" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Girouette_anemo_simu.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Launch.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Objet.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Parcours.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Polaire_J80.csv" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Polaire_J80.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/Readme.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/affichage_routage.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/exemple_test_cours.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/grib.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/grib1.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/interface.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/logo.PNG" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/polaire.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/regression_lineaire.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/tests_unitaires.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/vitesse.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/wind_acqui.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Autre_/Projet info_(pour nous)/wind_doc.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Ado_refus.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Ado_refus.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Bateau.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Bateau.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Calculateur.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Calculateur.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Girouette_anemo_simu.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Girouette_anemo_simu.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Launch.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Launch.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Objet.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Objet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Parcours.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Parcours.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Polaire_J80.csv" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Polaire_J80.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/Polaire_J80.xlsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/affichage_routage.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/affichage_routage.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/exemple_test_cours.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/grib.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/grib1.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/interface.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/interface.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/polaire.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/polaire.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/regression_lineaire.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/regression_lineaire.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/vitesse.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/vitesse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/wind_acqui.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/wind_acqui.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/wind_doc.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Projet info/wind_doc.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Readme.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/Readme.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_doc_obj.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_doc_obj.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_doc_x.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_doc_x.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_doc_y.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_doc_y.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_pts_ref_t.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_pts_ref_t.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_pts_ref_x.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_pts_ref_x.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_pts_ref_y.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/parcours_pts_ref_y.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/wind_doc.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Logiciel/Front-End/RADE_SPRINTER/wind_doc.txt" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 4
+}]]></component>
+  <component name="ProjectId" id="34HYZP1ZUeDSsWUInKsmIyaUOg9" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.Unnamed.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "cf.first.check.clang-format": "false",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "tiles",
+    "last_opened_file_path": "//wsl.localhost/Ubuntu/home/fefe/home/Kornog"
+  }
+}]]></component>
+  <component name="RunManager">
+    <configuration name="Unnamed" type="Application" factoryName="Application" nameIsGenerated="true">
+      <option name="ALTERNATIVE_JRE_PATH" value="$USER_HOME$/AppData/Local/Android/Sdk" />
+      <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
+      <module name="Kornog" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Logiciel/Front-End/app" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="10236dc5-ed7e-44a4-8469-d62f574871c3" name="Changes" comment="" />
+      <created>1760872021397</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1760872021397</updated>
+    </task>
+    <servers />
+  </component>
+</project>

@@ -165,18 +165,166 @@ class _MapDownloadDialogState extends ConsumerState<MapDownloadDialog> {
   Widget build(BuildContext context) {
     final courseBounds = ref.watch(courseBoundsProvider);
     
+    final maxDialogHeight = MediaQuery.of(context).size.height * 0.85;
+    final dialogWidth = MediaQuery.of(context).size.width < 600 ? MediaQuery.of(context).size.width * 0.95 : 500.0;
     return Dialog(
-      child: Container(
-        width: 500,
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: maxDialogHeight,
+          minWidth: 300,
+          maxWidth: dialogWidth,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ...existing code...
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Télécharger une carte', style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Nom de la carte',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (v) => v == null || v.trim().isEmpty ? 'Nom requis' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _descriptionController,
+                          decoration: const InputDecoration(
+                            labelText: 'Description (optionnel)',
+                            border: OutlineInputBorder(),
+                          ),
+                          minLines: 1,
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _minLatController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Min latitude',
+                                  border: OutlineInputBorder(),
+                                ),
+                                keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
+                                validator: (v) => v == null || v.isEmpty ? 'Requis' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _maxLatController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Max latitude',
+                                  border: OutlineInputBorder(),
+                                ),
+                                keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
+                                validator: (v) => v == null || v.isEmpty ? 'Requis' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _minLonController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Min longitude',
+                                  border: OutlineInputBorder(),
+                                ),
+                                keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
+                                validator: (v) => v == null || v.isEmpty ? 'Requis' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _maxLonController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Max longitude',
+                                  border: OutlineInputBorder(),
+                                ),
+                                keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
+                                validator: (v) => v == null || v.isEmpty ? 'Requis' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                value: _selectedZoomLevel,
+                                decoration: const InputDecoration(
+                                  labelText: 'Niveau de zoom',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: List.generate(19, (i) => i + 1)
+                                    .map((z) => DropdownMenuItem(
+                                          value: z,
+                                          child: Text(z.toString()),
+                                        ))
+                                    .toList(),
+                                onChanged: (v) {
+                                  if (v != null) setState(() => _selectedZoomLevel = v);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: _useCourseArea,
+                              icon: const Icon(Icons.map),
+                              label: const Text('Parcours'),
+                              style: ElevatedButton.styleFrom(minimumSize: const Size(80, 48)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Text('Tuiles estimées: $_estimatedTileCount'),
+                            const SizedBox(width: 16),
+                            Text('Taille: $_estimatedSize'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Annuler'),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: _isDownloading ? null : _downloadMap,
+                        child: _isDownloading
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('Télécharger'),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
