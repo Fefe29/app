@@ -358,7 +358,7 @@ class _CoursePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawRect(Offset.zero & size, bg);
 
-    _drawGrid(canvas, size);
+  // Quadrillage supprimé
     _drawLines(canvas, size);
     _drawRoute(canvas, size);
     _drawBuoys(canvas, size);
@@ -368,17 +368,6 @@ class _CoursePainter extends CustomPainter {
     _drawBoundsInfo(canvas, size);
   }
 
-  void _drawGrid(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.grey.withOpacity(0.2)
-      ..strokeWidth = 1;
-    for (double x = margin; x < size.width - margin; x += 60) {
-      canvas.drawLine(Offset(x, margin), Offset(x, size.height - margin), paint);
-    }
-    for (double y = margin; y < size.height - margin; y += 60) {
-      canvas.drawLine(Offset(margin, y), Offset(size.width - margin, y), paint);
-    }
-  }
 
   void _drawLines(Canvas canvas, Size size) {
     for (final line in [state.startLine, state.finishLine]) {
@@ -436,6 +425,8 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawWind(Canvas canvas, Size size) {
+    // --- FLECHE DE SENS DU VENT COMMENTEE POUR REUTILISATION ULTERIEURE ---
+    /*
     const arrowLen = 50.0;
     final toDir = (windDirDeg + 180.0) % 360.0;
     final angleRad = toDir * math.pi / 180.0;
@@ -476,6 +467,7 @@ class _CoursePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawPath(headPath, headBorder);
     // Label supprimé
+    */
   }
 
   void _drawLaylines(Canvas canvas, Size size) {
@@ -693,67 +685,70 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawWindTrendInfo(Canvas canvas, Size size) {
-    const margin = 12.0;
-    const lineHeight = 16.0;
+  // Nouvelle disposition et style pour une meilleure lisibilité et un contenu bien contenu dans le cadre
+  const margin = 12.0;
+  const innerMargin = 12.0;
+  const boxWidth = 210.0;
+  const boxHeight = 110.0;
+  const valueFont = 25.0;
+  const unitFont = 15.0;
+  const infoFont = 14.0;
+  const reliabilityFont = 13.0;
 
-    Color trendColor;
-    String trendIcon;
-    String trendLabel;
+  Color trendColor;
+  String trendIcon;
+  String trendLabel;
 
-    switch (windTrend.trend) {
-      case WindTrendDirection.veeringRight:
-        trendColor = Colors.green.shade700;
-        trendIcon = '↗';
-        trendLabel = 'BASCULE DROITE';
-        break;
-      case WindTrendDirection.backingLeft:
-        trendColor = Colors.orange.shade700;
-        trendIcon = '↙';
-        trendLabel = 'BASCULE GAUCHE';
-        break;
-      case WindTrendDirection.irregular:
-        trendColor = Colors.red.shade600;
-        trendIcon = '≋';
-        trendLabel = 'IRRÉGULIER';
-        break;
-      case WindTrendDirection.neutral:
-        trendColor = Colors.blue.shade600;
-        trendIcon = '→';
-        trendLabel = 'STABLE';
-        break;
-    }
+  switch (windTrend.trend) {
+    case WindTrendDirection.veeringRight:
+      trendColor = Colors.green.shade700;
+      trendIcon = '↗';
+      trendLabel = 'Bascule droite';
+      break;
+    case WindTrendDirection.backingLeft:
+      trendColor = Colors.orange.shade700;
+      trendIcon = '↙';
+      trendLabel = 'Bascule gauche';
+      break;
+    case WindTrendDirection.irregular:
+      trendColor = Colors.red.shade600;
+      trendIcon = '≋';
+      trendLabel = 'Irrégulier';
+      break;
+    case WindTrendDirection.neutral:
+      trendColor = Colors.blue.shade600;
+      trendIcon = '→';
+      trendLabel = 'Stable';
+      break;
+  }
 
-    final background = Paint()
-      ..color = Colors.black.withOpacity(0.7)
-      ..style = PaintingStyle.fill;
+  final background = Paint()
+    ..color = Colors.black.withOpacity(0.80)
+    ..style = PaintingStyle.fill;
 
-    const boxWidth = 180.0;
-    const boxHeight = 70.0;
-    final rect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(margin, margin, boxWidth, boxHeight),
-      const Radius.circular(6),
-    );
-    canvas.drawRRect(rect, background);
+  final rect = RRect.fromRectAndRadius(
+    Rect.fromLTWH(margin, margin, boxWidth, boxHeight),
+    const Radius.circular(12),
+  );
+  canvas.drawRRect(rect, background);
 
-    _drawText(canvas, '📊 ANALYSE VENT', const Offset(margin + 8, margin + 8),
-        fontSize: 11, color: Colors.white70);
+  // Affichage vertical, aligné à gauche, marges internes équilibrées
+  double y = margin + innerMargin;
+  final x = margin + innerMargin;
 
-    _drawText(canvas, '$trendIcon $trendLabel', const Offset(margin + 8, margin + 8 + lineHeight),
-        fontSize: 13, color: trendColor);
-
-    final slopeText = windTrend.linearSlopeDegPerMin >= 0
-        ? '+${windTrend.linearSlopeDegPerMin.toStringAsFixed(1)}°/min'
-        : '${windTrend.linearSlopeDegPerMin.toStringAsFixed(1)}°/min';
-
-    _drawText(canvas, 'Pente: $slopeText', const Offset(margin + 8, margin + 8 + lineHeight * 2),
-        fontSize: 10, color: Colors.white70);
-
-    final reliability = windTrend.isReliable ? '✓ Fiable' : '⚠ Peu fiable';
-    final reliabilityColor = windTrend.isReliable ? Colors.green.shade400 : Colors.orange.shade400;
-
-    _drawText(canvas, '$reliability (${windTrend.supportPoints}pts)',
-        const Offset(margin + 8, margin + 8 + lineHeight * 3),
-        fontSize: 10, color: reliabilityColor);
+  // Direction
+  _drawText(canvas, '${windDirDeg.toStringAsFixed(0)}°', Offset(x, y), fontSize: valueFont, color: Colors.white);
+  y += valueFont + 2;
+  // Force
+  _drawText(canvas, '${windSpeed.toStringAsFixed(1)} nds', Offset(x, y), fontSize: unitFont, color: Colors.white.withOpacity(0.92));
+  y += unitFont + 7;
+  // Tendance
+  _drawText(canvas, '$trendIcon $trendLabel', Offset(x, y), fontSize: infoFont, color: trendColor.withOpacity(0.95));
+  y += infoFont + 7;
+  // Fiabilité
+  final reliability = windTrend.isReliable ? '✓ Fiable' : '⚠ Peu fiable';
+  final reliabilityColor = windTrend.isReliable ? Colors.green.shade400 : Colors.orange.shade400;
+  _drawText(canvas, '$reliability (${windTrend.supportPoints}pts)', Offset(x, y), fontSize: reliabilityFont, color: reliabilityColor.withOpacity(0.95));
   }
 
   void _drawBoundsInfo(Canvas canvas, Size size) {

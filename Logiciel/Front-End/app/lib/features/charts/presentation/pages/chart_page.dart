@@ -59,12 +59,8 @@ class _HeaderStatus extends ConsumerWidget {
 						children: [
 							const CourseMenuButton(),
 							const SizedBox(width: 12),
-							Icon(table == null ? Icons.cloud_off : Icons.sailing, size: 18),
-							const SizedBox(width: 8),
-							Text(table == null ? 'Aucune polaire' : 'Polaires: ${table.angleCount} angles'),
-							const SizedBox(width: 16),
-							Text('Vent: ${wind.directionDeg.toStringAsFixed(0)}° / ${wind.speed.toStringAsFixed(1)} nds'),
-							const SizedBox(width: 16),
+							// Icône et widget polaires supprimés
+							// ...existing code...
 							if (!route.isEmpty) ...[
 								Icon(Icons.timer, size: 16, color: Colors.green.shade700),
 								const SizedBox(width: 4),
@@ -75,26 +71,13 @@ class _HeaderStatus extends ConsumerWidget {
 										)),
 								const SizedBox(width: 16),
 							],
-							ElevatedButton.icon(
+							IconButton(
+								tooltip: windTrend.isReliable ? 'Nouveau routage' : 'Routage (données limitées)',
+								icon: Icon(Icons.route, color: windTrend.isReliable ? Colors.blue : Colors.orange, size: 22),
 								onPressed: canRoute ? () {
 									print('CHART_PAGE - Bouton Nouveau routage appuyé');
 									ref.read(routePlanProvider.notifier).reroute();
 								} : null,
-								icon: Icon(
-									Icons.route, 
-									size: 16,
-									color: windTrend.isReliable ? null : Colors.orange,
-								),
-								label: Text(
-									windTrend.isReliable 
-											? 'Nouveau routage' 
-											: 'Routage (données limitées)',
-								),
-								style: ElevatedButton.styleFrom(
-									foregroundColor: canRoute 
-											? (windTrend.isReliable ? null : Colors.orange)
-											: Colors.grey,
-								),
 							),
 							const SizedBox(width: 8),
 							const MapToolbarButton(),
