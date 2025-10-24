@@ -47,9 +47,10 @@ class _MetricTileState extends ConsumerState<MetricTile>
     final valueText = _lastValue ?? '--';
     final unitText  = _lastUnit ?? '';
 
-  // Fond gris clair pour toutes les tuiles
-  final bgColor = Colors.grey[200]!;
-  final borderColor = Colors.grey[400]!;
+  // Fond selon le thème : noir en mode nuit, gris clair sinon
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final bgColor = isDark ? Colors.black : Colors.grey[200]!;
+  final borderColor = isDark ? Colors.grey[800]! : Colors.grey[400]!;
 
     return RepaintBoundary(
       child: Card(
@@ -149,6 +150,8 @@ class _StableValue extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Largeur mini pour éviter le shift lorsque la valeur raccourcit / s'allonge.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final neonRed = const Color(0xFFFF005C);
     return LayoutBuilder(
       builder: (ctx, c) {
         return ConstrainedBox(
@@ -159,10 +162,19 @@ class _StableValue extends StatelessWidget {
             child: Text.rich(
               TextSpan(
                 text: value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 100,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -1.4,
+                  color: isDark ? neonRed : null,
+                  shadows: isDark
+                      ? [
+                          Shadow(
+                            color: neonRed.withOpacity(0.7),
+                            blurRadius: 12,
+                          ),
+                        ]
+                      : null,
                 ),
                 children: [
                   if (unit.isNotEmpty)
@@ -176,8 +188,16 @@ class _StableValue extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w500,
-                            color: colorScheme.onSurfaceVariant,
+                            color: isDark ? neonRed : colorScheme.onSurfaceVariant,
                             letterSpacing: .7,
+                            shadows: isDark
+                                ? [
+                                    Shadow(
+                                      color: neonRed.withOpacity(0.7),
+                                      blurRadius: 8,
+                                    ),
+                                  ]
+                                : null,
                           ),
                         ),
                       ),
