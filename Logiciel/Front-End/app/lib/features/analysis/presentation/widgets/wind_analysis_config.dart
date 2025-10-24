@@ -135,9 +135,13 @@ class WindAnalysisConfig extends ConsumerWidget {
             
             const SizedBox(height: 8),
             
-            // Indicateurs avancés (thermomètre de stabilité, compas oscillation)
+            // Indicateurs avancés (stabilité TWD puis TWS, puis compas oscillation)
             const SizedBox(height: 8),
-            WindStabilityThermometer(stdTwd: stdTwd, stdTws: stdTws),
+            Text('Stabilité TWD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            WindStabilityThermometer(stdTwd: stdTwd, stdTws: null),
+            const SizedBox(height: 8),
+            Text('Stabilité TWS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            WindStabilityThermometer(stdTwd: null, stdTws: stdTws),
             const SizedBox(height: 8),
             WindOscillationCompassWidget(amplitude: oscAmplitude, period: oscPeriod),
             const SizedBox(height: 8),

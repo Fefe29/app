@@ -14,10 +14,10 @@ class AnalysisFilters {
 
   const AnalysisFilters({
     this.twd = true,
-    this.tws = true,
+    this.tws = false, // Désactivé par défaut
     this.twa = true,
     this.boatSpeed = true,
-    this.polars = false,
+    this.polars = true, // Polaires affichées par défaut
   });
 
   AnalysisFilters copyWith({

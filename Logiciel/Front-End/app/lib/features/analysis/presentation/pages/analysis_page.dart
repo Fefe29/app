@@ -48,116 +48,137 @@ class AnalysisPage extends StatelessWidget {
     return Consumer(
       builder: (context, ref, _) {
         final polarsAsync = ref.watch(polarsJ80Provider);
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        return Stack(
           children: [
-            Consumer(
-              builder: (context, ref, _) {
-                final f = ref.watch(analysisFiltersProvider);
-                if (f.twd || f.tws || f.twa) {
-                  return _buildAnalysisHeader(context);
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            Consumer(
-              builder: (context, ref, _) {
-                final f = ref.watch(analysisFiltersProvider);
-                if (f.twd || f.twa) {
-                  return const WindAnalysisConfig();
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            Consumer(
-              builder: (context, ref, _) {
-                final f = ref.watch(analysisFiltersProvider);
-                return Column(
-                  children: [
-                    if (f.twd) const SingleWindMetricChart(metricType: WindMetricType.twd),
-                    if (f.twa) const SingleWindMetricChart(metricType: WindMetricType.twa),
-                    if (f.tws) const SingleWindMetricChart(metricType: WindMetricType.tws),
-                    if (f.boatSpeed) _plotCard('Vitesse du bateau', 'Vitesse au fil du temps'),
-                    if (f.polars)
-                      polarsAsync.when(
-                        loading: () => const Center(child: CircularProgressIndicator()),
-                        error: (e, _) => Text('Erreur chargement polaires: $e'),
-                        data: (data) => Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Polaires J80', style: Theme.of(context).textTheme.titleMedium),
-                                const SizedBox(height: 8),
-                                ValueListenableBuilder<int?>(
-                                  valueListenable: selectedWindForce,
-                                  builder: (context, value, _) {
-                                    return Row(
-                                      children: [
-                                        DropdownButton<int?>(
-                                          value: value,
-                                          hint: const Text('Force de vent'),
-                                          items: [
-                                            const DropdownMenuItem<int?>(value: null, child: Text('Toutes')), 
-                                            ...data.windForces.map((f) => DropdownMenuItem<int?>(value: f, child: Text('$f nds'))),
-                                          ],
-                                          onChanged: (v) => selectedWindForce.value = v,
-                                        ),
-                                        const SizedBox(width: 16),
-                                        // Affichage force actuelle dans un Consumer local
-                                        Consumer(
-                                          builder: (context, ref, _) {
-                                            final twsAsync = ref.watch(twsHistoryProvider);
-                                            int currentWindForce = 10;
-                                            twsAsync.whenData((twsList) {
-                                              if (data.windForces.isNotEmpty && twsList.isNotEmpty) {
-                                                final tws = twsList.last.value;
-                                                currentWindForce = data.windForces.reduce((a, b) => (tws - a).abs() < (tws - b).abs() ? a : b);
-                                              }
-                                            });
-                                            return Text('Force actuelle: $currentWindForce nds', style: const TextStyle(fontSize: 12));
-                                          },
-                                        ),
-                                      ],
-                                    );
-                                  },
+            // Main content (no info bar)
+            ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                Consumer(
+                  builder: (context, ref, _) {
+                    final f = ref.watch(analysisFiltersProvider);
+                    if (f.twd || f.twa) {
+                      return const WindAnalysisConfig();
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final f = ref.watch(analysisFiltersProvider);
+                    return Column(
+                      children: [
+                        if (f.twd) const SingleWindMetricChart(metricType: WindMetricType.twd),
+                        if (f.twa) const SingleWindMetricChart(metricType: WindMetricType.twa),
+                        if (f.tws) const SingleWindMetricChart(metricType: WindMetricType.tws),
+                        if (f.boatSpeed) _plotCard('Vitesse du bateau', 'Vitesse au fil du temps'),
+                        if (f.polars)
+                          polarsAsync.when(
+                            loading: () => const Center(child: CircularProgressIndicator()),
+                            error: (e, _) => Text('Erreur chargement polaires: $e'),
+                            data: (data) {
+                              return Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Polaires J80', style: Theme.of(context).textTheme.titleMedium),
+                                      const SizedBox(height: 8),
+                                      ValueListenableBuilder<int?>(
+                                        valueListenable: selectedWindForce,
+                                        builder: (context, value, _) {
+                                          return Row(
+                                            children: [
+                                              DropdownButton<int?>(
+                                                value: value,
+                                                hint: const Text('Force de vent'),
+                                                items: [
+                                                  const DropdownMenuItem<int?>(value: null, child: Text('Toutes')),
+                                                  ...data.windForces.map((f) => DropdownMenuItem<int?>(value: f, child: Text('$f nds'))),
+                                                ],
+                                                onChanged: (v) => selectedWindForce.value = v,
+                                              ),
+                                              const SizedBox(width: 16),
+                                              // Affichage force actuelle dans un Consumer local
+                                              Consumer(
+                                                builder: (context, ref, _) {
+                                                  final twsAsync = ref.watch(twsHistoryProvider);
+                                                  int currentWindForce = 10;
+                                                  twsAsync.whenData((twsList) {
+                                                    if (data.windForces.isNotEmpty && twsList.isNotEmpty) {
+                                                      final tws = twsList.last.value;
+                                                      currentWindForce = data.windForces.reduce((a, b) => (tws - a).abs() < (tws - b).abs() ? a : b);
+                                                    }
+                                                  });
+                                                  return Text('Force actuelle: $currentWindForce nds', style: const TextStyle(fontSize: 12));
+                                                },
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(height: 12),
+                                      // PolarChart isolé dans un Consumer pour éviter le rebuild global
+                                      ValueListenableBuilder<int?>(
+                                        valueListenable: selectedWindForce,
+                                        builder: (context, value, _) {
+                                          return Consumer(
+                                            builder: (context, ref, _) {
+                                              final twsAsync = ref.watch(twsHistoryProvider);
+                                              int currentWindForce = 10;
+                                              twsAsync.whenData((twsList) {
+                                                if (data.windForces.isNotEmpty && twsList.isNotEmpty) {
+                                                  final tws = twsList.last.value;
+                                                  currentWindForce = data.windForces.reduce((a, b) => (tws - a).abs() < (tws - b).abs() ? a : b);
+                                                }
+                                              });
+                                              return PolarChart(
+                                                polaires: data.polaires,
+                                                angles: data.angles,
+                                                selectedWindForce: value,
+                                                currentWindForce: currentWindForce,
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(height: 12),
-                                // PolarChart isolé dans un Consumer pour éviter le rebuild global
-                                ValueListenableBuilder<int?>(
-                                  valueListenable: selectedWindForce,
-                                  builder: (context, value, _) {
-                                    return Consumer(
-                                      builder: (context, ref, _) {
-                                        final twsAsync = ref.watch(twsHistoryProvider);
-                                        int currentWindForce = 10;
-                                        twsAsync.whenData((twsList) {
-                                          if (data.windForces.isNotEmpty && twsList.isNotEmpty) {
-                                            final tws = twsList.last.value;
-                                            currentWindForce = data.windForces.reduce((a, b) => (tws - a).abs() < (tws - b).abs() ? a : b);
-                                          }
-                                        });
-                                        return PolarChart(
-                                          polaires: data.polaires,
-                                          angles: data.angles,
-                                          selectedWindForce: value,
-                                          currentWindForce: currentWindForce,
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
-                        ),
-                      ),
-                    if (!f.twd && !f.tws && !f.twa && !f.boatSpeed && !f.polars)
-                      _buildHelpCard(),
-                  ],
-                );
-              },
+                        if (!f.twd && !f.tws && !f.twa && !f.boatSpeed && !f.polars)
+                          _buildHelpCard(),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+            // Floating bubble button to open drawer (left) - always on top
+            Positioned(
+              top: 24,
+              left: 8,
+              child: Material(
+                color: Colors.transparent,
+                elevation: 4,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => Scaffold.of(context).openDrawer(),
+                  child: Ink(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    width: 36,
+                    height: 36,
+                    child: const Icon(Icons.tune, color: Colors.black, size: 20),
+                  ),
+                ),
+              ),
             ),
           ],
         );
@@ -179,7 +200,7 @@ class AnalysisPage extends StatelessWidget {
     );
   }
 
-  Widget _buildAnalysisHeader(BuildContext context) {
+  Widget _buildAnalysisHeader(BuildContext context, {bool showDrawerButton = true}) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
@@ -203,15 +224,7 @@ class AnalysisPage extends StatelessWidget {
                 ],
               ),
             ),
-            Builder(
-              builder: (BuildContext context) => IconButton(
-                onPressed: () {
-                  Scaffold.of(context).openDrawer();
-                },
-                icon: const Icon(Icons.tune),
-                tooltip: 'Sélectionner les données à afficher',
-              ),
-            ),
+            // Plus de bouton drawer ici
           ],
         ),
       ),
