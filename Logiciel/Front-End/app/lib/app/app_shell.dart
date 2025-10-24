@@ -42,28 +42,36 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       // 👉 Drawer uniquement sur la page Analysis
       drawer: _isAnalysis ? const AnalysisFilterDrawer() : null,
 
-      appBar: AppBar(
-        // Bouton en haut à gauche qui ouvre le drawer (uniquement en Analysis)
-        leading: _isAnalysis
-            ? Builder(
-                builder: (context) => IconButton(
-                  icon: const Icon(Icons.tune),
-                  tooltip: 'Select plots',
-                  onPressed: () => Scaffold.of(context).openDrawer(),
+      // AppBar supprimé pour maximiser l'espace d'affichage
+
+      body: Stack(
+        children: [
+          SafeArea(child: widget.child),
+          // Floating settings button (smaller, white background, black icon)
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Material(
+              color: Colors.transparent,
+              elevation: 4,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => context.go('/settings'),
+                child: Ink(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  width: 36,
+                  height: 36,
+                  child: const Icon(Icons.settings, color: Colors.black, size: 20),
                 ),
-              )
-            : null,
-        title: const Text(''),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-            onPressed: () => context.go('/settings'),
+              ),
+            ),
           ),
         ],
       ),
-
-      body: SafeArea(child: widget.child),
 
       bottomNavigationBar: NavigationBar(
         selectedIndex: idx,

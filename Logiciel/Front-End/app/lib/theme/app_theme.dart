@@ -7,7 +7,7 @@ final appThemeProvider = Provider<AppTheme>((ref) => AppTheme());
 
 class AppTheme {
   ThemeData get light => ThemeData(
-        colorScheme: ColorScheme(
+    colorScheme: ColorScheme(
           brightness: Brightness.light,
           primary: const Color(0xFF006BA4), // Bleu tech
           onPrimary: Colors.white,
@@ -43,13 +43,7 @@ class AppTheme {
           elevation: 3,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF006BA4),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white),
-        ),
+        // AppBarTheme supprimé car AppBar n'est plus utilisé
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           filled: true,
@@ -99,13 +93,7 @@ class AppTheme {
           elevation: 4,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF181A20),
-          foregroundColor: Color(0xFF00FFD0),
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Color(0xFF00FFD0)),
-        ),
+        // AppBarTheme supprimé car AppBar n'est plus utilisé
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           filled: true,

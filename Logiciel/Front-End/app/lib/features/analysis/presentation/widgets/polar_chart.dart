@@ -21,14 +21,64 @@ class PolarChart extends StatelessWidget {
   Widget build(BuildContext context) {
     return AspectRatio(
       aspectRatio: 1,
-      child: CustomPaint(
-        painter: _PolarChartPainter(
-          polaires: polaires,
-          angles: angles,
-          selectedWindForce: selectedWindForce,
-          currentWindForce: currentWindForce,
+      child: Stack(
+        children: [
+          CustomPaint(
+            painter: _PolarChartPainter(
+              polaires: polaires,
+              angles: angles,
+              selectedWindForce: selectedWindForce,
+              currentWindForce: currentWindForce,
+            ),
+            child: Container(),
+          ),
+          // Légende des forces de vent (en bas à gauche)
+          Positioned(
+            left: 8,
+            bottom: 8,
+            child: _WindForceLegend(
+              polaires: polaires,
+              selectedWindForce: selectedWindForce,
+              currentWindForce: currentWindForce,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+}
+
+class _WindForceLegend extends StatelessWidget {
+  final Map<int, List<double>> polaires;
+  final int? selectedWindForce;
+  final int? currentWindForce;
+  const _WindForceLegend({required this.polaires, this.selectedWindForce, this.currentWindForce, Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = [Colors.blue, Colors.green, Colors.pink, Colors.red, Colors.brown, Colors.black];
+    final toShow = selectedWindForce != null ? [selectedWindForce!] : polaires.keys.toList();
+    return Card(
+      color: Colors.white.withOpacity(0.85),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (int i = 0; i < toShow.length; i++) ...[
+              Container(
+                width: 16,
+                height: 4,
+                color: (currentWindForce == toShow[i]) ? Colors.orange : colors[i % colors.length],
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+              ),
+              Text('F${toShow[i]}', style: TextStyle(fontSize: 12, color: Colors.black)),
+              if (i != toShow.length - 1) const SizedBox(width: 8),
+            ]
+          ],
         ),
-        child: Container(),
       ),
     );
   }
@@ -59,11 +109,25 @@ class _PolarChartPainter extends CustomPainter {
     for (double v = 2; v <= 12; v += 2) {
       canvas.drawCircle(center, v / 12 * radius, paintGrid);
     }
-    // Dessine les rayons d'angle
+    // Dessine les rayons d'angle et les labels
+    final textStyle = TextStyle(color: Colors.black87, fontSize: 10);
     for (var a in angles) {
       final rad = (a - 90) * pi / 180;
       final p = Offset(center.dx + cos(rad) * radius, center.dy + sin(rad) * radius);
       canvas.drawLine(center, p, paintGrid);
+      // Label d'angle
+      final label = a.toStringAsFixed(0) + '°';
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: textStyle),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+      );
+      tp.layout();
+      final labelOffset = Offset(
+        center.dx + cos(rad) * (radius + 12) - tp.width / 2,
+        center.dy + sin(rad) * (radius + 12) - tp.height / 2,
+      );
+      tp.paint(canvas, labelOffset);
     }
 
     // Couleurs pour chaque force de vent
