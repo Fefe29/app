@@ -199,65 +199,52 @@ class RoutingCalculator {
   /// Choisit P1 ou P2 selon la proximité avec la première bouée et les conditions tactiques
   math.Point<double> _getOptimalStartPoint(LineSegment startLine, List<Buoy> regular, WindTrendSnapshot? windTrend) {
     final (p1, p2) = _lineToLocalPoints(startLine);
-    
     if (regular.isEmpty) {
       // Pas de bouée, prendre le milieu par défaut
       return math.Point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
     }
-    
     final firstBuoy = regular.first;
     final targetPoint = _buoyToLocalPoint(firstBuoy);
-    
-    // Calcul des temps de parcours réels depuis chaque extrémité
-    final timeFromP1 = _estimateTimeToTarget(p1.x, p1.y, targetPoint.x, targetPoint.y);
-    final timeFromP2 = _estimateTimeToTarget(p2.x, p2.y, targetPoint.x, targetPoint.y);
-    
-    // Choix du point avec le temps de parcours le plus court
-    final optimalPoint = timeFromP1 <= timeFromP2 ? p1 : p2;
-    final chosenSide = timeFromP1 <= timeFromP2 ? "P1" : "P2";
-    
-    print('OPTIMAL_START - P1: (${p1.x.toStringAsFixed(1)}, ${p1.y.toStringAsFixed(1)}) temps=${timeFromP1.toStringAsFixed(1)}s');
-    print('OPTIMAL_START - P2: (${p2.x.toStringAsFixed(1)}, ${p2.y.toStringAsFixed(1)}) temps=${timeFromP2.toStringAsFixed(1)}s');
-    print('OPTIMAL_START - Choix: $chosenSide (temps optimal vers B${firstBuoy.id})');
-    
-    // Vérifier l'écart de temps
-    final timeDiff = (timeFromP1 - timeFromP2).abs();
-    if (timeDiff < 5.0) { // Si moins de 5 secondes d'écart
-      print('OPTIMAL_START - Écart faible (${timeDiff.toStringAsFixed(1)}s), choix peu critique');
-    } else {
-      final advantage = timeFromP1 < timeFromP2 ? timeFromP2 - timeFromP1 : timeFromP1 - timeFromP2;
-      print('OPTIMAL_START - Avantage significatif: ${advantage.toStringAsFixed(1)}s au $chosenSide');
+    // Échantillonnage de N points sur la ligne
+    const int N = 11;
+    double minTime = double.infinity;
+    math.Point<double>? bestPoint;
+    for (int i = 0; i < N; i++) {
+      final t = i / (N - 1);
+      final x = p1.x + t * (p2.x - p1.x);
+      final y = p1.y + t * (p2.y - p1.y);
+      final time = _estimateTimeToTarget(x, y, targetPoint.x, targetPoint.y);
+      if (time < minTime) {
+        minTime = time;
+        bestPoint = math.Point(x, y);
+      }
+      print('OPTIMAL_START - t=${t.toStringAsFixed(2)}: (${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)}) temps=${time.toStringAsFixed(1)}s');
     }
-    
-    return optimalPoint;
+    print('OPTIMAL_START - Choix: (${bestPoint!.x.toStringAsFixed(1)}, ${bestPoint.y.toStringAsFixed(1)}) temps optimal vers B${firstBuoy.id} (${minTime.toStringAsFixed(1)}s)');
+    return bestPoint;
   }
   
   /// Détermine le point optimal de la ligne d'arrivée
   /// Choisit P1 ou P2 selon le temps de parcours minimal depuis la dernière position
   math.Point<double> _getOptimalFinishPoint(LineSegment finishLine, double lastX, double lastY) {
     final (p1, p2) = _lineToLocalPoints(finishLine);
-    
-    // Calcul des temps de parcours réels vers chaque extrémité
-    final timeToP1 = _estimateTimeToTarget(lastX, lastY, p1.x, p1.y);
-    final timeToP2 = _estimateTimeToTarget(lastX, lastY, p2.x, p2.y);
-    
-    final optimalPoint = timeToP1 <= timeToP2 ? p1 : p2;
-    final chosenSide = timeToP1 <= timeToP2 ? "P1" : "P2";
-    
-    print('OPTIMAL_FINISH - P1: (${p1.x.toStringAsFixed(1)}, ${p1.y.toStringAsFixed(1)}) temps=${timeToP1.toStringAsFixed(1)}s');
-    print('OPTIMAL_FINISH - P2: (${p2.x.toStringAsFixed(1)}, ${p2.y.toStringAsFixed(1)}) temps=${timeToP2.toStringAsFixed(1)}s');
-    print('OPTIMAL_FINISH - Choix: $chosenSide (temps optimal depuis dernière position)');
-    
-    // Vérifier l'écart de temps
-    final timeDiff = (timeToP1 - timeToP2).abs();
-    if (timeDiff < 5.0) { // Si moins de 5 secondes d'écart
-      print('OPTIMAL_FINISH - Écart faible (${timeDiff.toStringAsFixed(1)}s), choix peu critique');
-    } else {
-      final advantage = timeToP1 < timeToP2 ? timeToP2 - timeToP1 : timeToP1 - timeToP2;
-      print('OPTIMAL_FINISH - Avantage significatif: ${advantage.toStringAsFixed(1)}s au $chosenSide');
+    // Échantillonnage de N points sur la ligne
+    const int N = 11;
+    double minTime = double.infinity;
+    math.Point<double>? bestPoint;
+    for (int i = 0; i < N; i++) {
+      final t = i / (N - 1);
+      final x = p1.x + t * (p2.x - p1.x);
+      final y = p1.y + t * (p2.y - p1.y);
+      final time = _estimateTimeToTarget(lastX, lastY, x, y);
+      if (time < minTime) {
+        minTime = time;
+        bestPoint = math.Point(x, y);
+      }
+      print('OPTIMAL_FINISH - t=${t.toStringAsFixed(2)}: (${x.toStringAsFixed(1)}, ${y.toStringAsFixed(1)}) temps=${time.toStringAsFixed(1)}s');
     }
-    
-    return optimalPoint;
+    print('OPTIMAL_FINISH - Choix: (${bestPoint!.x.toStringAsFixed(1)}, ${bestPoint.y.toStringAsFixed(1)}) temps optimal depuis dernière position (${minTime.toStringAsFixed(1)}s)');
+    return bestPoint;
   }
 
   /// Estime le temps de parcours entre deux points en tenant compte du vent et de la polaire

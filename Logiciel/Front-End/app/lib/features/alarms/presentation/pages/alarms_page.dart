@@ -94,136 +94,154 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
     super.dispose();
   }
 
-	@override
-	Widget build(BuildContext context) {
-		final state = ref.watch(regattaTimerProvider);
-		String fmt(int s) {
-			final m = (s ~/ 60).toString().padLeft(2, '0');
-			final r = (s % 60).toString().padLeft(2, '0');
-			return '$m:$r';
+		@override
+		Widget build(BuildContext context) {
+			final state = ref.watch(regattaTimerProvider);
+			String fmt(int s) {
+				final m = (s ~/ 60).toString().padLeft(2, '0');
+				final r = (s % 60).toString().padLeft(2, '0');
+				return '$m:$r';
+			}
+			return Padding(
+				padding: const EdgeInsets.all(16),
+				child: Column(
+					mainAxisSize: MainAxisSize.max,
+					crossAxisAlignment: CrossAxisAlignment.start,
+					children: [
+						DropdownButton<RegattaSequence>(
+							value: state.sequence,
+							onChanged: (seq) => seq == null ? null : ref.read(regattaTimerProvider.notifier).selectSequence(seq),
+							items: [
+								for (final seq in RegattaSequence.predefined)
+									DropdownMenuItem(value: seq, child: Text(seq.name, style: const TextStyle(fontSize: 18))),
+							],
+						),
+						const SizedBox(height: 12),
+									Expanded(
+										child: Center(
+											child: Text(
+												fmt(state.remaining),
+												style: Theme.of(context).textTheme.displayLarge?.copyWith(
+													fontSize: 130,
+													fontWeight: FontWeight.bold,
+													color: Theme.of(context).colorScheme.primary,
+													letterSpacing: 2,
+												),
+												textAlign: TextAlign.center,
+											),
+										),
+									),
+						const SizedBox(height: 16),
+						Wrap(spacing: 12, children: [
+							ElevatedButton.icon(
+								onPressed: state.running ? null : () => ref.read(regattaTimerProvider.notifier).start(),
+								icon: const Icon(Icons.play_arrow),
+								label: const Text('Start', style: TextStyle(fontSize: 18)),
+								style: ElevatedButton.styleFrom(
+									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+								),
+							),
+							ElevatedButton.icon(
+								onPressed: state.running ? () => ref.read(regattaTimerProvider.notifier).stop() : null,
+								icon: const Icon(Icons.pause),
+								label: const Text('Pause', style: TextStyle(fontSize: 18)),
+								style: ElevatedButton.styleFrom(
+									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+								),
+							),
+							OutlinedButton.icon(
+								onPressed: () => ref.read(regattaTimerProvider.notifier).reset(),
+								icon: const Icon(Icons.restart_alt),
+								label: const Text('Reset', style: TextStyle(fontSize: 18)),
+								style: OutlinedButton.styleFrom(
+									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+								),
+							),
+						]),
+						const SizedBox(height: 16),
+						Text('Repères: ' + state.sequence.marks.map((m) => fmt(m)).join(', '), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+						const SizedBox(height: 8),
+						LinearProgressIndicator(
+							value: state.sequence.total == 0 ? 0 : (state.sequence.total - state.remaining) / state.sequence.total,
+						),
+					],
+				),
+			);
 		}
-		return Padding(
-			padding: const EdgeInsets.all(16),
-			child: Column(
-				crossAxisAlignment: CrossAxisAlignment.start,
-				children: [
-					DropdownButton<RegattaSequence>(
-						value: state.sequence,
-						onChanged: (seq) => seq == null ? null : ref.read(regattaTimerProvider.notifier).selectSequence(seq),
-						items: [
-							for (final seq in RegattaSequence.predefined)
-								DropdownMenuItem(value: seq, child: Text(seq.name, style: const TextStyle(fontSize: 18))),
-						],
-					),
-					const SizedBox(height: 12),
-					Center(
-						child: Text(
-							fmt(state.remaining),
-							style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 48, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
-						),
-					),
-					const SizedBox(height: 16),
-					Wrap(spacing: 12, children: [
-						ElevatedButton.icon(
-							onPressed: state.running ? null : () => ref.read(regattaTimerProvider.notifier).start(),
-							icon: const Icon(Icons.play_arrow),
-							label: const Text('Start', style: TextStyle(fontSize: 18)),
-							style: ElevatedButton.styleFrom(
-								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-							),
-						),
-						ElevatedButton.icon(
-							onPressed: state.running ? () => ref.read(regattaTimerProvider.notifier).stop() : null,
-							icon: const Icon(Icons.pause),
-							label: const Text('Pause', style: TextStyle(fontSize: 18)),
-							style: ElevatedButton.styleFrom(
-								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-							),
-						),
-						OutlinedButton.icon(
-							onPressed: () => ref.read(regattaTimerProvider.notifier).reset(),
-							icon: const Icon(Icons.restart_alt),
-							label: const Text('Reset', style: TextStyle(fontSize: 18)),
-							style: OutlinedButton.styleFrom(
-								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-							),
-						),
-					]),
-					const SizedBox(height: 16),
-					Text('Repères: ' + state.sequence.marks.map((m) => fmt(m)).join(', '), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-					const SizedBox(height: 8),
-					LinearProgressIndicator(
-						value: state.sequence.total == 0 ? 0 : (state.sequence.total - state.remaining) / state.sequence.total,
-					),
-				],
-			),
-		);
-	}
 }
 
 // --- Sommeil ---
 class _SleepTab extends ConsumerWidget {
 	const _SleepTab();
-	@override
-	Widget build(BuildContext context, WidgetRef ref) {
-		final st = ref.watch(sleepTimerProvider);
-		final notifier = ref.read(sleepTimerProvider.notifier);
-		final remaining = notifier.remaining();
-		String fmt(Duration d) => d.inMinutes.toString().padLeft(2, '0') + ':' + (d.inSeconds % 60).toString().padLeft(2, '0');
-		return Padding(
-			padding: const EdgeInsets.all(16),
-			child: Column(
-				crossAxisAlignment: CrossAxisAlignment.start,
-				children: [
-					Row(children: [
-						const Text('Durée sieste:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-						const SizedBox(width: 12),
-						DropdownButton<int>(
-							value: st.napDuration.inMinutes,
-							onChanged: (v) => v == null ? null : notifier.setDuration(Duration(minutes: v)),
-							items: const [10, 15, 20, 25, 30, 40, 45, 60]
-								.map((m) => DropdownMenuItem(value: m, child: Text('$m min', style: TextStyle(fontSize: 16))))
-								.toList(),
-						),
-					]),
-					const SizedBox(height: 24),
+		@override
+		Widget build(BuildContext context, WidgetRef ref) {
+			final st = ref.watch(sleepTimerProvider);
+			final notifier = ref.read(sleepTimerProvider.notifier);
+			final remaining = notifier.remaining();
+			String fmt(Duration d) => d.inMinutes.toString().padLeft(2, '0') + ':' + (d.inSeconds % 60).toString().padLeft(2, '0');
+			return Padding(
+				padding: const EdgeInsets.all(16),
+				child: Column(
+					mainAxisSize: MainAxisSize.max,
+					crossAxisAlignment: CrossAxisAlignment.start,
+					children: [
+						Row(children: [
+							const Text('Durée sieste:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+							const SizedBox(width: 12),
+							DropdownButton<int>(
+								value: st.napDuration.inMinutes,
+								onChanged: (v) => v == null ? null : notifier.setDuration(Duration(minutes: v)),
+								items: const [10, 15, 20, 25, 30, 40, 45, 60]
+									.map((m) => DropdownMenuItem(value: m, child: Text('$m min', style: TextStyle(fontSize: 16))))
+									.toList(),
+							),
+						]),
+						const SizedBox(height: 24),
 						if (st.running && st.wakeUpAt != null)
 							Text('Réveil: ${st.wakeUpAt!.hour.toString().padLeft(2,'0')}:${st.wakeUpAt!.minute.toString().padLeft(2,'0')}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-					const SizedBox(height: 12),
-					Center(
-						child: Text(
-							st.running ? fmt(remaining) : fmt(st.napDuration),
-							style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 48, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
-						),
-					),
-					const SizedBox(height: 24),
-					Wrap(spacing: 12, children: [
-						ElevatedButton.icon(
-							onPressed: st.running ? null : () => notifier.start(),
-							icon: const Icon(Icons.hotel),
-							label: const Text('Démarrer sieste', style: TextStyle(fontSize: 18)),
-							style: ElevatedButton.styleFrom(
-								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+						const SizedBox(height: 12),
+									Expanded(
+										child: Center(
+											child: Text(
+												st.running ? fmt(remaining) : fmt(st.napDuration),
+												style: Theme.of(context).textTheme.displayLarge?.copyWith(
+													fontSize: 130,
+													fontWeight: FontWeight.bold,
+													color: Theme.of(context).colorScheme.primary,
+													letterSpacing: 2,
+												),
+												textAlign: TextAlign.center,
+											),
+										),
+									),
+						const SizedBox(height: 24),
+						Wrap(spacing: 12, children: [
+							ElevatedButton.icon(
+								onPressed: st.running ? null : () => notifier.start(),
+								icon: const Icon(Icons.hotel),
+								label: const Text('Démarrer sieste', style: TextStyle(fontSize: 18)),
+								style: ElevatedButton.styleFrom(
+									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+								),
 							),
-						),
-						OutlinedButton.icon(
-							onPressed: st.running ? () => notifier.cancel() : null,
-							icon: const Icon(Icons.close),
-							label: const Text('Annuler', style: TextStyle(fontSize: 18)),
-							style: OutlinedButton.styleFrom(
-								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+							OutlinedButton.icon(
+								onPressed: st.running ? () => notifier.cancel() : null,
+								icon: const Icon(Icons.close),
+								label: const Text('Annuler', style: TextStyle(fontSize: 18)),
+								style: OutlinedButton.styleFrom(
+									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+								),
 							),
-						),
-					]),
-				],
-			),
-		);
-	}
+						]),
+					],
+				),
+			);
+		}
 }
 
 // --- Mouillage ---
