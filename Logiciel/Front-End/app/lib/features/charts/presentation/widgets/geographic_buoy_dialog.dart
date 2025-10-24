@@ -26,9 +26,7 @@ class _GeographicBuoyDialogState extends ConsumerState<GeographicBuoyDialog> {
   final _latController = TextEditingController();
   final _lonController = TextEditingController();
   final _passageController = TextEditingController();
-  bool _useLocalCoordinates = false;
-  final _xController = TextEditingController();
-  final _yController = TextEditingController();
+  // Suppression des coordonnées locales X/Y
 
   @override
   void initState() {
@@ -38,12 +36,6 @@ class _GeographicBuoyDialogState extends ConsumerState<GeographicBuoyDialog> {
       _latController.text = existing.position.latitude.toStringAsFixed(6);
       _lonController.text = existing.position.longitude.toStringAsFixed(6);
       _passageController.text = existing.passageOrder?.toString() ?? '';
-      
-      // If we have temporary local coordinates, show them too
-      if (existing.tempLocalPos != null) {
-        _xController.text = existing.x.toStringAsFixed(1);
-        _yController.text = existing.y.toStringAsFixed(1);
-      }
     }
   }
 
@@ -52,29 +44,16 @@ class _GeographicBuoyDialogState extends ConsumerState<GeographicBuoyDialog> {
     _latController.dispose();
     _lonController.dispose();
     _passageController.dispose();
-    _xController.dispose();
-    _yController.dispose();
     super.dispose();
   }
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
-    final coordinateService = ref.read(coordinateSystemProvider);
-    GeographicPosition position;
-
-    if (_useLocalCoordinates) {
-      // Convert from local to geographic
-      final x = double.parse(_xController.text.replaceAll(',', '.'));
-      final y = double.parse(_yController.text.replaceAll(',', '.'));
-      final localPos = LocalPosition(x: x, y: y);
-      position = coordinateService.toGeographic(localPos);
-    } else {
-      // Use geographic coordinates directly
-      final lat = double.parse(_latController.text.replaceAll(',', '.'));
-      final lon = double.parse(_lonController.text.replaceAll(',', '.'));
-      position = GeographicPosition(latitude: lat, longitude: lon);
-    }
+    // Utilise uniquement les coordonnées géographiques directement
+    final lat = double.parse(_latController.text.replaceAll(',', '.'));
+    final lon = double.parse(_lonController.text.replaceAll(',', '.'));
+    final position = GeographicPosition(latitude: lat, longitude: lon);
 
     final passageOrder = _passageController.text.isEmpty 
         ? null 
@@ -102,7 +81,6 @@ class _GeographicBuoyDialogState extends ConsumerState<GeographicBuoyDialog> {
   Widget build(BuildContext context) {
     final coordinateService = ref.watch(coordinateSystemProvider);
     final isRegular = widget.role == BuoyRole.regular;
-    
     String title;
     switch (widget.role) {
       case BuoyRole.regular:
@@ -153,142 +131,58 @@ class _GeographicBuoyDialogState extends ConsumerState<GeographicBuoyDialog> {
                   ],
                 ),
               ),
-              
               const SizedBox(height: 16),
-              
-              // Coordinate type switcher
+              const Text('Coordonnées géographiques :', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
-                    child: ChoiceChip(
-                      label: const Text('Géographiques (Lat/Lon)'),
-                      selected: !_useLocalCoordinates,
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() => _useLocalCoordinates = false);
-                        }
+                    child: TextFormField(
+                      controller: _latController,
+                      decoration: const InputDecoration(
+                        labelText: 'Latitude (°)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.north),
+                        helperText: 'Ex: 43.5432',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*\.?[0-9]*')),
+                      ],
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) return 'Requis';
+                        final lat = double.tryParse(value!.replaceAll(',', '.'));
+                        if (lat == null) return 'Nombre invalide';
+                        if (lat < -90 || lat > 90) return 'Doit être entre -90° et +90°';
+                        return null;
                       },
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: ChoiceChip(
-                      label: const Text('Locales (X/Y mètres)'),
-                      selected: _useLocalCoordinates,
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() => _useLocalCoordinates = true);
-                        }
+                    child: TextFormField(
+                      controller: _lonController,
+                      decoration: const InputDecoration(
+                        labelText: 'Longitude (°)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.east),
+                        helperText: 'Ex: 7.1234',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*\.?[0-9]*')),
+                      ],
+                      validator: (value) {
+                        if (value?.isEmpty ?? true) return 'Requis';
+                        final lon = double.tryParse(value!.replaceAll(',', '.'));
+                        if (lon == null) return 'Nombre invalide';
+                        if (lon < -180 || lon > 180) return 'Doit être entre -180° et +180°';
+                        return null;
                       },
                     ),
                   ),
                 ],
               ),
-              
-              const SizedBox(height: 16),
-              
-              // Coordinate input fields
-              if (_useLocalCoordinates) ...[
-                const Text('Coordonnées locales en mètres :', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _xController,
-                        decoration: const InputDecoration(
-                          labelText: 'X (mètres)',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.east),
-                          helperText: 'Positif = Est',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*\.?[0-9]*')),
-                        ],
-                        validator: (value) {
-                          if (value?.isEmpty ?? true) return 'Requis';
-                          if (double.tryParse(value!.replaceAll(',', '.')) == null) return 'Nombre invalide';
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _yController,
-                        decoration: const InputDecoration(
-                          labelText: 'Y (mètres)',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.north),
-                          helperText: 'Positif = Nord',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*\.?[0-9]*')),
-                        ],
-                        validator: (value) {
-                          if (value?.isEmpty ?? true) return 'Requis';
-                          if (double.tryParse(value!.replaceAll(',', '.')) == null) return 'Nombre invalide';
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ] else ...[
-                const Text('Coordonnées géographiques :', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _latController,
-                        decoration: const InputDecoration(
-                          labelText: 'Latitude (°)',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.north),
-                          helperText: 'Ex: 43.5432',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*\.?[0-9]*')),
-                        ],
-                        validator: (value) {
-                          if (value?.isEmpty ?? true) return 'Requis';
-                          final lat = double.tryParse(value!.replaceAll(',', '.'));
-                          if (lat == null) return 'Nombre invalide';
-                          if (lat < -90 || lat > 90) return 'Doit être entre -90° et +90°';
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _lonController,
-                        decoration: const InputDecoration(
-                          labelText: 'Longitude (°)',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.east),
-                          helperText: 'Ex: 7.1234',
-                        ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*\.?[0-9]*')),
-                        ],
-                        validator: (value) {
-                          if (value?.isEmpty ?? true) return 'Requis';
-                          final lon = double.tryParse(value!.replaceAll(',', '.'));
-                          if (lon == null) return 'Nombre invalide';
-                          if (lon < -180 || lon > 180) return 'Doit être entre -180° et +180°';
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
               
               if (isRegular) ...[
                 const SizedBox(height: 16),

@@ -361,7 +361,7 @@ class _ModificationItem {
     return _ModificationItem._(
       type: _ModificationItemType.buoy,
       title: label,
-      subtitle: '(${buoy.x.toStringAsFixed(1)}, ${buoy.y.toStringAsFixed(1)})',
+  subtitle: 'Lat: ${buoy.position.latitude.toStringAsFixed(5)}, Lon: ${buoy.position.longitude.toStringAsFixed(5)}',
       icon: switch (buoy.role) {
         BuoyRole.committee => Icons.location_on,
         BuoyRole.target => Icons.visibility,
@@ -375,7 +375,7 @@ class _ModificationItem {
     return _ModificationItem._(
       type: _ModificationItemType.startLine,
       title: 'Ligne de départ',
-      subtitle: 'Viseur: (${line.p1x.toStringAsFixed(1)}, ${line.p1y.toStringAsFixed(1)}) - Comité: (${line.p2x.toStringAsFixed(1)}, ${line.p2y.toStringAsFixed(1)})',
+      subtitle: 'Viseur: Lat: ${line.point1.latitude.toStringAsFixed(5)}, Lon: ${line.point1.longitude.toStringAsFixed(5)} - Comité: Lat: ${line.point2.latitude.toStringAsFixed(5)}, Lon: ${line.point2.longitude.toStringAsFixed(5)}',
       icon: Icons.flag,
       startLine: line,
     );
@@ -385,7 +385,7 @@ class _ModificationItem {
     return _ModificationItem._(
       type: _ModificationItemType.finishLine,
       title: 'Ligne d\'arrivée',
-      subtitle: 'Marque 1: (${line.p1x.toStringAsFixed(1)}, ${line.p1y.toStringAsFixed(1)}) - Marque 2: (${line.p2x.toStringAsFixed(1)}, ${line.p2y.toStringAsFixed(1)})',
+      subtitle: 'Marque 1: Lat: ${line.point1.latitude.toStringAsFixed(5)}, Lon: ${line.point1.longitude.toStringAsFixed(5)} - Marque 2: Lat: ${line.point2.latitude.toStringAsFixed(5)}, Lon: ${line.point2.longitude.toStringAsFixed(5)}',
       icon: Icons.sports_score,
       finishLine: line,
     );
