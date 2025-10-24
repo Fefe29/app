@@ -408,8 +408,10 @@ class _CoursePainter extends CustomPainter {
 
   void _drawRoute(Canvas canvas, Size size) {
     if (route.isEmpty) return;
+    // Utilise le thème pour choisir la couleur du routage
+    final isDark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
     final pathPaint = Paint()
-      ..color = Colors.black
+      ..color = isDark ? Colors.redAccent.shade200 : Colors.black
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round
