@@ -1,16 +1,19 @@
+// FLUTTER & DART
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// PROVIDERS & MODELS
 import '../../../charts/providers/course_providers.dart';
-import '../../domain/models/course.dart';
 import '../../../charts/providers/route_plan_provider.dart';
-import '../../../charts/domain/services/routing_calculator.dart';
-import 'package:kornog/common/providers/app_providers.dart';
 import '../../../charts/providers/polar_providers.dart';
 import '../../../charts/providers/wind_trend_provider.dart';
+import '../../../charts/domain/services/routing_calculator.dart';
 import '../../../charts/domain/services/wind_trend_analyzer.dart';
+import '../../domain/models/course.dart';
 import '../../domain/models/geographic_position.dart';
 import '../../providers/coordinate_system_provider.dart';
 import '../../providers/mercator_coordinate_system_provider.dart';
@@ -21,10 +24,10 @@ import '../../../../data/datasources/maps/models/map_layers.dart';
 import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart';
 import 'multi_layer_tile_painter.dart';
 import 'tile_image_service.dart';
-
-/// -------------------------
-/// Vue & projection partagées
-/// -------------------------
+import 'package:kornog/common/providers/app_providers.dart';
+// -------------------------
+// Vue & projection partagées
+// -------------------------
 class ViewTransform {
   const ViewTransform({
     required this.minX, required this.maxX,
@@ -45,40 +48,79 @@ class ViewTransform {
   double get spanY => maxY - minY;
 }
 
-/// Widget displaying the course (buoys + start/finish lines) in plan view.
-class CourseCanvas extends ConsumerWidget {
+class CourseCanvas extends ConsumerStatefulWidget {
   const CourseCanvas({super.key});
 
   static const double _margin = 24.0;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CourseCanvas> createState() => _CourseCanvasState();
+}
+
+class _CourseCanvasState extends ConsumerState<CourseCanvas> {
+  // Offset de déplacement (pan)
+  Offset _panOffset = Offset.zero;
+  Offset? _lastPanPosition;
+  double _zoomFactor = 1.0; // 1.0 = normal, >1 = zoom in, <1 = zoom out
+  int _tileZoomOffset = 0; // Décalage de zoom OSM
+  final double _minZoomFactor = 0.25;
+  final double _maxZoomFactor = 8.0;
+
+  void _incrementZoom() {
+    setState(() {
+      _zoomFactor = (_zoomFactor * 1.25).clamp(_minZoomFactor, _maxZoomFactor);
+      _adjustTileZoomIfNeeded();
+    });
+  }
+
+  void _decrementZoom() {
+    setState(() {
+      _zoomFactor = (_zoomFactor / 1.25).clamp(_minZoomFactor, _maxZoomFactor);
+      _adjustTileZoomIfNeeded();
+    });
+  }
+
+  void _adjustTileZoomIfNeeded() {
+    // Limites du tileZoom OSM (1 à 20)
+    const int minTileZoom = 1;
+    const int maxTileZoom = 20;
+    int baseTileZoom = context.mounted ? (ref.read(activeMapProvider)?.zoomLevel ?? 10) : 10;
+    int nextTileZoom = _tileZoomOffset + baseTileZoom;
+
+    // On ne modifie le tileZoomOffset que si on reste dans les bornes OSM
+    while (_zoomFactor >= 2.0 && nextTileZoom < maxTileZoom) {
+      _zoomFactor /= 2.0;
+      _tileZoomOffset += 1;
+      nextTileZoom++;
+    }
+    while (_zoomFactor < 0.5 && nextTileZoom > minTileZoom) {
+      _zoomFactor *= 2.0;
+      _tileZoomOffset -= 1;
+      nextTileZoom--;
+    }
+    // Si on ne peut plus ajuster le tileZoomOffset, on laisse _zoomFactor évoluer librement dans ses bornes
+    _zoomFactor = _zoomFactor.clamp(_minZoomFactor, _maxZoomFactor);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final course = ref.watch(courseProvider);
     final route = ref.watch(routePlanProvider);
     final wind = ref.watch(windSampleProvider);
-    final vmcUp = ref.watch(vmcUpwindProvider); // Pour laylines (angle optimal de près)
-    final windTrend = ref.watch(windTrendSnapshotProvider); // Analyse des tendances de vent
+    final vmcUp = ref.watch(vmcUpwindProvider);
+    final windTrend = ref.watch(windTrendSnapshotProvider);
     final mercatorService = ref.watch(mercatorCoordinateSystemProvider);
-    final activeMap = ref.watch(activeMapProvider); // Carte active sélectionnée
-    final displayMaps = ref.watch(mapDisplayProvider); // Affichage activé/désactivé
-
-    // DEBUG: Vérification de la carte active
-    if (displayMaps && activeMap != null) {
-      // ignore: avoid_print
-      print('TILES DEBUG - Carte active: id=${activeMap.id}, name=${activeMap.name}');
-    } else {
-      // ignore: avoid_print
-      print('TILES DEBUG - Aucune carte active (displayMaps: $displayMaps, activeMap: ${activeMap?.id})');
-    }
+    final activeMap = ref.watch(activeMapProvider);
+    final displayMaps = ref.watch(mapDisplayProvider);
 
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text('Aucune bouée / ligne'),
             SizedBox(height: 16),
-            // Bandeau système de coordonnées supprimé
           ],
         ),
       );
@@ -86,9 +128,6 @@ class CourseCanvas extends ConsumerWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // -------------------------
-        // 1) Calcule la bbox logique commune en coordonnées locales (Mercator)
-        // -------------------------
         final localPoints = <Offset>[];
         for (final b in course.buoys) {
           final l = mercatorService.toLocal(b.position);
@@ -101,8 +140,6 @@ class CourseCanvas extends ConsumerWidget {
             localPoints.addAll([Offset(p1.x, p1.y), Offset(p2.x, p2.y)]);
           }
         }
-
-        // Fallback si rien : carré 100x100
         double minX = double.infinity, maxX = double.negativeInfinity;
         double minY = double.infinity, maxY = double.negativeInfinity;
         if (localPoints.isEmpty) {
@@ -115,10 +152,11 @@ class CourseCanvas extends ConsumerWidget {
             maxY = math.max(maxY, o.dy);
           }
         }
-
-        // Forcer une bbox carrée (mêmes règles que l’ancien _CoursePainter)
-        var spanX = (maxX - minX).abs() < 1e-6 ? 100 : (maxX - minX);
-        var spanY = (maxY - minY).abs() < 1e-6 ? 100 : (maxY - minY);
+        // Fixe des bornes minimales et maximales pour éviter le reset ou la disparition
+        const double minSpan = 100.0;
+        const double maxSpan = 1000000.0;
+        var spanX = (maxX - minX).abs() < 1e-6 ? minSpan : (maxX - minX);
+        var spanY = (maxY - minY).abs() < 1e-6 ? minSpan : (maxY - minY);
         if (spanX > spanY) {
           final delta = spanX - spanY;
           minY -= delta / 2; maxY += delta / 2;
@@ -128,13 +166,31 @@ class CourseCanvas extends ConsumerWidget {
           minX -= delta / 2; maxX += delta / 2;
           spanX = spanY;
         }
-
-        final availW = constraints.maxWidth - 2 * _margin;
-        final availH = constraints.maxHeight - 2 * _margin;
-        final scale = math.min(availW / spanX, availH / spanY);
-        final offsetX = (constraints.maxWidth - spanX * scale) / 2;
-        final offsetY = (constraints.maxHeight - spanY * scale) / 2;
-
+        // Clamp la taille de la bbox pour éviter les extrêmes
+        if (spanX < minSpan) {
+          final delta = minSpan - spanX;
+          minX -= delta / 2; maxX += delta / 2;
+          spanX = minSpan;
+        } else if (spanX > maxSpan) {
+          final delta = spanX - maxSpan;
+          minX += delta / 2; maxX -= delta / 2;
+          spanX = maxSpan;
+        }
+        if (spanY < minSpan) {
+          final delta = minSpan - spanY;
+          minY -= delta / 2; maxY += delta / 2;
+          spanY = minSpan;
+        } else if (spanY > maxSpan) {
+          final delta = spanY - maxSpan;
+          minY += delta / 2; maxY -= delta / 2;
+          spanY = maxSpan;
+        }
+        final availW = constraints.maxWidth - 2 * CourseCanvas._margin;
+        final availH = constraints.maxHeight - 2 * CourseCanvas._margin;
+        final baseScale = math.min(availW / spanX, availH / spanY);
+        final scale = baseScale * _zoomFactor;
+        final offsetX = (constraints.maxWidth - spanX * scale) / 2 + _panOffset.dx;
+        final offsetY = (constraints.maxHeight - spanY * scale) / 2 + _panOffset.dy;
         final view = ViewTransform(
           minX: minX,
           maxX: maxX,
@@ -144,68 +200,102 @@ class CourseCanvas extends ConsumerWidget {
           offsetX: offsetX,
           offsetY: offsetY,
         );
+        int baseTileZoom = activeMap?.zoomLevel ?? 10;
+        int tileZoom = (baseTileZoom + _tileZoomOffset).clamp(1, 20);
 
-        return Stack(
-          children: [
-            // -------- Tuiles multi-couches (même projection + même vue) --------
-            if (displayMaps && activeMap != null)
-              FutureBuilder<List<LayeredTile>>(
-                future: _loadMultiLayerTilesForMap(
-                  activeMap,
-                  course,
-                  mercatorService: mercatorService,
-                  view: view,
-                  size: Size(constraints.maxWidth, constraints.maxHeight),
-                ),
-                builder: (context, snapshot) {
-                  // ignore: avoid_print
-                  print('MULTI-LAYER DEBUG - FutureBuilder ${activeMap.name}: hasData=${snapshot.hasData}, hasError=${snapshot.hasError}');
-                  if (snapshot.hasError) {
-                    // ignore: avoid_print
-                    print('MULTI-LAYER DEBUG - Erreur: ${snapshot.error}');
-                  }
-                  if (snapshot.hasData) {
-                    // ignore: avoid_print
-                    print('MULTI-LAYER DEBUG - ${snapshot.data!.length} tuiles multi-couches chargées pour ${activeMap.name}');
-                    return CustomPaint(
+        return GestureDetector(
+          onPanStart: (details) {
+            _lastPanPosition = details.localPosition;
+          },
+          onPanUpdate: (details) {
+            if (_lastPanPosition != null) {
+              setState(() {
+                _panOffset += details.localPosition - _lastPanPosition!;
+                _lastPanPosition = details.localPosition;
+              });
+            }
+          },
+          onPanEnd: (details) {
+            _lastPanPosition = null;
+          },
+          child: SizedBox(
+            width: constraints.maxWidth,
+            height: constraints.maxHeight,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (displayMaps && activeMap != null)
+                  FutureBuilder<List<LayeredTile>>(
+                    future: _loadMultiLayerTilesForMap(
+                      activeMap.copyWith(zoomLevel: tileZoom),
+                      course,
+                      mercatorService: mercatorService,
+                      view: view,
                       size: Size(constraints.maxWidth, constraints.maxHeight),
-                      painter: MultiLayerTilePainter(
-                        snapshot.data!,
-                        mercatorService,
-                        view,
-                        MapLayersConfig.defaultConfig,
-                      ),
-                    );
-                  }
-                  return const Center(
-                    child: Text('Chargement des tuiles multi-couches...', style: TextStyle(color: Colors.white)),
-                  );
-                },
-              ),
-
-            // -------- Canvas parcours (utilise la même vue) --------
-            RepaintBoundary(
-              child: CustomPaint(
-                size: Size(constraints.maxWidth, constraints.maxHeight),
-                painter: _CoursePainter(
-                  state: course,
-                  route: route,
-                  windDirDeg: wind.directionDeg,
-                  windSpeed: wind.speed,
-                  upwindOptimalAngle: vmcUp?.angleDeg,
-                  windTrend: windTrend,
-                  mercatorService: mercatorService,
-                  view: view,
+                    ),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Erreur de chargement des tuiles'));
+                      }
+                      if (snapshot.hasData) {
+                        return CustomPaint(
+                          size: Size(constraints.maxWidth, constraints.maxHeight),
+                          painter: MultiLayerTilePainter(
+                            snapshot.data!,
+                            mercatorService,
+                            view,
+                            MapLayersConfig.defaultConfig,
+                          ),
+                        );
+                      }
+                      return Center(child: Text('Chargement des tuiles...'));
+                    },
+                  ),
+                RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: _CoursePainter(
+                      state: course,
+                      route: route,
+                      windDirDeg: wind.directionDeg,
+                      windSpeed: wind.speed,
+                      upwindOptimalAngle: vmcUp?.angleDeg,
+                      windTrend: windTrend,
+                      mercatorService: mercatorService,
+                      view: view,
+                    ),
+                  ),
                 ),
-              ),
+                Positioned(
+                  right: 16,
+                  bottom: 32,
+                  child: Column(
+                    children: [
+                      FloatingActionButton(
+                        heroTag: 'zoom_in',
+                        mini: true,
+                        onPressed: _incrementZoom,
+                        child: Icon(Icons.add),
+                      ),
+                      SizedBox(height: 8),
+                      FloatingActionButton(
+                        heroTag: 'zoom_out',
+                        mini: true,
+                        onPressed: _decrementZoom,
+                        child: Icon(Icons.remove),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-
-            // Overlay supprimé : plus de bandeau système de coordonnées
-          ],
+          ),
         );
       },
     );
   }
+
+
 
   Future<List<LayeredTile>> _loadMultiLayerTilesForMap(
     MapTileSet map,
@@ -223,11 +313,13 @@ class CourseCanvas extends ConsumerWidget {
 
     // BBox géographique couvrant tout le widget (projetée depuis les 4 coins du widget en pixels)
     // On projette (0,0), (size.width,0), (0,size.height), (size.width,size.height) en coordonnées locales, puis en géographiques
+    // On élargit la bbox de 1.0 tuile de chaque côté pour éviter les bords vides
+    const double tileMargin = 1.0;
     List<Offset> widgetCornersPx = [
-      Offset(0, 0),
-      Offset(size.width, 0),
-      Offset(0, size.height),
-      Offset(size.width, size.height),
+      Offset(-size.width * tileMargin, -size.height * tileMargin),
+      Offset(size.width * (1 + tileMargin), -size.height * tileMargin),
+      Offset(-size.width * tileMargin, size.height * (1 + tileMargin)),
+      Offset(size.width * (1 + tileMargin), size.height * (1 + tileMargin)),
     ];
     // Inverse de view.project : (px, py) -> (x, y)
     List<LocalPosition> localCorners = widgetCornersPx.map((pt) {
@@ -245,14 +337,15 @@ class CourseCanvas extends ConsumerWidget {
       if (g.longitude > maxLon) maxLon = g.longitude;
     }
 
-    final zoom = map.zoomLevel;
-    int tileXmin = _lon2tile(minLon, zoom);
-    int tileXmax = _lon2tile(maxLon, zoom);
-    int tileYmin = _lat2tile(maxLat, zoom); // attention: Y inversé en tuiles
-    int tileYmax = _lat2tile(minLat, zoom);
+  final zoom = map.zoomLevel;
+  // On ajoute une tuile de marge de chaque côté pour garantir la couverture
+  int tileXmin = (_lon2tile(minLon, zoom) - 1).floor();
+  int tileXmax = (_lon2tile(maxLon, zoom) + 1).ceil();
+  int tileYmin = (_lat2tile(maxLat, zoom) - 1).floor(); // attention: Y inversé en tuiles
+  int tileYmax = (_lat2tile(minLat, zoom) + 1).ceil();
 
-    if (tileXmin > tileXmax) { final t = tileXmin; tileXmin = tileXmax; tileXmax = t; }
-    if (tileYmin > tileYmax) { final t = tileYmin; tileYmin = tileYmax; tileYmax = t; }
+  if (tileXmin > tileXmax) { final t = tileXmin; tileXmin = tileXmax; tileXmax = t; }
+  if (tileYmin > tileYmax) { final t = tileYmin; tileYmin = tileYmax; tileYmax = t; }
 
     // ignore: avoid_print
     print('MULTI-LAYER DEBUG - Tiles widget (full): X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] z=$zoom');
@@ -274,6 +367,10 @@ class CourseCanvas extends ConsumerWidget {
             localMapPath: mapPath,
           );
           tiles.add(layeredTile);
+        } else {
+          // Log tuile manquante pour debug
+          // ignore: avoid_print
+          print('MULTI-LAYER DEBUG - Tuile manquante: $filePath');
         }
       }
     }
