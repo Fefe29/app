@@ -550,8 +550,8 @@ class _CoursePainter extends CustomPainter {
 
   /// Laylines de près
   void _drawUpwindLaylines(Canvas canvas, Size size, double ox, double oy, String buoyLabel) {
-    final heading1 = (windDirDeg + 180.0 - upwindOptimalAngle!) % 360.0; // bâbord
-    final heading2 = (windDirDeg + 180.0 + upwindOptimalAngle!) % 360.0; // tribord
+  final heading1 = (windDirDeg + 180.0 - upwindOptimalAngle!) % 360.0; // tribord
+  final heading2 = (windDirDeg + 180.0 + upwindOptimalAngle!) % 360.0; // bâbord
 
     final maxSpan = math.max(view.spanX, view.spanY);
     final length = maxSpan * 1.2;
@@ -587,15 +587,15 @@ class _CoursePainter extends CustomPainter {
       }
     }
 
-    drawLay(heading1, Colors.lightGreenAccent.shade400, 'Bb');
-    drawLay(heading2, Colors.lightGreenAccent.shade700, 'Tb');
+  drawLay(heading1, Colors.lightGreenAccent.shade700, 'Tb');
+  drawLay(heading2, Colors.lightGreenAccent.shade400, 'Bb');
   }
 
   /// Laylines de portant (bug corrigé : longueur)
   void _drawDownwindLaylines(Canvas canvas, Size size, double ox, double oy, String buoyLabel) {
-    const optimalDownwindAngle = 150.0;
-    final downwindHeading1 = (windDirDeg + 180.0 + optimalDownwindAngle) % 360.0; // tribord portant inversé -> bâbord
-    final downwindHeading2 = (windDirDeg + 180.0 - optimalDownwindAngle) % 360.0; // bâbord portant inversé -> tribord
+  const optimalDownwindAngle = 150.0;
+  final downwindHeading1 = (windDirDeg + 180.0 + optimalDownwindAngle) % 360.0; // bâbord portant
+  final downwindHeading2 = (windDirDeg + 180.0 - optimalDownwindAngle) % 360.0; // tribord portant
 
     // BUG FIX: maxSpan utilisait maxY - maxY
     final maxSpan = math.max(view.spanX, view.spanY);
@@ -632,8 +632,8 @@ class _CoursePainter extends CustomPainter {
       }
     }
 
-  drawLay(downwindHeading2, Colors.orangeAccent.shade400, 'Bb↑');
-  drawLay(downwindHeading1, Colors.orangeAccent.shade700, 'Tb↑');
+  drawLay(downwindHeading2, Colors.orangeAccent.shade700, 'Tb↑');
+  drawLay(downwindHeading1, Colors.orangeAccent.shade400, 'Bb↑');
   }
 
   String _shortLabel(RouteLeg leg) {

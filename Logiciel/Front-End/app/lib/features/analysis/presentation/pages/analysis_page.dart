@@ -57,15 +57,6 @@ class AnalysisPage extends StatelessWidget {
                 Consumer(
                   builder: (context, ref, _) {
                     final f = ref.watch(analysisFiltersProvider);
-                    if (f.twd || f.twa) {
-                      return const WindAnalysisConfig();
-                    }
-                    return const SizedBox.shrink();
-                  },
-                ),
-                Consumer(
-                  builder: (context, ref, _) {
-                    final f = ref.watch(analysisFiltersProvider);
                     return Column(
                       children: [
                         if (f.twd) const SingleWindMetricChart(metricType: WindMetricType.twd),

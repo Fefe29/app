@@ -76,28 +76,31 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: idx,
         onDestinationSelected: _go,
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard),
-            label: 'Dash',
+            label: 'Tableau',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.show_chart_outlined),
             selectedIcon: Icon(Icons.show_chart),
-            label: 'Charts',
+            label: 'Carte',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.alarm_outlined),
             selectedIcon: Icon(Icons.alarm),
-            label: 'Alarms',
+            label: 'Alarmes',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.calculate_outlined),
             selectedIcon: Icon(Icons.calculate),
-            label: 'Analysis',
+            label: 'Analyse',
           ),
         ],
+        labelTextStyle: MaterialStatePropertyAll(
+          TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
