@@ -12,7 +12,9 @@ const SettingsPage({super.key});
 
 @override
 Widget build(BuildContext context) {
-return ListView(
+return Stack(
+children: [
+ListView(
 padding: const EdgeInsets.all(16),
 children: [
 const Text('Sources de données', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
@@ -37,6 +39,22 @@ ListTile(
 leading: const Icon(Icons.info_outline),
 title: const Text('À propos'),
 subtitle: const Text('Version 0.1.0'),
+),
+],
+),
+// Bouton de retour discret en haut à gauche
+Positioned(
+left: 10,
+top: 10 + MediaQuery.of(context).padding.top,
+child: CircleAvatar(
+backgroundColor: Theme.of(context).colorScheme.primary,
+radius: 20,
+child: IconButton(
+icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+onPressed: () => Navigator.of(context).pop(),
+tooltip: 'Retour',
+),
+),
 ),
 ],
 );
