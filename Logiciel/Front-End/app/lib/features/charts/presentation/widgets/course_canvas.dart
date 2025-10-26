@@ -223,9 +223,13 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                   _panOffset += Offset(delta.dx, -delta.dy);
                   _lastPanPosition = details.focalPoint;
                 }
-                // Zoom (pinch)
+                // Zoom (pinch) adouci : on réduit la sensibilité du facteur de scale
                 if (details.scale != 1.0) {
-                  _zoomFactor = (_zoomFactor * details.scale).clamp(_minZoomFactor, _maxZoomFactor);
+                  // Adoucissement : on élève le facteur à la puissance 0.4 (plus proche de 1)
+                  final softenedScale = details.scale > 1.0
+                      ? 1 + (details.scale - 1) * 0.4
+                      : 1 - (1 - details.scale) * 0.4;
+                  _zoomFactor = (_zoomFactor * softenedScale).clamp(_minZoomFactor, _maxZoomFactor);
                   _adjustTileZoomIfNeeded();
                 }
               });
