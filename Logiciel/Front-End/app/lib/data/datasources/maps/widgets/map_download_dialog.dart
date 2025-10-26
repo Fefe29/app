@@ -36,8 +36,7 @@ class _MapDownloadDialogState extends ConsumerState<MapDownloadDialog> {
   @override
   void initState() {
     super.initState();
-    
-    // Pré-remplir avec les bounds du parcours si disponibles
+    // Pré-remplir avec les bounds du parcours si disponibles, sinon valeurs par défaut demandées
     if (widget.initialBounds != null) {
       final bounds = widget.initialBounds!;
       _minLatController.text = bounds.minLatitude.toStringAsFixed(6);
@@ -45,6 +44,13 @@ class _MapDownloadDialogState extends ConsumerState<MapDownloadDialog> {
       _minLonController.text = bounds.minLongitude.toStringAsFixed(6);
       _maxLonController.text = bounds.maxLongitude.toStringAsFixed(6);
       _nameController.text = 'Carte Parcours ${DateTime.now().day}/${DateTime.now().month}';
+    } else {
+      // Valeurs par défaut : lat 43.5-43.6, lon 6.95-7.15
+      _minLatController.text = '43.500000';
+      _maxLatController.text = '43.600000';
+      _minLonController.text = '6.950000';
+      _maxLonController.text = '7.150000';
+      _nameController.text = 'Carte 43.5-43.6 / 6.95-7.15';
     }
   }
 

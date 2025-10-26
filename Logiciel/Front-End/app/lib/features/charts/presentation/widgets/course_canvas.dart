@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // PROVIDERS & MODELS
@@ -25,6 +26,7 @@ import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart
 import 'multi_layer_tile_painter.dart';
 import 'tile_image_service.dart';
 import 'package:kornog/common/providers/app_providers.dart';
+import 'zoom_button.dart';
 // -------------------------
 // Vue & projection partagées
 // -------------------------
@@ -203,91 +205,112 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
         int baseTileZoom = activeMap?.zoomLevel ?? 10;
         int tileZoom = (baseTileZoom + _tileZoomOffset).clamp(1, 20);
 
-        return GestureDetector(
-          onPanStart: (details) {
-            _lastPanPosition = details.localPosition;
-          },
-          onPanUpdate: (details) {
-            if (_lastPanPosition != null) {
+
+        return Listener(
+          onPointerSignal: (event) {
+            if (event is PointerScrollEvent) {
               setState(() {
-                _panOffset += details.localPosition - _lastPanPosition!;
-                _lastPanPosition = details.localPosition;
+                if (event.scrollDelta.dy < 0) {
+                  _zoomFactor = (_zoomFactor * 1.1).clamp(_minZoomFactor, _maxZoomFactor);
+                } else if (event.scrollDelta.dy > 0) {
+                  _zoomFactor = (_zoomFactor / 1.1).clamp(_minZoomFactor, _maxZoomFactor);
+                }
+                _adjustTileZoomIfNeeded();
               });
             }
           },
-          onPanEnd: (details) {
-            _lastPanPosition = null;
-          },
-          child: SizedBox(
-            width: constraints.maxWidth,
-            height: constraints.maxHeight,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (displayMaps && activeMap != null)
-                  FutureBuilder<List<LayeredTile>>(
-                    future: _loadMultiLayerTilesForMap(
-                      activeMap.copyWith(zoomLevel: tileZoom),
-                      course,
-                      mercatorService: mercatorService,
-                      view: view,
+          child: GestureDetector(
+            onScaleStart: (details) {
+              _lastPanPosition = details.focalPoint;
+            },
+            onScaleUpdate: (details) {
+              setState(() {
+                // Pan (déplacement)
+                if (_lastPanPosition != null) {
+                  final delta = details.focalPoint - _lastPanPosition!;
+                  // Inverser le déplacement vertical (Y)
+                  _panOffset += Offset(delta.dx, -delta.dy);
+                  _lastPanPosition = details.focalPoint;
+                }
+                // Zoom (pinch)
+                if (details.scale != 1.0) {
+                  _zoomFactor = (_zoomFactor * details.scale).clamp(_minZoomFactor, _maxZoomFactor);
+                  _adjustTileZoomIfNeeded();
+                }
+              });
+            },
+            onScaleEnd: (details) {
+              _lastPanPosition = null;
+            },
+            child: SizedBox(
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (displayMaps && activeMap != null)
+                    FutureBuilder<List<LayeredTile>>(
+                      future: _loadMultiLayerTilesForMap(
+                        activeMap.copyWith(zoomLevel: tileZoom),
+                        course,
+                        mercatorService: mercatorService,
+                        view: view,
+                        size: Size(constraints.maxWidth, constraints.maxHeight),
+                      ),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Center(child: Text('Erreur de chargement des tuiles'));
+                        }
+                        if (snapshot.hasData) {
+                          return CustomPaint(
+                            size: Size(constraints.maxWidth, constraints.maxHeight),
+                            painter: MultiLayerTilePainter(
+                              snapshot.data!,
+                              mercatorService,
+                              view,
+                              MapLayersConfig.defaultConfig,
+                            ),
+                          );
+                        }
+                        return Center(child: Text('Chargement des tuiles...'));
+                      },
+                    ),
+                  RepaintBoundary(
+                    child: CustomPaint(
                       size: Size(constraints.maxWidth, constraints.maxHeight),
-                    ),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Erreur de chargement des tuiles'));
-                      }
-                      if (snapshot.hasData) {
-                        return CustomPaint(
-                          size: Size(constraints.maxWidth, constraints.maxHeight),
-                          painter: MultiLayerTilePainter(
-                            snapshot.data!,
-                            mercatorService,
-                            view,
-                            MapLayersConfig.defaultConfig,
-                          ),
-                        );
-                      }
-                      return Center(child: Text('Chargement des tuiles...'));
-                    },
-                  ),
-                RepaintBoundary(
-                  child: CustomPaint(
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
-                    painter: _CoursePainter(
-                      state: course,
-                      route: route,
-                      windDirDeg: wind.directionDeg,
-                      windSpeed: wind.speed,
-                      upwindOptimalAngle: vmcUp?.angleDeg,
-                      windTrend: windTrend,
-                      mercatorService: mercatorService,
-                      view: view,
+                      painter: _CoursePainter(
+                        state: course,
+                        route: route,
+                        windDirDeg: wind.directionDeg,
+                        windSpeed: wind.speed,
+                        upwindOptimalAngle: vmcUp?.angleDeg,
+                        windTrend: windTrend,
+                        mercatorService: mercatorService,
+                        view: view,
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                  right: 16,
-                  bottom: 32,
-                  child: Column(
-                    children: [
-                      FloatingActionButton(
-                        heroTag: 'zoom_in',
-                        mini: true,
-                        onPressed: _incrementZoom,
-                        child: Icon(Icons.add),
-                      ),
-                      SizedBox(height: 8),
-                      FloatingActionButton(
-                        heroTag: 'zoom_out',
-                        mini: true,
-                        onPressed: _decrementZoom,
-                        child: Icon(Icons.remove),
-                      ),
-                    ],
+                  Positioned(
+                    right: 16,
+                    bottom: 32,
+                    child: Column(
+                      children: [
+                        ZoomButton(
+                          icon: Icons.add,
+                          onTap: _incrementZoom,
+                          tooltip: 'Zoomer',
+                        ),
+                        SizedBox(height: 8),
+                        ZoomButton(
+                          icon: Icons.remove,
+                          onTap: _decrementZoom,
+                          tooltip: 'Dézoomer',
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -306,8 +329,10 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   }) async {
     // ignore: avoid_print
     print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap: ${map.id}');
-    final mapBasePath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
-    final mapPath = '$mapBasePath/${map.id}';
+  // Récupérer dynamiquement le chemin de stockage des cartes
+  final container = ProviderScope.containerOf(context);
+  final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
+  final mapPath = '$mapBasePath/${map.id}';
     // ignore: avoid_print
     print('MULTI-LAYER DEBUG - Chemin des tuiles: $mapPath');
 
@@ -400,8 +425,9 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   Future<List<LoadedTile>> _loadTilesForMap(MapTileSet map) async {
     // ignore: avoid_print
     print('TILES DEBUG - _loadTilesForMap: ${map.id}');
-    const mapBasePath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
-    final tiles = await TileImageService.preloadMapTiles(map.id, mapBasePath);
+  final container = ProviderScope.containerOf(context);
+  final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
+  final tiles = await TileImageService.preloadMapTiles(map.id, mapBasePath);
     // ignore: avoid_print
     print('TILES DEBUG - ${tiles.length} tuiles chargées pour ${map.id}');
     return tiles;
@@ -410,9 +436,10 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   Future<List<LoadedTile>> _loadTilesDirectly() async {
     // ignore: avoid_print
     print('TILES DEBUG - _loadTilesDirectly');
-    const mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
-    const mapId = 'map_1759955517334_43.535_6.999';
-    final tiles = await TileImageService.preloadMapTiles(mapId, mapPath);
+  final container = ProviderScope.containerOf(context);
+  final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
+  const mapId = 'map_1759955517334_43.535_6.999';
+  final tiles = await TileImageService.preloadMapTiles(mapId, mapBasePath);
     // ignore: avoid_print
     print('TILES DEBUG - ${tiles.length} tuiles chargées directement');
     return tiles;

@@ -96,7 +96,13 @@ class LoadedTile {
 }
 
 /// Provider pour les tuiles chargées
-final loadedTilesProvider = FutureProvider.family<List<LoadedTile>, String>((ref, mapId) async {
-  const mapPath = '/home/fefe/home/Kornog/Logiciel/Front-End/app/lib/data/datasources/maps/repositories/downloaded_maps';
-  return await TileImageService.preloadMapTiles(mapId, mapPath);
+// Ce provider attend maintenant le chemin du dossier de stockage (à fournir dynamiquement)
+final loadedTilesProvider = FutureProvider.family<List<LoadedTile>, MapTilesProviderParams>((ref, params) async {
+  return await TileImageService.preloadMapTiles(params.mapId, params.mapPath);
 });
+
+class MapTilesProviderParams {
+  final String mapId;
+  final String mapPath;
+  MapTilesProviderParams({required this.mapId, required this.mapPath});
+}
