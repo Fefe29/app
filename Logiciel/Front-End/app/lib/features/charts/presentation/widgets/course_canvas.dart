@@ -71,6 +71,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   void _incrementZoom() {
     setState(() {
       _zoomFactor = (_zoomFactor * 1.25).clamp(_minZoomFactor, _maxZoomFactor);
+      print('[ZOOM] _incrementZoom: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
       _adjustTileZoomIfNeeded();
     });
   }
@@ -78,30 +79,15 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   void _decrementZoom() {
     setState(() {
       _zoomFactor = (_zoomFactor / 1.25).clamp(_minZoomFactor, _maxZoomFactor);
+      print('[ZOOM] _decrementZoom: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
       _adjustTileZoomIfNeeded();
     });
   }
 
   void _adjustTileZoomIfNeeded() {
-    // Limites du tileZoom OSM (1 à 20)
-    const int minTileZoom = 1;
-    const int maxTileZoom = 20;
-    int baseTileZoom = context.mounted ? (ref.read(activeMapProvider)?.zoomLevel ?? 10) : 10;
-    int nextTileZoom = _tileZoomOffset + baseTileZoom;
-
-    // On ne modifie le tileZoomOffset que si on reste dans les bornes OSM
-    while (_zoomFactor >= 2.0 && nextTileZoom < maxTileZoom) {
-      _zoomFactor /= 2.0;
-      _tileZoomOffset += 1;
-      nextTileZoom++;
-    }
-    while (_zoomFactor < 0.5 && nextTileZoom > minTileZoom) {
-      _zoomFactor *= 2.0;
-      _tileZoomOffset -= 1;
-      nextTileZoom--;
-    }
-    // Si on ne peut plus ajuster le tileZoomOffset, on laisse _zoomFactor évoluer librement dans ses bornes
+    // Désactivé : on ne touche plus au tileZoomOffset, le zoom est totalement libre
     _zoomFactor = _zoomFactor.clamp(_minZoomFactor, _maxZoomFactor);
+    // print('[ZOOM] _adjustTileZoomIfNeeded: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
   }
 
   @override
@@ -130,6 +116,10 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Log pour debug disparition carte
+        if (_zoomFactor <= _minZoomFactor || _zoomFactor >= _maxZoomFactor) {
+          print('[BUG?] _zoomFactor extrême: $_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
+        }
         final localPoints = <Offset>[];
         for (final b in course.buoys) {
           final l = mercatorService.toLocal(b.position);
@@ -202,8 +192,9 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
           offsetX: offsetX,
           offsetY: offsetY,
         );
-        int baseTileZoom = activeMap?.zoomLevel ?? 10;
-        int tileZoom = (baseTileZoom + _tileZoomOffset).clamp(1, 20);
+  int baseTileZoom = activeMap?.zoomLevel ?? 10;
+  int tileZoom = (baseTileZoom + _tileZoomOffset).clamp(1, 20);
+  print('[TILE] baseTileZoom=$baseTileZoom, _tileZoomOffset=$_tileZoomOffset, tileZoom=$tileZoom, _zoomFactor=$_zoomFactor');
 
 
         return Listener(
@@ -261,6 +252,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                         if (snapshot.hasError) {
                           return Center(child: Text('Erreur de chargement des tuiles'));
                         }
+                        // Si aucune tuile n'est trouvée, on laisse simplement du blanc (pas de message)
                         if (snapshot.hasData) {
                           return CustomPaint(
                             size: Size(constraints.maxWidth, constraints.maxHeight),

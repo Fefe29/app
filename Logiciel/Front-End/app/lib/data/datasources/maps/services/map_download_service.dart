@@ -15,7 +15,9 @@ import '../models/map_bounds.dart';
 class MapDownloadService {
   MapDownloadService({
     required String storageDirectory,
-  }) : _storageDir = storageDirectory;
+  }) : _storageDir = storageDirectory {
+    print('[KORNOG_MAP_DL] MapDownloadService instancié avec storageDirectory=$_storageDir');
+  }
 
   final String _storageDir;
   final Map<String, StreamController<MapTileSet>> _downloadControllers = {};
@@ -30,20 +32,23 @@ class MapDownloadService {
   /// Démarre le téléchargement d'une carte
   Future<void> downloadMap(MapDownloadConfig config) async {
     final mapId = _generateMapId(config);
-    
+    print('[KORNOG_MAP_DL] Début téléchargement carte "$mapId"');
     try {
       // Validation de la configuration
       final errors = config.validate();
       if (errors.isNotEmpty) {
-        throw MapDownloadException('Configuration invalide: ${errors.join(', ')}');
+        print('[KORNOG_MAP_DL] Erreur config: \\${errors.join(', ')}');
+        throw MapDownloadException('Configuration invalide: \\${errors.join(', ')}');
       }
 
       // Création du répertoire de stockage
       await _ensureStorageDirectory();
+      print('[KORNOG_MAP_DL] Dossier stockage prêt: $_storageDir');
 
       // Calcul des tuiles à télécharger
       final tiles = _calculateTiles(config.bounds, config.zoomLevel);
-      
+      print('[KORNOG_MAP_DL] Nombre de tuiles à télécharger: \\${tiles.length}');
+
       // Initialisation de l'état de téléchargement
       final initialState = MapTileSet(
         id: mapId,
@@ -70,8 +75,9 @@ class MapDownloadService {
       );
 
       _emitUpdate(mapId, completedState);
-      
+      print('[KORNOG_MAP_DL] Téléchargement carte "$mapId" terminé');
     } catch (e) {
+      print('[KORNOG_MAP_DL] Erreur téléchargement carte "$mapId": $e');
       final errorState = MapTileSet(
         id: mapId,
         name: config.name,
@@ -80,7 +86,6 @@ class MapDownloadService {
         status: MapDownloadStatus.failed,
         errorMessage: e.toString(),
       );
-      
       _emitUpdate(mapId, errorState);
       rethrow;
     }
@@ -157,13 +162,11 @@ class MapDownloadService {
     int completed = 0;
     final total = tiles.length;
 
-    // Téléchargement séquentiel pour respecter les serveurs OSM
     for (final tile in tiles) {
       try {
+        print('[KORNOG_MAP_DL] Téléchargement tuile $tile');
         await _downloadSingleTile(config, tile, mapId);
         completed++;
-        
-        // Mise à jour du progrès
         final progress = completed / total;
         final updateState = MapTileSet(
           id: mapId,
@@ -174,15 +177,10 @@ class MapDownloadService {
           tileCount: total,
           downloadProgress: progress,
         );
-        
         _emitUpdate(mapId, updateState);
-
-        // Délai pour respecter les serveurs
         await Future.delayed(config.requestDelay);
-        
       } catch (e) {
-        print('Erreur téléchargement tuile $tile: $e');
-        // Continue avec les autres tuiles
+        print('[KORNOG_MAP_DL] Erreur téléchargement tuile $tile: $e');
       }
     }
   }
@@ -190,11 +188,13 @@ class MapDownloadService {
   /// Télécharge une seule tuile
   Future<void> _downloadSingleTile(MapDownloadConfig config, TileCoordinate tile, String mapId) async {
     final url = '${config.tileServer}/${tile.zoom}/${tile.x}/${tile.y}.png';
-    
+    print('[KORNOG_MAP_DL] Requête HTTP: $url');
     final response = await _httpClient.get(Uri.parse(url));
     if (response.statusCode == 200) {
+      print('[KORNOG_MAP_DL] Tuile OK: $url');
       await _saveTile(mapId, tile, response.bodyBytes);
     } else {
+      print('[KORNOG_MAP_DL] Erreur HTTP ${response.statusCode} pour $url');
       throw Exception('Erreur HTTP ${response.statusCode} pour $url');
     }
   }

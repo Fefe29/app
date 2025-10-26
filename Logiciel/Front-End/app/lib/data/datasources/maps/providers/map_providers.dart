@@ -15,20 +15,18 @@ import '../../../../features/charts/providers/course_providers.dart';
 
 /// Provider pour le répertoire de stockage des cartes
 final mapStorageDirectoryProvider = FutureProvider<String>((ref) async {
-  // Demander la permission de stockage sur Android
-  if (Platform.isAndroid) {
-    final status = await Permission.storage.request();
-    if (!status.isGranted) {
-      throw Exception('Permission de stockage refusée');
-    }
-  }
+  print('[KORNOG_PROVIDER] mapStorageDirectoryProvider: début');
+  print('[KORNOG_PROVIDER] Appel getKornogDataDirectory');
   final dir = await getKornogDataDirectory();
+  print('[KORNOG_PROVIDER] getKornogDataDirectory OK: ${dir.path}');
   return dir.path;
 });
 
 /// Provider pour le service de téléchargement de cartes
 final mapDownloadServiceProvider = FutureProvider<MapDownloadService>((ref) async {
+  print('[KORNOG_PROVIDER] mapDownloadServiceProvider: attente storageDir');
   final storageDir = await ref.watch(mapStorageDirectoryProvider.future);
+  print('[KORNOG_PROVIDER] mapDownloadServiceProvider: storageDir=$storageDir');
   return MapDownloadService(storageDirectory: storageDir);
 });
 
@@ -59,9 +57,9 @@ class MapManagerNotifier extends Notifier<List<MapTileSet>> {
 
   /// Démarre le téléchargement d'une nouvelle carte
   Future<void> downloadMap(MapDownloadConfig config) async {
+    print('[KORNOG_PROVIDER] downloadMap appelé');
     try {
       final downloadService = await ref.read(mapDownloadServiceProvider.future);
-      
       // Ajouter une carte en cours de téléchargement
       final downloadingMap = MapTileSet(
         id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
@@ -72,17 +70,13 @@ class MapManagerNotifier extends Notifier<List<MapTileSet>> {
         description: config.description,
         downloadProgress: 0.0,
       );
-      
       state = [...state, downloadingMap];
-      
       // Démarrer le téléchargement
       await downloadService.downloadMap(config);
-      
       // Recharger la liste des cartes
       await _loadMaps();
-      
     } catch (e) {
-      print('Erreur lors du téléchargement: $e');
+      print('[KORNOG_PROVIDER] Erreur lors du téléchargement: $e');
       // Retirer la carte en erreur
       state = state.where((map) => map.status != MapDownloadStatus.downloading).toList();
     }
