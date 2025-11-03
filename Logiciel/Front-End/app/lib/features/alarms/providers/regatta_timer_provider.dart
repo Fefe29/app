@@ -1,7 +1,6 @@
 /// Regatta start timer providers.
 /// See ARCHITECTURE_DOCS.md (section: regatta_timer_provider.dart).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:typed_data/typed_data.dart' as _td; // placeholder to avoid unused import warnings
 import '../../../services/sound_player_factory.dart';
 import '../../../services/sound_player.dart';
 

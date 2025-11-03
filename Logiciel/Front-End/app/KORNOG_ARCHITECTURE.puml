@@ -1,0 +1,251 @@
+@startuml KORNOG_App_Organization
+!define LAYER1_COLOR #FF6B6B
+!define LAYER2_COLOR #4ECDC4
+!define LAYER3_COLOR #45B7D1
+!define LAYER4_COLOR #96CEB4
+!define LAYER5_COLOR #FFEAA7
+!define LAYER6_COLOR #DDA15E
+
+title Kornog Flutter App - Architecture Organizationnelle
+
+package "📱 LAYER 1: ENTRY POINT" as Layer1 <<LAYER1>> #FF6B6B {
+    class main.dart {
+        main()
+        App (ConsumerWidget)
+    }
+    
+    class app_shell.dart {
+        HomeShell
+        BottomNavigationBar / NavigationRail
+    }
+    
+    class router.dart {
+        appRouterProvider: GoRouter
+        ShellRoute configuration
+    }
+    
+    class app_theme.dart {
+        appThemeProvider
+        ThemeData (light/dark)
+    }
+}
+
+package "🎯 LAYER 2: STATE MANAGEMENT (Riverpod Providers)" as Layer2 <<LAYER2>> #4ECDC4 {
+    package "Core Providers" {
+        class app_providers.dart {
+            windSampleProvider
+            telemetryBusProvider
+            simulationModeProvider
+        }
+    }
+    
+    package "Feature Providers" {
+        class wind_trend_provider.dart {
+            windTrendProvider
+            WindTrendSnapshot
+        }
+        
+        class route_plan_provider.dart {
+            routePlanProvider
+            RoutePlan
+        }
+        
+        class tactics_providers.dart {
+            tackRecommendationProvider
+            performanceProvider
+        }
+        
+        class polar_providers.dart {
+            polarTableProvider
+            boatPerformanceProvider
+        }
+        
+        class course_providers.dart {
+            courseProvider
+            courseHistoryProvider
+        }
+    }
+}
+
+package "💾 LAYER 3: DATA LAYER" as Layer3 <<LAYER3>> #45B7D1 {
+    package "Telemetry Datasources" {
+        interface TelemetryBus {
+            {abstract} stream: Stream<TelemetryEvent>
+            {abstract} emit(TelemetryEvent)
+        }
+        
+        class FakeTelemetryBus {
+            emit(TelemetryEvent)
+            uses: WindTestConfig
+        }
+    }
+    
+    package "Maps Datasources" {
+        class MapRepository {
+            getTile(x, y, zoom)
+            MapTileSet storage
+        }
+    }
+    
+    package "Config" {
+        class WindTestConfig {
+            {static} mode: String
+            {static} baseDirection: double
+            {static} baseSpeed: double
+            {static} presets...
+        }
+    }
+}
+
+package "🧠 LAYER 4: DOMAIN LAYER" as Layer4 <<LAYER4>> #96CEB4 {
+    package "Models" {
+        class Boat {
+            lengthMeters, beamMeters
+            position: GeographicPosition
+            polars: PolarTable
+        }
+        
+        class Course {
+            startPoint, endPoint
+            waypoints: List<Point>
+        }
+        
+        class PolarTable {
+            getSpeed(twa, tws): double
+        }
+        
+        class GeographicPosition {
+            latitude, longitude
+        }
+    }
+    
+    package "Business Services" {
+        class VMCCalculator {
+            calculateVMC(twa, tws)
+        }
+        
+        class RoutingCalculator {
+            calculateOptimalRoute()
+        }
+        
+        class WindTrendAnalyzer {
+            detectBacking()
+            detectVeering()
+        }
+        
+        class AdoRefusStrategy {
+            recommendTack()
+            TackRecommendation
+        }
+        
+        class PolarParser {
+            parse(csv)
+        }
+    }
+}
+
+package "🎨 LAYER 5: PRESENTATION (Features)" as Layer5 <<LAYER5>> #FFEAA7 {
+    package "Dashboard Feature" {
+        class DashboardPage {
+            displays: key metrics
+        }
+        class MetricTile {
+            MetricTile widget
+        }
+    }
+    
+    package "Charts Feature" {
+        class ChartsPage {
+            displays: wind/performance charts
+        }
+        class CourseCanvas {
+            CustomPainter: draws route
+        }
+        class CourseMenu {
+            interactive menu
+        }
+    }
+    
+    package "Analysis Feature" {
+        class AnalysisPage {
+            detailed analysis UI
+        }
+    }
+    
+    package "Other Features" {
+        class AlarmsPage
+        class SettingsPage
+    }
+}
+
+' DEPENDENCIES
+main.dart --> router.dart : uses
+main.dart --> app_theme.dart : uses
+router.dart --> app_shell.dart : uses
+
+DashboardPage --> app_providers.dart : watches
+ChartsPage --> route_plan_provider.dart : watches
+ChartsPage --> wind_trend_provider.dart : watches
+AnalysisPage --> wind_trend_provider.dart : watches
+
+wind_trend_provider.dart --> WindTrendAnalyzer : uses
+route_plan_provider.dart --> RoutingCalculator : uses
+tactics_providers.dart --> AdoRefusStrategy : uses
+polar_providers.dart --> PolarParser : uses
+
+VMCCalculator --> Boat : uses
+VMCCalculator --> PolarTable : uses
+RoutingCalculator --> Boat : uses
+RoutingCalculator --> Course : uses
+
+app_providers.dart --> FakeTelemetryBus : uses
+app_providers.dart --> WindTestConfig : uses
+FakeTelemetryBus --|> TelemetryBus : implements
+
+CourseCanvas --> Course : draws
+CourseCanvas --> Boat : uses
+
+note right of Layer1
+    **Point d'entrée de l'application**
+    - main() lance ProviderScope
+    - GoRouter gère la navigation
+    - Theme configuration
+end note
+
+note right of Layer2
+    **État réactif centralisé**
+    - Riverpod providers
+    - Computed state
+    - Stream transformations
+end note
+
+note right of Layer3
+    **Accès aux données**
+    - Télémétrie (réelle ou simulée)
+    - Cartes marines
+    - Configuration
+end note
+
+note right of Layer4
+    **Logique métier**
+    - Modèles de domaine
+    - Calculateurs (VMC, routing)
+    - Analyseurs (wind trends)
+end note
+
+note right of Layer5
+    **Interface utilisateur**
+    - Pages (features)
+    - Widgets (UI components)
+    - Canvas drawings
+end note
+
+legend right
+    | <#FF6B6B> Entry Point & Init |
+    | <#4ECDC4> State Management |
+    | <#45B7D1> Data & Config |
+    | <#96CEB4> Domain Logic |
+    | <#FFEAA7> UI Components |
+end legend
+
+@enduml

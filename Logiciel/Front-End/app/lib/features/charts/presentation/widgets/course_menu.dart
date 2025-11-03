@@ -92,7 +92,6 @@ class CourseMenuButton extends ConsumerWidget {
   }
 
   Future<void> _openStartLineDialog(BuildContext context, WidgetRef ref) async {
-    final course = ref.read(courseProvider);
     await showDialog<void>(
       context: context,
       builder: (ctx) => const GeographicLineDialog(
@@ -102,7 +101,6 @@ class CourseMenuButton extends ConsumerWidget {
   }
 
   Future<void> _openFinishLineDialog(BuildContext context, WidgetRef ref) async {
-    final course = ref.read(courseProvider);
     await showDialog<void>(
       context: context,
       builder: (ctx) => const GeographicLineDialog(
@@ -288,33 +286,6 @@ class CourseMenuButton extends ConsumerWidget {
       ref.read(courseProvider.notifier).clear();
     }
   }
-
-  String _titleForRole(BuoyRole role) {
-    switch (role) {
-      case BuoyRole.committee:
-        return 'Bouée comité';
-      case BuoyRole.target:
-        return 'Bouée viseur';
-      case BuoyRole.regular:
-      default:
-        return 'Bouée parcours';
-    }
-  }
-
-  String _labelFor(Buoy b) {
-    switch (b.role) {
-      case BuoyRole.committee:
-        return 'Comité';
-      case BuoyRole.target:
-        return 'Viseur';
-      case BuoyRole.regular:
-      default:
-        final po = b.passageOrder != null ? ' (P${b.passageOrder})' : '';
-        return 'B${b.id}$po';
-    }
-  }
-
-
 }
 
 enum _BuoyType {

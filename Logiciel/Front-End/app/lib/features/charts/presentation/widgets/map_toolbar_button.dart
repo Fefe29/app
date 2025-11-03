@@ -6,7 +6,6 @@ import '../../../../data/datasources/maps/models/map_tile_set.dart';
 import '../../../../data/datasources/maps/models/map_bounds.dart';
 import '../../../../data/datasources/maps/providers/map_providers.dart';
 import '../../../../data/datasources/maps/widgets/map_download_dialog.dart';
-import '../../../../data/datasources/gribs/grib_downloader.dart';
 import 'grib_layers_panel.dart';
 
 class MapToolbarButton extends ConsumerStatefulWidget {
@@ -21,7 +20,6 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
   @override
   Widget build(BuildContext context) {
     final maps = ref.watch(mapManagerProvider);
-    final courseBounds = ref.watch(courseBoundsProvider);
     final selectedMapId = ref.watch(selectedMapProvider);
     final showMaps = ref.watch(mapDisplayProvider);
     

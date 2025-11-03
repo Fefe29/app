@@ -1,6 +1,5 @@
 /// Fonctions pour la prévision court-terme (EMA, Kalman, ARIMA, HMM, régression, etc.)
 /// Implémentations simplifiées pour embarqué
-import 'dart:math';
 
 /// EMA + Kalman simplifié pour TWD/TWS
 List<double> kalman1D(List<double> measurements, double q, double r) {

@@ -23,7 +23,6 @@ class FakeTelemetryBus implements TelemetryBus {
 	// ---------------- Wind Simulator (utilise WindTestConfig) ----------------
 	double _baseTwd = WindTestConfig.baseDirection;
 	double _elapsedMin = 0;
-	final double _rotRateDegPerMin = WindTestConfig.rotationRate;
 	final double _baseTws = WindTestConfig.baseSpeed;
 
 	FakeTelemetryBus({this.mode = TwaSimMode.irregular}) {

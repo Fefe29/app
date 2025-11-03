@@ -1,6 +1,5 @@
 /// Painter pour dessiner les tuiles multi-couches (OSM + OpenSeaMap)
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../domain/models/geographic_position.dart';
@@ -125,11 +124,6 @@ class MultiLayerTilePainter extends CustomPainter {
     final right = ((visibleRect.right - tileRect.left) / tileRect.width).clamp(0.0, 1.0) * imgW;
     final bottom = ((visibleRect.bottom - tileRect.top) / tileRect.height).clamp(0.0, 1.0) * imgH;
     return Rect.fromLTRB(left, top, right, bottom);
-  }
-
-  Rect _fullImageRect(ui.Image? img) {
-    if (img == null) return Rect.zero;
-    return Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
   }
 
   /// Convertit indices de tuile (x,y,z) en lat/lon du coin **NW**.

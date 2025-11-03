@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'sound_player.dart';
 import 'sound_player_stub.dart';
-import 'dart:io' show Platform;
 
 SoundPlayer createSoundPlayer() {
   if (kIsWeb) return SoundPlayerStub();

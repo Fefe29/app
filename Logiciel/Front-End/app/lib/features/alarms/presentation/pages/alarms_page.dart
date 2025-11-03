@@ -1,7 +1,6 @@
 /// Alarms management UI page.
 /// See ARCHITECTURE_DOCS.md (section: alarms_page.dart).
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/regatta_timer_provider.dart';
@@ -301,7 +300,6 @@ class _OtherAlarmsTab extends ConsumerWidget {
 	Widget build(BuildContext context, WidgetRef ref) {
 		final st = ref.watch(otherAlarmsProvider);
 		final n = ref.read(otherAlarmsProvider.notifier);
-		Color warn(bool trig) => trig ? Colors.red : Theme.of(context).colorScheme.primary;
 		return Padding(
 			padding: const EdgeInsets.all(16),
 			child: ListView(

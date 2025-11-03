@@ -130,11 +130,6 @@ class _MetricTileState extends ConsumerState<MetricTile>
   String _fmt(num v) => v is int ? '$v' : (v as double).toStringAsFixed(1);
 }
 
-Color _categoryColor(String cat, ColorScheme cs) {
-  // Désormais inutilisé, mais conservé pour compatibilité éventuelle
-  return Colors.grey[200]!;
-}
-
 // (Ancienne classe _Badge retirée car design refondu)
 
 class _StableValue extends StatelessWidget {

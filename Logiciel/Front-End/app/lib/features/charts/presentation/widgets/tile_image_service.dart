@@ -4,8 +4,6 @@ library;
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class TileImageService {
   static final Map<String, ui.Image> _imageCache = {};

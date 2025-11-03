@@ -1,5 +1,4 @@
 /// Fonctions pour extraire les features utiles à l'IA (fenêtres glissantes, stats, etc.)
-import 'dart:math';
 
 /// Fenêtre glissante sur une liste
 dynamic slidingWindow(List<dynamic> data, int window) {

@@ -3,7 +3,6 @@
 /// Listens to telemetry metrics via existing metricProvider keys:
 ///   env.depth, wind.twd, wind.tws
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:math' as math;
 import 'package:kornog/common/utils/angle_utils.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
 import 'package:kornog/common/providers/app_providers.dart';

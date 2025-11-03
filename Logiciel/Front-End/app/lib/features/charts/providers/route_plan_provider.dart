@@ -1,16 +1,15 @@
 /// Routing / route plan providers.
 /// See ARCHITECTURE_DOCS.md (section: route_plan_provider.dart).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 
 import '../domain/services/routing_calculator.dart';
+import '../domain/services/wind_trend_analyzer.dart';
 import 'course_providers.dart';
 import 'polar_providers.dart';
-import 'coordinate_system_provider.dart';
-import 'mercator_coordinate_system_provider.dart';
-import 'package:kornog/common/providers/app_providers.dart';
 import 'wind_trend_provider.dart';
-import '../domain/services/wind_trend_analyzer.dart';
-import 'dart:async';
+import 'mercator_coordinate_system_provider.dart';
+import '../../../common/providers/app_providers.dart';
 
 /// Calcule l'angle de remontée optimal selon la force du vent
 /// Plus le vent est fort, plus on peut serrer le vent (VMG optimal)

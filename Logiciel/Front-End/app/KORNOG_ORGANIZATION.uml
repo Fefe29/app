@@ -1,0 +1,532 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<XMI xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.omg.org/XMI http://www.omg.org/spec/XMI/20131001/XMI.xsd">
+  <XMI.header>
+    <XMI.documentation exporter="Kornog Flutter App Organization" exporterVersion="1.0"/>
+  </XMI.header>
+
+  <XMI.content>
+    <!-- ====================================================================
+         ROOT PACKAGE - APPLICATION STRUCTURE
+         ==================================================================== -->
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_kornog" name="Kornog App">
+      
+      <!-- ================================================================
+           LAYER 1: ENTRY POINT & INITIALIZATION
+           ================================================================ -->
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_core" name="Core - Entry Point">
+        <ownedComment>
+          <body>Point d'entrée et initialisation de l'application</body>
+        </ownedComment>
+        
+        <packagedElement xmi:type="uml:Class" xmi:id="class_main" name="main.dart">
+          <ownedAttribute name="main()"/>
+          <ownedAttribute name="App (widget)"/>
+          <ownedComment>
+            <body>Fonction d'entrée - Lance l'app avec ProviderScope</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_app_shell" name="app_shell.dart">
+          <ownedAttribute name="HomeShell"/>
+          <ownedAttribute name="navigation tabs"/>
+          <ownedComment>
+            <body>Structure permanente avec navigation (BottomNavigationBar/NavigationRail)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_router" name="router.dart">
+          <ownedAttribute name="appRouterProvider"/>
+          <ownedAttribute name="GoRouter"/>
+          <ownedComment>
+            <body>Configuration de routage (GoRouter avec ShellRoute)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_theme" name="app_theme.dart">
+          <ownedAttribute name="appThemeProvider"/>
+          <ownedAttribute name="Material Design theme"/>
+          <ownedComment>
+            <body>Thème global (light/dark mode)</body>
+          </ownedComment>
+        </packagedElement>
+      </packagedElement>
+
+      <!-- ================================================================
+           LAYER 2: PROVIDERS & STATE MANAGEMENT (Riverpod)
+           ================================================================ -->
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_providers" name="Providers - State Management">
+        <ownedComment>
+          <body>Gestion d'état centralisée avec Riverpod</body>
+        </ownedComment>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_app_providers" name="app_providers.dart">
+          <ownedAttribute name="windSampleProvider"/>
+          <ownedAttribute name="telemetryBusProvider"/>
+          <ownedAttribute name="simulationModeProvider"/>
+          <ownedComment>
+            <body>Providers globaux (télémétrie, vent, simulation)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_wind_trend_provider" name="wind_trend_provider.dart">
+          <ownedAttribute name="windTrendProvider"/>
+          <ownedAttribute name="WindTrendSnapshot"/>
+          <ownedComment>
+            <body>Analyse des tendances de vent (backing/veering)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_route_plan_provider" name="route_plan_provider.dart">
+          <ownedAttribute name="routePlanProvider"/>
+          <ownedAttribute name="RoutePlan"/>
+          <ownedComment>
+            <body>Calcul du plan de route optimal</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_tactics_providers" name="tactics_providers.dart">
+          <ownedAttribute name="tackRecommendationProvider"/>
+          <ownedAttribute name="performanceProvider"/>
+          <ownedComment>
+            <body>Tactiques et recommandations de navigation</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_polar_providers" name="polar_providers.dart">
+          <ownedAttribute name="polarTableProvider"/>
+          <ownedAttribute name="boatPerformanceProvider"/>
+          <ownedComment>
+            <body>Polaires de performance du bateau</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_course_providers" name="course_providers.dart">
+          <ownedAttribute name="courseProvider"/>
+          <ownedAttribute name="courseHistoryProvider"/>
+          <ownedComment>
+            <body>Gestion de la route et historique</body>
+          </ownedComment>
+        </packagedElement>
+      </packagedElement>
+
+      <!-- ================================================================
+           LAYER 3: DATA LAYER (Datasources, Repositories)
+           ================================================================ -->
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_data" name="Data Layer">
+        <ownedComment>
+          <body>Accès aux données (télémétrie, cartes, etc.)</body>
+        </ownedComment>
+
+        <!-- Telemetry Subsystem -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_telemetry" name="Telemetry Datasources">
+          <packagedElement xmi:type="uml:Class" xmi:id="class_telemetry_bus" name="telemetry_bus.dart">
+            <ownedAttribute name="TelemetryBus (abstract)"/>
+            <ownedAttribute name="stream: TelemetryEvent"/>
+            <ownedComment>
+              <body>Interface abstraite pour le bus d'événements télémétriques</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_fake_telemetry" name="fake_telemetry_bus.dart">
+            <ownedAttribute name="FakeTelemetryBus"/>
+            <ownedAttribute name="emit(TelemetryEvent)"/>
+            <ownedAttribute name="uses WindTestConfig"/>
+            <ownedComment>
+              <body>Implémentation simulée pour développement/tests</body>
+            </ownedComment>
+          </packagedElement>
+        </packagedElement>
+
+        <!-- Maps Subsystem -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_maps" name="Maps Datasources">
+          <packagedElement xmi:type="uml:Class" xmi:id="class_map_repository" name="map_repository.dart">
+            <ownedAttribute name="MapRepository"/>
+            <ownedAttribute name="getTile(x, y, zoom)"/>
+            <ownedComment>
+              <body>Repository pour les tuiles de cartes marines</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_map_models" name="Map Models">
+            <ownedAttribute name="MapTileSet"/>
+            <ownedAttribute name="MapBounds"/>
+            <ownedComment>
+              <body>Modèles de données pour les cartes</body>
+            </ownedComment>
+          </packagedElement>
+        </packagedElement>
+      </packagedElement>
+
+      <!-- ================================================================
+           LAYER 4: DOMAIN LAYER (Business Logic & Models)
+           ================================================================ -->
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_domain" name="Domain Layer">
+        <ownedComment>
+          <body>Logique métier et modèles indépendants du framework</body>
+        </ownedComment>
+
+        <!-- Telemetry Entities -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_telemetry_entities" name="Telemetry Entities">
+          <packagedElement xmi:type="uml:Class" xmi:id="class_telemetry_entity" name="telemetry.dart">
+            <ownedAttribute name="TelemetrySnapshot"/>
+            <ownedAttribute name="TelemetryEvent"/>
+            <ownedComment>
+              <body>Entités métier pour les données télémétriques</body>
+            </ownedComment>
+          </packagedElement>
+        </packagedElement>
+
+        <!-- Charts/Navigation Domain -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_charts_domain" name="Charts Domain">
+          
+          <!-- Models -->
+          <packagedElement xmi:type="uml:Class" xmi:id="class_boat" name="boat.dart">
+            <ownedAttribute name="Boat"/>
+            <ownedAttribute name="lengthMeters, beamMeters, draftMeters"/>
+            <ownedAttribute name="position: GeographicPosition"/>
+            <ownedAttribute name="polars: PolarTable"/>
+            <ownedComment>
+              <body>Modèle du bateau avec caractéristiques physiques</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_course" name="course.dart">
+            <ownedAttribute name="Course"/>
+            <ownedAttribute name="startPoint, endPoint"/>
+            <ownedAttribute name="waypoints[]"/>
+            <ownedComment>
+              <body>Modèle d'une route/parcours avec waypoints</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_polar_table" name="polar_table.dart">
+            <ownedAttribute name="PolarTable"/>
+            <ownedAttribute name="getSpeed(twa, tws)"/>
+            <ownedAttribute name="polars: Matrix"/>
+            <ownedComment>
+              <body>Tableau de polaires (performances bateau)</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_geographic_pos" name="geographic_position.dart">
+            <ownedAttribute name="GeographicPosition"/>
+            <ownedAttribute name="latitude, longitude"/>
+            <ownedComment>
+              <body>Position géographique (lat/long)</body>
+            </ownedComment>
+          </packagedElement>
+
+          <!-- Services (Business Logic) -->
+          <packagedElement xmi:type="uml:Package" xmi:id="pkg_charts_services" name="Charts Services">
+            
+            <packagedElement xmi:type="uml:Class" xmi:id="class_polar_parser" name="polar_parser.dart">
+              <ownedAttribute name="PolarParser"/>
+              <ownedAttribute name="parse(csv/file)"/>
+              <ownedComment>
+                <body>Parser pour charger les polaires (CSV)</body>
+              </ownedComment>
+            </packagedElement>
+
+            <packagedElement xmi:type="uml:Class" xmi:id="class_vmc_calculator" name="vmc_calculator.dart">
+              <ownedAttribute name="VMCCalculator"/>
+              <ownedAttribute name="calculateVMC(twa, tws)"/>
+              <ownedComment>
+                <body>Calcule la vitesse vers le mark (VMC)</body>
+              </ownedComment>
+            </packagedElement>
+
+            <packagedElement xmi:type="uml:Class" xmi:id="class_routing_calculator" name="routing_calculator.dart">
+              <ownedAttribute name="RoutingCalculator"/>
+              <ownedAttribute name="calculateOptimalRoute()"/>
+              <ownedComment>
+                <body>Calcule la route optimale en fonction du vent</body>
+              </ownedComment>
+            </packagedElement>
+
+            <packagedElement xmi:type="uml:Class" xmi:id="class_wind_trend_analyzer" name="wind_trend_analyzer.dart">
+              <ownedAttribute name="WindTrendAnalyzer"/>
+              <ownedAttribute name="detectBacking(), detectVeering()"/>
+              <ownedComment>
+                <body>Analyse les tendances du vent (backing/veering)</body>
+              </ownedComment>
+            </packagedElement>
+
+            <packagedElement xmi:type="uml:Class" xmi:id="class_ado_refus" name="ado_refus_strategy.dart">
+              <ownedAttribute name="AdoRefusStrategy"/>
+              <ownedAttribute name="recommendTack()"/>
+              <ownedAttribute name="TackRecommendation"/>
+              <ownedComment>
+                <body>Stratégie de recommandation d'amure</body>
+              </ownedComment>
+            </packagedElement>
+
+            <packagedElement xmi:type="uml:Class" xmi:id="class_polaire_port" name="polaire_port.dart">
+              <ownedAttribute name="PolairePort"/>
+              <ownedAttribute name="exportPolars()"/>
+              <ownedComment>
+                <body>Port/export pour les données de polaires</body>
+              </ownedComment>
+            </packagedElement>
+
+          </packagedElement>
+        </packagedElement>
+      </packagedElement>
+
+      <!-- ================================================================
+           LAYER 5: CONFIG (Configuration & Constants)
+           ================================================================ -->
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_config" name="Config">
+        <ownedComment>
+          <body>Configuration et constantes de l'application</body>
+        </ownedComment>
+
+        <packagedElement xmi:type="uml:Class" xmi:id="class_wind_config" name="wind_test_config.dart">
+          <ownedAttribute name="WindTestConfig"/>
+          <ownedAttribute name="mode: String"/>
+          <ownedAttribute name="baseDirection, baseSpeed"/>
+          <ownedAttribute name="static presets: stable(), irregular(), backing_left(), etc."/>
+          <ownedComment>
+            <body>Configuration pour les tests de vent</body>
+          </ownedComment>
+        </packagedElement>
+      </packagedElement>
+
+      <!-- ================================================================
+           LAYER 6: PRESENTATION LAYER (UI - Features)
+           ================================================================ -->
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_features" name="Features - UI Layer">
+        <ownedComment>
+          <body>Pages et widgets organisés par fonctionnalité</body>
+        </ownedComment>
+
+        <!-- Dashboard Feature -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_dashboard" name="Dashboard Feature">
+          <packagedElement xmi:type="uml:Class" xmi:id="class_dashboard_page" name="dashboard_page.dart">
+            <ownedAttribute name="DashboardPage"/>
+            <ownedAttribute name="displays key metrics"/>
+            <ownedComment>
+              <body>Page d'accueil avec métriques clés</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_selected_metrics" name="selected_metrics.dart">
+            <ownedAttribute name="selectedMetricsProvider"/>
+            <ownedComment>
+              <body>État des métriques sélectionnées</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_metric_tile" name="metric_tile.dart">
+            <ownedAttribute name="MetricTile (widget)"/>
+            <ownedComment>
+              <body>Widget pour afficher une métrique</body>
+            </ownedComment>
+          </packagedElement>
+        </packagedElement>
+
+        <!-- Charts Feature -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_charts_feature" name="Charts Feature">
+          <packagedElement xmi:type="uml:Class" xmi:id="class_chart_page" name="chart_page.dart">
+            <ownedAttribute name="ChartsPage"/>
+            <ownedAttribute name="displays wind/performance charts"/>
+            <ownedComment>
+              <body>Page affichant les graphiques de vent et performance</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_course_canvas" name="course_canvas.dart">
+            <ownedAttribute name="CourseCanvas (CustomPainter)"/>
+            <ownedAttribute name="draws route on canvas"/>
+            <ownedComment>
+              <body>Widget de dessin pour la route (Canvas)</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_course_menu" name="course_menu.dart">
+            <ownedAttribute name="CourseMenu"/>
+            <ownedAttribute name="interactive menu"/>
+            <ownedComment>
+              <body>Menu interactif pour la gestion de route</body>
+            </ownedComment>
+          </packagedElement>
+        </packagedElement>
+
+        <!-- Analysis Feature -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_analysis" name="Analysis Feature">
+          <packagedElement xmi:type="uml:Class" xmi:id="class_analysis_page" name="analysis_page.dart">
+            <ownedAttribute name="AnalysisPage"/>
+            <ownedAttribute name="displays detailed analysis"/>
+            <ownedComment>
+              <body>Page d'analyse détaillée des données</body>
+            </ownedComment>
+          </packagedElement>
+
+          <packagedElement xmi:type="uml:Class" xmi:id="class_analysis_filters" name="analysis_filters.dart">
+            <ownedAttribute name="AnalysisFilters"/>
+            <ownedComment>
+              <body>Filtres pour l'analyse</body>
+            </ownedComment>
+          </packagedElement>
+        </packagedElement>
+
+        <!-- Alarms Feature -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_alarms" name="Alarms Feature">
+          <packagedElement xmi:type="uml:Class" xmi:id="class_alarms_page" name="alarms_page.dart">
+            <ownedAttribute name="AlarmsPage"/>
+            <ownedAttribute name="displays alerts"/>
+            <ownedComment>
+              <body>Page des alarmes et alertes</body>
+            </ownedComment>
+          </packagedElement>
+        </packagedElement>
+
+        <!-- Settings Feature -->
+        <packagedElement xmi:type="uml:Package" xmi:id="pkg_settings" name="Settings Feature">
+          <packagedElement xmi:type="uml:Class" xmi:id="class_settings_page" name="settings_page.dart">
+            <ownedAttribute name="SettingsPage"/>
+            <ownedAttribute name="theme, language, etc."/>
+            <ownedComment>
+              <body>Page des paramètres utilisateur</body>
+            </ownedComment>
+          </packagedElement>
+        </packagedElement>
+      </packagedElement>
+
+      <!-- ================================================================
+           DEPENDENCIES & RELATIONSHIPS
+           ================================================================ -->
+      <packagedElement xmi:type="uml:Package" xmi:id="pkg_dependencies" name="Dependencies">
+
+        <!-- main.dart depends on -->
+        <packagedElement xmi:type="uml:Dependency" xmi:id="dep_main_to_router" name="uses">
+          <ownedComment>
+            <body>main.dart uses router.dart (GoRouter)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Dependency" xmi:id="dep_main_to_theme" name="uses">
+          <ownedComment>
+            <body>main.dart uses app_theme.dart (Theme)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <!-- router.dart depends on -->
+        <packagedElement xmi:type="uml:Dependency" xmi:id="dep_router_to_shell" name="uses">
+          <ownedComment>
+            <body>router.dart uses app_shell.dart (ShellRoute)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <!-- Features depend on Providers -->
+        <packagedElement xmi:type="uml:Dependency" xmi:id="dep_features_to_providers" name="uses">
+          <ownedComment>
+            <body>All features depend on Providers (watch/read)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <!-- Providers depend on Domain/Data -->
+        <packagedElement xmi:type="uml:Dependency" xmi:id="dep_providers_to_domain" name="uses">
+          <ownedComment>
+            <body>Providers use Domain Services (Calculators, Analyzers)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Dependency" xmi:id="dep_providers_to_data" name="uses">
+          <ownedComment>
+            <body>Providers use Data Layer (TelemetryBus, Repositories)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <!-- Domain/Data relationships -->
+        <packagedElement xmi:type="uml:Dependency" xmi:id="dep_services_to_models" name="uses">
+          <ownedComment>
+            <body>Services use Domain Models (Boat, Course, PolarTable)</body>
+          </ownedComment>
+        </packagedElement>
+
+        <packagedElement xmi:type="uml:Dependency" xmi:id="dep_data_to_domain" name="implements">
+          <ownedComment>
+            <body>Data Layer implements Domain abstractions (TelemetryBus)</body>
+          </ownedComment>
+        </packagedElement>
+
+      </packagedElement>
+
+    </packagedElement>
+
+    <!-- ====================================================================
+         ARCHITECTURE FLOW DIAGRAM (Textual - see notes)
+         ==================================================================== -->
+    <packagedElement xmi:type="uml:Comment" xmi:id="comment_architecture" name="Architecture Flow">
+      <body>
+        ┌─────────────────────────────────────────────────────────────────────┐
+        │                    KORNOG FLUTTER APP - LAYERS                      │
+        ├─────────────────────────────────────────────────────────────────────┤
+        │                                                                     │
+        │  1. ENTRY POINT (main.dart)                                         │
+        │     ↓ initializes ProviderScope                                    │
+        │                                                                     │
+        │  2. APP SHELL (router.dart → app_shell.dart)                        │
+        │     ↓ sets up navigation structure                                 │
+        │                                                                     │
+        │  3. FEATURE PAGES                                                   │
+        │     ├── Dashboard (metrics display)                                 │
+        │     ├── Charts (wind/performance visualization)                     │
+        │     ├── Analysis (detailed analysis)                                │
+        │     ├── Alarms (alerts)                                             │
+        │     └── Settings (user preferences)                                 │
+        │     ↑ all watch Providers                                           │
+        │                                                                     │
+        │  4. PROVIDERS (Riverpod State Management)                           │
+        │     ├── app_providers: telemetryBus, windSample                    │
+        │     ├── wind_trend_provider: wind analysis                         │
+        │     ├── route_plan_provider: routing                               │
+        │     ├── tactics_providers: recommendations                         │
+        │     ├── polar_providers: boat performance                          │
+        │     └── course_providers: route history                            │
+        │     ↑ all use Domain Services                                       │
+        │                                                                     │
+        │  5. DOMAIN LAYER (Business Logic)                                   │
+        │     ├── Models: Boat, Course, PolarTable, GeographicPosition      │
+        │     └── Services:                                                   │
+        │         ├── VMCCalculator: speed calculations                      │
+        │         ├── RoutingCalculator: optimal route                       │
+        │         ├── WindTrendAnalyzer: wind trends                         │
+        │         ├── AdoRefusStrategy: tack recommendations                 │
+        │         ├── PolarParser: load performance data                     │
+        │         └── PolairePort: export/import                             │
+        │     ↑ uses Data Layer                                               │
+        │                                                                     │
+        │  6. DATA LAYER (Datasources & Repositories)                         │
+        │     ├── Telemetry:                                                  │
+        │     │   ├── TelemetryBus (abstract interface)                      │
+        │     │   └── FakeTelemetryBus (simulated for testing)               │
+        │     ├── Maps:                                                       │
+        │     │   └── MapRepository (tile management)                        │
+        │     └── Config:                                                     │
+        │         └── WindTestConfig (wind simulation params)                 │
+        │                                                                     │
+        │  7. EXTERNAL (Flutter/Riverpod)                                     │
+        │     ├── flutter_riverpod: reactive state management                │
+        │     ├── go_router: navigation                                      │
+        │     └── flutter_material: UI components                            │
+        │                                                                     │
+        └─────────────────────────────────────────────────────────────────────┘
+
+        FLOW:
+        User Action → Feature Page → watches Provider(s)
+                                   ↓
+                            Provider computes
+                              using Services
+                                   ↓
+                            Services use Models
+                                   ↓
+                            Data Layer fetches/simulates data
+                                   ↓
+                            Result flows back to UI
+      </body>
+    </packagedElement>
+
+  </XMI.content>
+</XMI>

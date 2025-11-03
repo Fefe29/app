@@ -1,9 +1,7 @@
 // FLUTTER & DART
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,15 +14,12 @@ import '../../../charts/domain/services/routing_calculator.dart';
 import '../../../charts/domain/services/wind_trend_analyzer.dart';
 import '../../domain/models/course.dart';
 import '../../domain/models/geographic_position.dart';
-import '../../providers/coordinate_system_provider.dart';
 import '../../providers/mercator_coordinate_system_provider.dart';
-import 'coordinate_system_config.dart';
 import '../../../../data/datasources/maps/providers/map_providers.dart';
 import '../../../../data/datasources/maps/models/map_tile_set.dart';
 import '../../../../data/datasources/maps/models/map_layers.dart';
 import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart';
 import 'multi_layer_tile_painter.dart';
-import 'tile_image_service.dart';
 import 'package:kornog/common/providers/app_providers.dart';
 import 'zoom_button.dart';
 // -------------------------
@@ -416,30 +411,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     final rad = lat * math.pi / 180.0;
     return ((1.0 - math.log(math.tan(rad) + 1.0 / math.cos(rad)) / math.pi) / 2.0 * (1 << zoom)).floor();
   }
-
-  // ------ Anciennes fonctions de test direct conservées au besoin ------
-  Future<List<LoadedTile>> _loadTilesForMap(MapTileSet map) async {
-    // ignore: avoid_print
-    print('TILES DEBUG - _loadTilesForMap: ${map.id}');
-  final container = ProviderScope.containerOf(context);
-  final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
-  final tiles = await TileImageService.preloadMapTiles(map.id, mapBasePath);
-    // ignore: avoid_print
-    print('TILES DEBUG - ${tiles.length} tuiles chargées pour ${map.id}');
-    return tiles;
-  }
-
-  Future<List<LoadedTile>> _loadTilesDirectly() async {
-    // ignore: avoid_print
-    print('TILES DEBUG - _loadTilesDirectly');
-  final container = ProviderScope.containerOf(context);
-  final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
-  const mapId = 'map_1759955517334_43.535_6.999';
-  final tiles = await TileImageService.preloadMapTiles(mapId, mapBasePath);
-    // ignore: avoid_print
-    print('TILES DEBUG - ${tiles.length} tuiles chargées directement');
-    return tiles;
-  }
 }
 
 /// ----------------------------------------
@@ -466,7 +437,6 @@ class _CoursePainter extends CustomPainter {
   final MercatorCoordinateSystemService mercatorService;
   final ViewTransform view;
 
-  static const double margin = 24.0; // logical px margin inside canvas
   static const double buoyRadius = 8.0;
 
   Offset _project(double x, double y, Size size) => view.project(x, y, size);
@@ -763,7 +733,6 @@ class _CoursePainter extends CustomPainter {
       case RouteLegType.finish:
         return 'Arrivée';
       case RouteLegType.leg:
-      default:
         return leg.label ?? '';
     }
   }
@@ -783,7 +752,6 @@ class _CoursePainter extends CustomPainter {
           text: Colors.purple.shade900,
         );
       case BuoyRole.regular:
-      default:
         return _RoleColors(
           background: Colors.amber.shade400,
           border: Colors.orange.shade700,
@@ -799,7 +767,6 @@ class _CoursePainter extends CustomPainter {
       case BuoyRole.target:
         return 'Vis';
       case BuoyRole.regular:
-      default:
         final base = 'B${b.id}';
         if (b.passageOrder != null) return '$base(${b.passageOrder})';
         return base;
@@ -905,38 +872,6 @@ class _CoursePainter extends CustomPainter {
         old.view.minY != view.minY || old.view.maxY != view.maxY ||
         old.view.scale != view.scale || old.view.offsetX != view.offsetX || old.view.offsetY != view.offsetY;
   }
-}
-
-/// Painter placeholder inchangé
-class _MapPlaceholderPainter extends CustomPainter {
-  const _MapPlaceholderPainter(this.coordinateService);
-  final CoordinateSystemService coordinateService;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.blue.withAlpha(100)..style = PaintingStyle.fill;
-    final borderPaint = Paint()..color = Colors.blue.withAlpha(180)..style = PaintingStyle.stroke..strokeWidth = 1;
-
-    for (int i = 0; i < 3; i++) {
-      for (int j = 0; j < 3; j++) {
-        final rect = Rect.fromLTWH(i * 256.0, j * 256.0, 256.0, 256.0);
-        if (rect.right > 0 && rect.bottom > 0 && rect.left < size.width && rect.top < size.height) {
-          canvas.drawRect(rect, paint);
-          canvas.drawRect(rect, borderPaint);
-        }
-      }
-    }
-
-    final textPainter = TextPainter(
-      text: const TextSpan(text: 'Chargement des tuiles...', style: TextStyle(color: Colors.white, fontSize: 16)),
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    textPainter.paint(canvas, Offset(20, size.height - 50));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _RoleColors {

@@ -166,8 +166,6 @@ class _MapDownloadDialogState extends ConsumerState<MapDownloadDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final courseBounds = ref.watch(courseBoundsProvider);
-    
     final maxDialogHeight = MediaQuery.of(context).size.height * 0.85;
     final dialogWidth = MediaQuery.of(context).size.width < 600 ? MediaQuery.of(context).size.width * 0.95 : 500.0;
     return Dialog(

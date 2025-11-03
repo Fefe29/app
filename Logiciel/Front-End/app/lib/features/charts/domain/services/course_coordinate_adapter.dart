@@ -1,18 +1,10 @@
 /// Migration adapter for converting between legacy coordinate system and geographic coordinates.
 /// This file helps maintain compatibility during the transition to geographic coordinates.
 import '../models/course.dart';
-import '../models/boat.dart';
 import '../models/geographic_position.dart';
-import '../../providers/coordinate_system_provider.dart';
-import '../../providers/course_providers.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Adapter for converting Course objects between coordinate systems
 class CourseCoordinateAdapter {
-  static final CoordinateConverter _defaultConverter = CoordinateConverter(
-    origin: const GeographicPosition(latitude: 43.5, longitude: 7.0), // Mediterranean default
-  );
-
   /// Convert legacy CourseState with x/y coordinates to geographic coordinates
   static CourseState legacyToGeographic(
     CourseState legacyCourse,

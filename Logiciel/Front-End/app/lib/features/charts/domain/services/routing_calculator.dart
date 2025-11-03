@@ -2,8 +2,6 @@ import 'dart:math' as math;
 import 'package:kornog/common/utils/angle_utils.dart';
 
 import '../../domain/models/course.dart';
-import '../../domain/models/geographic_position.dart';
-import '../../providers/coordinate_system_provider.dart';
 import '../../providers/mercator_coordinate_system_provider.dart';
 import 'wind_trend_analyzer.dart';
 
@@ -116,12 +114,6 @@ class RoutingCalculator {
       }
       return a.id.compareTo(b.id);
     });
-
-    // Bouée target (viseur)
-    final target = course.buoys.where((b) => b.role == BuoyRole.target).cast<Buoy?>().firstWhere(
-          (b) => true,
-          orElse: () => null,
-        );
 
     // Point de départ : côté optimal de la ligne de départ sinon première bouée
     double? curX;
@@ -426,7 +418,6 @@ class RoutingCalculator {
     
     final firstVec = startWithLeftTack ? v2 : v1;
     final firstHeading = startWithLeftTack ? h2 : h1;
-    final secondVec = startWithLeftTack ? v1 : v2;
     final secondHeading = startWithLeftTack ? h1 : h2;
     final firstTack = startWithLeftTack ? "Bâbord" : "Tribord";
     final secondTack = startWithLeftTack ? "Tribord" : "Bâbord";
@@ -488,7 +479,6 @@ class RoutingCalculator {
     // Vérifier l'angle du second bord
     final dx2 = ex - wp1x;
     final dy2 = ey - wp1y;
-    final distToTarget = math.sqrt(dx2 * dx2 + dy2 * dy2);
     final headingToTarget = math.atan2(dx2, dy2) * 180 / math.pi;
     final normalizedHeadingToTarget = headingToTarget < 0 ? headingToTarget + 360 : headingToTarget;
     final twaToTarget = signedDelta(windDir, normalizedHeadingToTarget).abs();
@@ -625,7 +615,6 @@ class RoutingCalculator {
     // Vérifier l'angle du second bord (même logique que pour le près)
     final dx2 = ex - wp1x;
     final dy2 = ey - wp1y;
-    final distToTarget = math.sqrt(dx2 * dx2 + dy2 * dy2);
     final headingToTarget = math.atan2(dx2, dy2) * 180 / math.pi;
     final normalizedHeadingToTarget = headingToTarget < 0 ? headingToTarget + 360 : headingToTarget;
     final twaToTarget = signedDelta(windDir, normalizedHeadingToTarget).abs();
@@ -671,6 +660,4 @@ class RoutingCalculator {
     print('JIBING DEBUG - Generated ${legs.length} legs (layline intersection method)');
     return legs;
   }
-
-  double _angleDiff(double a, double b) => ((a - b + 540) % 360) - 180; // legacy (kept for backward compat callers)
 }

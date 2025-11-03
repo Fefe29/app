@@ -1,6 +1,5 @@
 /// Central routing configuration.
 /// See ARCHITECTURE_DOCS.md (section: lib/app/router.dart).
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -51,19 +50,3 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-
-/// Page temporaire en attendant les vraies implémentations
-class _PlaceholderPage extends StatelessWidget {
-  final String label;
-  const _PlaceholderPage({super.key, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        label,
-        style: const TextStyle(fontSize: 22),
-      ),
-    );
-  }
-}

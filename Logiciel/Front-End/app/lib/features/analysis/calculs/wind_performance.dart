@@ -1,5 +1,4 @@
 /// Fonctions pour les indicateurs orientés performance (VMG, polaire, laylines dynamiques, etc.)
-import 'dart:math';
 
 /// Variation de VMG expliquée par le vent
 List<double> vmgChangeByWind(List<double> vmg, List<double> twd, List<double> tws) {

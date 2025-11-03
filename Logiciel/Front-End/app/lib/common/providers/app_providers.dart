@@ -4,7 +4,6 @@
 // File: lib/providers.dart
 // ------------------------------
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:async';
 
 import 'package:kornog/data/datasources/telemetry/telemetry_bus.dart';
 import 'package:kornog/domain/entities/telemetry.dart';

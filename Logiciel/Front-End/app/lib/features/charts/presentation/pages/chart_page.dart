@@ -41,7 +41,6 @@ class _HeaderStatus extends ConsumerWidget {
 	final dynamic table;
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
-		final wind = ref.watch(windSampleProvider);
 		final course = ref.watch(courseProvider);
 		final windTrend = ref.watch(windTrendSnapshotProvider);
 		final route = ref.watch(routePlanProvider);

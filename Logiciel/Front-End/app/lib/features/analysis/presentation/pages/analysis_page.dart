@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/analysis_filters.dart';
 import '../widgets/single_wind_metric_chart.dart';
-import '../widgets/wind_analysis_config.dart';
 import '../widgets/polar_chart.dart';
 import '../../domain/services/wind_history_service.dart';
 import 'dart:convert';
@@ -186,37 +185,6 @@ class AnalysisPage extends StatelessWidget {
           title: Text(title),
           subtitle: Text(subtitle),
           trailing: const Icon(Icons.show_chart),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAnalysisHeader(BuildContext context, {bool showDrawerButton = true}) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            const Icon(Icons.analytics, color: Colors.blue, size: 32),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Analyse du Vent en Temps Réel',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const Text(
-                    'Chaque graphique affiche l\'historique d\'une métrique spécifique',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-            // Plus de bouton drawer ici
-          ],
         ),
       ),
     );

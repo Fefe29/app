@@ -2,8 +2,6 @@
 /// Fournit l'accès au service de téléchargement et au repository de cartes.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'dart:io';
-import 'package:permission_handler/permission_handler.dart';
 import '../../../../common/kornog_data_directory.dart';
 
 import '../services/map_download_service.dart';

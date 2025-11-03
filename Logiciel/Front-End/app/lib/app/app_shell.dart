@@ -17,6 +17,7 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   bool get _isAnalysis => widget.location.startsWith('/analysis');
+  bool get _isSettings => widget.location.startsWith('/settings');
 
   int _indexFromLocation(String location) {
     if (location.startsWith('/charts')) return 1;
@@ -48,28 +49,30 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         children: [
           SafeArea(child: widget.child),
           // Floating settings button (smaller, white background, black icon)
-          Positioned(
-            top: 16,
-            right: 16,
-            child: Material(
-              color: Colors.transparent,
-              elevation: 4,
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => context.go('/settings'),
-                child: Ink(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
+          // Masqué si on est déjà sur la page settings
+          if (!_isSettings)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Material(
+                color: Colors.transparent,
+                elevation: 4,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => context.go('/settings'),
+                  child: Ink(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    width: 36,
+                    height: 36,
+                    child: const Icon(Icons.settings, color: Colors.black, size: 20),
                   ),
-                  width: 36,
-                  height: 36,
-                  child: const Icon(Icons.settings, color: Colors.black, size: 20),
                 ),
               ),
             ),
-          ),
         ],
       ),
 

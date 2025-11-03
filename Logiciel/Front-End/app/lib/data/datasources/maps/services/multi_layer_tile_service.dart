@@ -3,11 +3,8 @@ library;
 
 import 'dart:io';
 import 'dart:ui' as ui;
-import 'dart:typed_data';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/map_layers.dart';
-import '../models/map_tile_set.dart';
 
 class LayeredTile {
   const LayeredTile({
