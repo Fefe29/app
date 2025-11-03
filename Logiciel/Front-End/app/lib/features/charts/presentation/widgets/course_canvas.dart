@@ -22,6 +22,10 @@ import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart
 import 'multi_layer_tile_painter.dart';
 import 'package:kornog/common/providers/app_providers.dart';
 import 'zoom_button.dart';
+import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
+import '../../../../data/datasources/gribs/grib_painters.dart';
+import '../../../../data/datasources/gribs/grib_models.dart';
+import '../../providers/grib_layers_provider.dart';
 // -------------------------
 // Vue & projection partagées
 // -------------------------
@@ -96,6 +100,23 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     final mercatorService = ref.watch(mercatorCoordinateSystemProvider);
     final activeMap = ref.watch(activeMapProvider);
     final displayMaps = ref.watch(mapDisplayProvider);
+    
+    // GRIB providers
+    final gribGrid = ref.watch(currentGribGridProvider);
+    final gribOpacity = ref.watch(gribOpacityProvider);
+    final gribVmin = ref.watch(gribVminProvider);
+    final gribVmax = ref.watch(gribVmaxProvider);
+    final gribUGrid = ref.watch(currentGribUGridProvider);
+    final gribVGrid = ref.watch(currentGribVGridProvider);
+    final gribVisible = ref.watch(gribVisibilityProvider);
+
+    // Debug
+    if (gribGrid != null) {
+      print('[COURSE_CANVAS] GRIB Grid: ${gribGrid.nx}x${gribGrid.ny}, visible=$gribVisible');
+    }
+    if (gribUGrid != null || gribVGrid != null) {
+      print('[COURSE_CANVAS] GRIB Vectors: U=${gribUGrid != null}, V=${gribVGrid != null}, visible=$gribVisible');
+    }
 
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
       return Center(
@@ -264,6 +285,62 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                           );
                         }
                         return Center(child: Text('Chargement des tuiles...'));
+                      },
+                    ),
+                  // Couche GRIB si disponible
+                  if (gribGrid != null && gribVisible)
+                    IgnorePointer(
+                      child: Opacity(
+                        opacity: gribOpacity,
+                        child: CustomPaint(
+                          size: Size(constraints.maxWidth, constraints.maxHeight),
+                          painter: GribGridPainter(
+                            grid: gribGrid,
+                            vmin: gribVmin,
+                            vmax: gribVmax,
+                            projector: (lon, lat, size) {
+                              // Convertir lon/lat en coordonnées locales (Mercator)
+                              final geoPos = GeographicPosition(latitude: lat, longitude: lon);
+                              final localPos = mercatorService.toLocal(geoPos);
+                              // Puis en coordonnées écran via ViewTransform
+                              return view.project(localPos.x, localPos.y, size);
+                            },
+                            colorMapName: ColorMap.parula, // Utiliser parula au lieu de blueToRed
+                            opacity: gribOpacity,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Couche des flèches de vent/courant (vecteurs)
+                  if (gribUGrid != null && gribVGrid != null && gribVisible)
+                    Builder(
+                      builder: (_) {
+                        print('[COURSE_CANVAS] Affichage des vecteurs: U=${gribUGrid?.nx}x${gribUGrid?.ny}, V=${gribVGrid?.nx}x${gribVGrid?.ny}');
+                        return IgnorePointer(
+                          child: Opacity(
+                            opacity: gribOpacity * 0.9, // Légèrement plus transparent
+                            child: CustomPaint(
+                              size: Size(constraints.maxWidth, constraints.maxHeight),
+                              painter: GribVectorFieldPainter(
+                                uGrid: gribUGrid,
+                                vGrid: gribVGrid,
+                                vmin: 0.0,
+                                vmax: 20.0, // Vitesse max en m/s
+                                projector: (lon, lat, size) {
+                                  final geoPos = GeographicPosition(latitude: lat, longitude: lon);
+                                  final localPos = mercatorService.toLocal(geoPos);
+                                  return view.project(localPos.x, localPos.y, size);
+                                },
+                                opacity: gribOpacity * 0.9,
+                                samplingStride: 3, // Un vecteur tous les 3 points
+                                boundsMinX: view.minX,
+                                boundsMaxX: view.maxX,
+                                boundsMinY: view.minY,
+                                boundsMaxY: view.maxY,
+                              ),
+                            ),
+                          ),
+                        );
                       },
                     ),
                   RepaintBoundary(

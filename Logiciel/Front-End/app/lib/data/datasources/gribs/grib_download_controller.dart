@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'grib_downloader.dart';
 import 'package:http/http.dart' as http;
+import '../../../common/kornog_data_directory.dart';
 
 class GribDownloadState {
   final bool isLoading;
@@ -108,8 +109,7 @@ class GribDownloadController extends Notifier<GribDownloadState> {
     state = state.copyWith(isLoading: true, message: null);
 
     try {
-      final out = outDirOverride ??
-          Directory('lib/data/datasources/gribs/repositories');
+      final out = outDirOverride ?? await getGribDataDirectory();
 
       DateTime cycle = latestSynopticCycleUtc(DateTime.now().toUtc());
       // Pour GFS uniquement, on tente une sonde pour éviter 404 si run pas prêt

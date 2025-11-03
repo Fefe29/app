@@ -14,9 +14,9 @@ import '../../../../features/charts/providers/course_providers.dart';
 /// Provider pour le répertoire de stockage des cartes
 final mapStorageDirectoryProvider = FutureProvider<String>((ref) async {
   print('[KORNOG_PROVIDER] mapStorageDirectoryProvider: début');
-  print('[KORNOG_PROVIDER] Appel getKornogDataDirectory');
-  final dir = await getKornogDataDirectory();
-  print('[KORNOG_PROVIDER] getKornogDataDirectory OK: ${dir.path}');
+  print('[KORNOG_PROVIDER] Appel getMapDataDirectory');
+  final dir = await getMapDataDirectory();
+  print('[KORNOG_PROVIDER] getMapDataDirectory OK: ${dir.path}');
   return dir.path;
 });
 

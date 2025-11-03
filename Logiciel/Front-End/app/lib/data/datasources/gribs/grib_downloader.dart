@@ -4,7 +4,8 @@ import 'package:http/http.dart' as http;
 
 /// Variables dispo
 enum GribVariable {
-  wind10m,     // UGRD/VGRD à 10 m
+  wind10m,     // UGRD/VGRD à 10 m (force du vent)
+  windVectors, // Afficher les flèches directionnelles du vent
   mslp,        // PRMSL (niveau: mean sea level)
   windGust,    // GUST (surface)
   precip,      // APCP (surface)
