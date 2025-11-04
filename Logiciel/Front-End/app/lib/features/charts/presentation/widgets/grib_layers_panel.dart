@@ -21,7 +21,8 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
   GribModel? _selectedModel;
   int _days = 3;
   int _stepHours = 3;
-  double _leftLon = -12, _rightLon = 12, _bottomLat = 41, _topLat = 52;
+  // Méditerranée (France du sud): 5-9°E, 42-45°N
+  double _leftLon = 5, _rightLon = 9, _bottomLat = 42, _topLat = 45;
 
   @override
   void initState() {
