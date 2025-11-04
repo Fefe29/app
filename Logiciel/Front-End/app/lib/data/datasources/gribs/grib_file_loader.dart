@@ -94,10 +94,11 @@ class GribFileLoader {
         );
       }
 
-      // Si toujours rien, générer des données de test
+      // Si toujours rien, ERREUR - ne pas utiliser de données de test
       if (grid == null) {
-        print('[GRIB_LOADER] ⚠️  Aucun champ scalaire trouvé, utilisant données de test');
-        grid = _generateTestGrid();
+        print('[GRIB_LOADER] ❌ Aucun champ scalaire trouvé dans le GRIB');
+        print('[GRIB_LOADER] ℹ️  Vérifiez que cfgrib est installé: pip install cfgrib xarray');
+        return null;
       }
 
       if (grid != null) {
@@ -111,43 +112,6 @@ class GribFileLoader {
       print('[GRIB_LOADER] ❌ Erreur: $e');
       return null;
     }
-  }
-
-  /// Génère une grille de test avec variations évidentes
-  static ScalarGrid _generateTestGrid() {
-    final nx = 145;
-    final ny = 73;
-    final lon0 = -180.0;
-    final lat0 = -90.0;
-    final dlon = 2.5;
-    final dlat = 2.5;
-
-    final values = Float32List(nx * ny);
-    for (int iy = 0; iy < ny; iy++) {
-      for (int ix = 0; ix < nx; ix++) {
-        final lon = lon0 + ix * dlon;
-        final lat = lat0 + iy * dlat;
-        
-        // Créer des variations évidentes:
-        // - Augmente avec la latitude (0 au sud, 25 au nord)
-        // - Perturbations sinusoïdales
-        final baseWind = 10.0 + (lat + 90.0) / 180.0 * 15.0; // 10..25 m/s avec latitude
-        final perturbation = 5.0 * math.sin(lon * math.pi / 180.0) * math.cos(lat * math.pi / 360.0);
-        final value = baseWind + perturbation;
-        
-        values[iy * nx + ix] = value.clamp(0.0, 30.0).toDouble();
-      }
-    }
-
-    return ScalarGrid(
-      nx: nx,
-      ny: ny,
-      lon0: lon0,
-      lat0: lat0,
-      dlon: dlon,
-      dlat: dlat,
-      values: values,
-    );
   }
 
   /// Charge les composantes U et V (Est et Nord) du vent/courant
@@ -196,8 +160,8 @@ class GribFileLoader {
         
         return (uGrid, vGrid);
       } else {
-        print('[GRIB_VECTORS] ⚠️  Impossible de parser le GRIB');
-        print('[GRIB_VECTORS] ℹ️  Vérifiez que wgrib2 est installé: sudo apt-get install wgrib2');
+        print('[GRIB_VECTORS] ❌ Échec du chargement des vecteurs depuis le GRIB');
+        print('[GRIB_VECTORS] ℹ️  Vérifiez que cfgrib/xarray est installé: pip install cfgrib xarray');
         return (null, null);
       }
     } catch (e) {

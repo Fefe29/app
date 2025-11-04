@@ -8,6 +8,14 @@ import 'grib_models.dart';
 class GribConverter {
   /// Chemin du script Python de parsing
   static const String _pythonScriptName = 'parse_grib.py';
+  
+  /// Chemins Python pour trouver cfgrib/xarray
+  static String _getPythonPaths() {
+    final homeDir = Platform.environment['HOME'] ?? '/home/fefe';
+    return '$homeDir/.local/lib/python3.12/site-packages:'
+           '/var/data/python/lib/python3.13/site-packages:'
+           '/app/lib/python3.13/site-packages';
+  }
 
   /// Obtient le chemin absolu du script Python
   static String _getScriptPath() {
@@ -20,11 +28,19 @@ class GribConverter {
   /// Crée un Map d'environment avec PYTHONPATH pour les subprocesses
   static Map<String, String> _getEnvWithPythonPath() {
     final env = Map<String, String>.from(Platform.environment);
-    final pythonPath = '/var/data/python/lib/python3.13/site-packages';
+    // Ajouter tous les chemins Python standards
+    final pythonPaths = [
+      '/var/data/python/lib/python3.13/site-packages',
+      '/app/lib/python3.13/site-packages',
+      '/usr/lib/python3.13/site-packages',
+      '/usr/lib/python3.13',
+    ];
+    final newPythonPath = pythonPaths.join(':');
+    
     if (env.containsKey('PYTHONPATH')) {
-      env['PYTHONPATH'] = '${env['PYTHONPATH']}:$pythonPath';
+      env['PYTHONPATH'] = '${env['PYTHONPATH']}:$newPythonPath';
     } else {
-      env['PYTHONPATH'] = pythonPath;
+      env['PYTHONPATH'] = newPythonPath;
     }
     return env;
   }
@@ -42,19 +58,41 @@ class GribConverter {
   /// Vérifie si eccodes est disponible via pip
   static Future<bool> isEccodesAvailable() async {
     try {
-      // Essayer d'importer eccodes avec les options de verbosité réduites
+      // Test avec cfgrib+xarray en gardant tout l'environnement
+      print('[GRIB_CONVERTER] Testing cfgrib availability...');
+      
+      final env = Map<String, String>.from(Platform.environment);
+      final pythonPaths = _getPythonPaths();
+      if (env.containsKey('PYTHONPATH')) {
+        env['PYTHONPATH'] = '${env['PYTHONPATH']}:$pythonPaths';
+      } else {
+        env['PYTHONPATH'] = pythonPaths;
+      }
+      
+      // DEBUG: afficher le sys.path que Python voit
+      final pathResult = await Process.run(
+        '/usr/bin/python3',
+        ['-c', 'import sys; print("\\n".join(sys.path))'],
+        environment: env,
+      );
+      print('[GRIB_CONVERTER] Python sys.path:\n${pathResult.stdout}');
+      
       final result = await Process.run(
-        'python3',
-        ['-c', 'import eccodes; import cfgrib; print("1")'],
-        environment: _getEnvWithPythonPath(),
+        '/usr/bin/python3',
+        ['-c', 'import cfgrib; import xarray; print("1")'],
+        environment: env,
       );
       final success = result.exitCode == 0 && result.stdout.toString().contains('1');
-      if (!success) {
-        print('[GRIB_CONVERTER] DEBUG isEccodesAvailable: exit=${result.exitCode}, stdout=${result.stdout}, stderr=${result.stderr}');
+      if (success) {
+        print('[GRIB_CONVERTER] ✅ cfgrib+xarray disponible');
+      } else {
+        print('[GRIB_CONVERTER] ⚠️ cfgrib not available');
+        print('[GRIB_CONVERTER] stderr: ${result.stderr}');
+        print('[GRIB_CONVERTER] PYTHONPATH in env: ${env['PYTHONPATH']}');
       }
       return success;
     } catch (e) {
-      print('[GRIB_CONVERTER] DEBUG isEccodesAvailable exception: $e');
+      print('[GRIB_CONVERTER] Exception testing: $e');
       return false;
     }
   }
@@ -86,15 +124,23 @@ class GribConverter {
         return (null, null);
       }
 
-      print('[GRIB_CONVERTER] � Extraction des données U/V avec eccodes...');
+      print('[GRIB_CONVERTER] ✅ Extraction des données U/V avec parse_grib.py...');
+
+      // Préparer l'environnement: garder TOUT et ajouter PYTHONPATH
+      final env = Map<String, String>.from(Platform.environment);
+      final pythonPaths = _getPythonPaths();
+      if (env.containsKey('PYTHONPATH')) {
+        env['PYTHONPATH'] = '${env['PYTHONPATH']}:$pythonPaths';
+      } else {
+        env['PYTHONPATH'] = pythonPaths;
+      }
 
       // Étape 2 : Appeler le script Python pour extraire U
       print('[GRIB_CONVERTER] 📍 Extraction U (UGRD)...');
       final uResult = await Process.run(
-        'python3',
+        '/usr/bin/python3',
         [_getScriptPath(), gribFile.path, 'U'],
-        runInShell: false,
-        environment: _getEnvWithPythonPath(),
+        environment: env,
       );
 
       if (uResult.exitCode != 0) {
@@ -105,10 +151,9 @@ class GribConverter {
       // Étape 3 : Appeler le script Python pour extraire V
       print('[GRIB_CONVERTER] 📍 Extraction V (VGRD)...');
       final vResult = await Process.run(
-        'python3',
+        '/usr/bin/python3',
         [_getScriptPath(), gribFile.path, 'V'],
-        runInShell: false,
-        environment: _getEnvWithPythonPath(),
+        environment: env,
       );
 
       if (vResult.exitCode != 0) {
@@ -265,19 +310,27 @@ class GribConverter {
 
       print('[GRIB_CONVERTER] 📖 Extraction scalaire: $fieldName');
 
-      // Vérifier eccodes
+      // Vérifier cfgrib
       final hasEccodes = await isEccodesAvailable();
       if (!hasEccodes) {
-        print('[GRIB_CONVERTER] ⚠️  eccodes non disponible pour extraction scalaire');
+        print('[GRIB_CONVERTER] ⚠️  cfgrib non disponible pour extraction scalaire');
         return null;
+      }
+
+      // Préparer l'environnement: garder TOUT et ajouter PYTHONPATH
+      final env = Map<String, String>.from(Platform.environment);
+      final pythonPaths = _getPythonPaths();
+      if (env.containsKey('PYTHONPATH')) {
+        env['PYTHONPATH'] = '${env['PYTHONPATH']}:$pythonPaths';
+      } else {
+        env['PYTHONPATH'] = pythonPaths;
       }
 
       // Appeler le script Python
       final result = await Process.run(
-        'python3',
+        '/usr/bin/python3',
         [_getScriptPath(), gribFile.path, 'SCALAR', fieldName],
-        runInShell: false,
-        environment: _getEnvWithPythonPath(),
+        environment: env,
       );
 
       if (result.exitCode != 0) {

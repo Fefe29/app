@@ -189,24 +189,23 @@ class GribVectorFieldPainter extends CustomPainter {
         _drawArrow(canvas, p0, p1, paint);
       }
     } else {
-      print('[GRIB_VECTORS_PAINTER] 📌 Mode GRILLE GFS FILTRÉE: affichage des flèches visibles');
+      print('[GRIB_VECTORS_PAINTER] 📌 Mode LEGACY (STRIDE): affichage avec samplingStride=$samplingStride');
       
-      // Adapter le stride pour avoir ~targetVectorCount flèches au total
-      // (la plupart seront filtrées hors-bounds)
-      final totalPoints = uGrid.nx * uGrid.ny;
-      final adaptiveStride = math.max(1, (math.sqrt(totalPoints / (targetVectorCount! * 2 + 1))).ceil());
+      // Utiliser le samplingStride classique en mode legacy
+      final effectiveStride = samplingStride;
       
-      print('[GRIB_VECTORS_PAINTER] 🎯 Grille ${uGrid.nx}x${uGrid.ny}, stride=$adaptiveStride, cible ~${targetVectorCount} visibles');
+      print('[GRIB_VECTORS_PAINTER] 🎯 Grille ${uGrid.nx}x${uGrid.ny}, stride=$effectiveStride');
       print('[GRIB_VECTORS_PAINTER] Bounds écran: X=[${boundsMinX}, ${boundsMaxX}], Y=[${boundsMinY}, ${boundsMaxY}]');
       
       double minMagVisibles = double.infinity;
       double maxMagVisibles = double.negativeInfinity;
       int pointsInBounds = 0;
       int pointsOutOfBounds = 0;
+      bool firstPointLogged = false;
       
       // Parcourir la grille GFS avec stride
-      for (int iy = 0; iy < uGrid.ny; iy += adaptiveStride) {
-        for (int ix = 0; ix < uGrid.nx; ix += adaptiveStride) {
+      for (int iy = 0; iy < uGrid.ny; iy += effectiveStride) {
+        for (int ix = 0; ix < uGrid.nx; ix += effectiveStride) {
           final u = uGrid.valueAtIndex(ix, iy);
           final v = vGrid.valueAtIndex(ix, iy);
 
@@ -218,17 +217,22 @@ class GribVectorFieldPainter extends CustomPainter {
           // Projeter le point
           final p0 = projector(lon, lat, size);
           
-          if (p0.dx.isNaN || p0.dy.isNaN || p0.dx.isInfinite || p0.dy.isInfinite) continue;
+          // Log premier point pour debug
+          if (!firstPointLogged) {
+            print('[GRIB_VECTORS_PAINTER] 📍 Premier point GRIB: lon=$lon, lat=$lat → canvas=(${p0.dx}, ${p0.dy})');
+            print('[GRIB_VECTORS_PAINTER] 📍 Canvas size: ${size.width}x${size.height}');
+            firstPointLogged = true;
+          }
           
-          // FILTRER PAR BOUNDS: ne garder que les flèches visibles
-          final inBoundsX = boundsMinX != null && boundsMaxX != null 
-            ? (p0.dx >= boundsMinX! && p0.dx <= boundsMaxX!)
-            : true;
-          final inBoundsY = boundsMinY != null && boundsMaxY != null 
-            ? (p0.dy >= boundsMinY! && p0.dy <= boundsMaxY!)
-            : true;
-            
-          if (!inBoundsX || !inBoundsY) {
+          if (p0.dx.isNaN || p0.dy.isNaN || p0.dx.isInfinite || p0.dy.isInfinite) {
+            arrowsInvalid++;
+            continue;
+          }
+          
+          // Filtrer par zone visible du canvas (avec marge raisonnable)
+          const margin = 100.0;
+          if (p0.dx < -margin || p0.dx > size.width + margin ||
+              p0.dy < -margin || p0.dy > size.height + margin) {
             pointsOutOfBounds++;
             continue;
           }

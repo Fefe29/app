@@ -163,6 +163,24 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
             maxY = math.max(maxY, o.dy);
           }
         }
+        
+        // 🆕 ÉTENDRE LES BOUNDS POUR INCLURE LA ZONE GRIB SI CHARGÉE
+        if (gribGrid != null) {
+          // Convertir les 4 coins du GRIB en coordonnées locales
+          final gribCorners = [
+            GeographicPosition(latitude: gribGrid.lat0, longitude: gribGrid.lon0),
+            GeographicPosition(latitude: gribGrid.lat0, longitude: gribGrid.lon0 + (gribGrid.nx - 1) * gribGrid.dlon),
+            GeographicPosition(latitude: gribGrid.lat0 + (gribGrid.ny - 1) * gribGrid.dlat, longitude: gribGrid.lon0),
+            GeographicPosition(latitude: gribGrid.lat0 + (gribGrid.ny - 1) * gribGrid.dlat, longitude: gribGrid.lon0 + (gribGrid.nx - 1) * gribGrid.dlon),
+          ];
+          for (final corner in gribCorners) {
+            final l = mercatorService.toLocal(corner);
+            minX = math.min(minX, l.x);
+            maxX = math.max(maxX, l.x);
+            minY = math.min(minY, l.y);
+            maxY = math.max(maxY, l.y);
+          }
+        }
         // Fixe des bornes minimales et maximales pour éviter le reset ou la disparition
         const double minSpan = 100.0;
         const double maxSpan = 1000000.0;
