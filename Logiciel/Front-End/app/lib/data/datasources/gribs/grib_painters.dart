@@ -81,6 +81,7 @@ class GribVectorFieldPainter extends CustomPainter {
   final int samplingStride;
   final Offset Function(double, double, Size) projector;
   final double? boundsMinX, boundsMaxX, boundsMinY, boundsMaxY; // Bounds pour filtrer
+  final int? targetVectorCount; // Nouveau: nombre de vecteurs cible (remplace samplingStride si non-null)
 
   GribVectorFieldPainter({
     required this.uGrid,
@@ -94,94 +95,68 @@ class GribVectorFieldPainter extends CustomPainter {
     this.boundsMaxX,
     this.boundsMinY,
     this.boundsMaxY,
+    this.targetVectorCount, // 20 pour avoir ~20 vecteurs, null pour utiliser samplingStride
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (uGrid.nx <= 0 || uGrid.ny <= 0 || vGrid.nx <= 0 || vGrid.ny <= 0) return;
 
-    print('[GRIB_VECTORS_PAINTER] Début du paint - U:${uGrid.nx}x${uGrid.ny}, V:${vGrid.nx}x${vGrid.ny}');
-    print('[GRIB_VECTORS_PAINTER] Canvas size: ${size.width}x${size.height}');
-    if (boundsMinX != null && boundsMaxX != null && boundsMinY != null && boundsMaxY != null) {
-      print('[GRIB_VECTORS_PAINTER] Bounds locaux: X=[${boundsMinX!.toStringAsFixed(0)}..${boundsMaxX!.toStringAsFixed(0)}] m, Y=[${boundsMinY!.toStringAsFixed(0)}..${boundsMaxY!.toStringAsFixed(0)}] m');
-    }
-    print('[GRIB_VECTORS_PAINTER] Première flèche projetée: p0=(-4902161.7, 7016485.7) -> devrait être dans (0..${size.width}, 0..${size.height})');
-
+    print('[GRIB_VECTORS_PAINTER] 🎯 PAINT APPELÉ');
+    print('[GRIB_VECTORS_PAINTER] Mode: ${targetVectorCount != null ? 'INTERPOLÉ (cible=$targetVectorCount)' : 'LEGACY (stride=$samplingStride)'}');
+    print('[GRIB_VECTORS_PAINTER] Grilles: U=${uGrid.nx}x${uGrid.ny}, V=${vGrid.nx}x${vGrid.ny}');
+    print('[GRIB_VECTORS_PAINTER] Canvas: ${size.width}x${size.height}');
+    print('[GRIB_VECTORS_PAINTER] Bounds: X=[${boundsMinX?.toStringAsFixed(2) ?? "null"}, ${boundsMaxX?.toStringAsFixed(2) ?? "null"}], Y=[${boundsMinY?.toStringAsFixed(2) ?? "null"}, ${boundsMaxY?.toStringAsFixed(2) ?? "null"}]');
+    print('[GRIB_VECTORS_PAINTER] Lon/Lat: lon0=${uGrid.lon0}, lat0=${uGrid.lat0}, dlon=${uGrid.dlon}, dlat=${uGrid.dlat}');
 
     int arrowsDrawn = 0;
     int arrowsSkipped = 0;
     int arrowsInvalid = 0;
-    int arrowsInfinity = 0;
     double minMag = double.infinity;
     double maxMag = double.negativeInfinity;
 
-    // Sauter la première et dernière rangée (pôles) - projection Mercator impossible aux pôles
-    for (int iy = 1; iy < uGrid.ny - 1; iy += samplingStride) {
-      for (int ix = 0; ix < uGrid.nx; ix += samplingStride) {
-        final u = uGrid.valueAtIndex(ix, iy);
-        final v = vGrid.valueAtIndex(ix, iy);
+    // NOUVELLE APPROCHE: utiliser des points interpolés si targetVectorCount est défini
+    if (targetVectorCount != null && targetVectorCount! > 0) {
+      print('[GRIB_VECTORS_PAINTER] 📌 Mode INTERPOLÉ: génération de ${targetVectorCount} points...');
+      
+      // Générer une grille régulière de points interpolés
+      final gridPoints = uGrid.generateInterpolatedGridPoints(
+        targetVectorCount: targetVectorCount!,
+      );
 
-        if (u.isNaN || v.isNaN) continue;
+      print('[GRIB_VECTORS_PAINTER] Points interpolés générés: ${gridPoints.length}');
 
-        final lon = uGrid.lonFromIndex(ix);
-        final lat = uGrid.latFromIndex(iy);
+      for (final (lon, lat) in gridPoints) {
+        // Interpoler U et V à ce point
+        final u = uGrid.sampleAtLatLon(lat, lon);
+        final v = vGrid.sampleAtLatLon(lat, lon);
 
-        // FILTRAGE: Passer seulement les points dans les bounds locaux visibles
-        if (boundsMinX != null && boundsMaxX != null && boundsMinY != null && boundsMaxY != null) {
-          // Convertir lon/lat en Mercator local pour comparer avec bounds
-          // ATTENTION: ici on utilise une estimation simple (le service Mercator n'est pas accessible)
-          // Pour une meilleure approche, utiliser mercatorService.toLocal() dans course_canvas.dart
-          
-          // Approximation Mercator locale: ΔX ≈ Δlon * 111320 * cos(lat), ΔY ≈ Δlat * 111320
-          // Mais pour l'instant, on fait un simple filtre sur lon/lat
-          // (on suppose que si lon/lat est dans bounds géo approximatifs, il sera visible)
-          
-          // Les bounds sont en mètres Mercator, mais on peut les comparer à une enveloppe géo
-          // Pour cette démo, on filtre les points qui sont probablement hors écran
-          // (en supposant que le centre de la carte est autour de lon=50..100, lat=30..60)
-          
-          // Filtre simple: passer les points dans une "fenêtre" probable autour du centre
-          // Si minX/maxX correspondent au parcours (entre -1M et +2M mètres), 
-          // ça correspond à peu près à une zone côtière (pas le monde entier)
-          
-          // Pour être sûr, on projette d'abord et on vérifie après
-        }
-
-        // DEBUG: Log pour les premières flèches
-        if (arrowsDrawn < 3) {
-          print('[GRIB_VECTORS_PAINTER] lonFromIndex($ix)=$lon, latFromIndex($iy)=$lat');
-        }
-
-        final p0 = projector(lon, lat, size);
-        
-        // Vérifier que p0 est valide (pas NaN, pas Infinity)
-        if (p0.dx.isNaN || p0.dy.isNaN || p0.dx.isInfinite || p0.dy.isInfinite) {
-          if (arrowsDrawn < 3) {
-            print('[GRIB_VECTORS_PAINTER] p0 invalide: dx=${p0.dx}, dy=${p0.dy}');
-          }
-          arrowsInvalid++;
-          if (p0.dx.isInfinite || p0.dy.isInfinite) arrowsInfinity++;
+        if (u.isNaN || v.isNaN) {
+          arrowsSkipped++;
           continue;
         }
 
-        // FILTRAGE POST-PROJECTION: vérifier que p0 est dans les bounds écran
-        // Ajouter une marge pour les flèches qui dépassent légèrement
+        final p0 = projector(lon, lat, size);
+
+        // Vérifier validité
+        if (p0.dx.isNaN || p0.dy.isNaN || p0.dx.isInfinite || p0.dy.isInfinite) {
+          arrowsInvalid++;
+          continue;
+        }
+
+        // Filtrage post-projection
         const margin = 100.0;
         if (p0.dx < -margin || p0.dx > size.width + margin ||
             p0.dy < -margin || p0.dy > size.height + margin) {
           arrowsSkipped++;
-          if (arrowsDrawn < 5) {
-            print('[GRIB_VECTORS_PAINTER] Flèche hors écran: p0=(${p0.dx.toStringAsFixed(1)}, ${p0.dy.toStringAsFixed(1)}), bounds=(0..${size.width}, 0..${size.height})');
-          }
           continue;
         }
 
         final mag = math.sqrt(u * u + v * v);
-        
-        // Track magnitude statistics
+
         if (mag < minMag) minMag = mag;
         if (mag > maxMag) maxMag = mag;
-        
+
         if (mag < 0.1) {
           arrowsSkipped++;
           continue;
@@ -189,36 +164,94 @@ class GribVectorFieldPainter extends CustomPainter {
 
         arrowsDrawn++;
 
-        const arrowScale = 80.0; // Augmenté pour bien voir les flèches
-        final u_scaled = (u / mag) * arrowScale;
-        final v_scaled = (v / mag) * arrowScale;
+        const arrowScale = 80.0;
+        final uScaled = (u / mag) * arrowScale;
+        final vScaled = (v / mag) * arrowScale;
 
-        final p1 = Offset(p0.dx + u_scaled, p0.dy - v_scaled);
-        
-        // Vérifier que p1 est aussi valide
+        final p1 = Offset(p0.dx + uScaled, p0.dy - vScaled);
+
         if (p1.dx.isNaN || p1.dy.isNaN) {
           arrowsInvalid++;
           continue;
         }
 
-        // Couleur rouge pour bien voir les vecteurs
         final paint = Paint()
-          ..strokeWidth = 3.0 // Plus épais pour être visible
+          ..strokeWidth = 6.0 // TRÈS ÉPAIS pour être visible
           ..strokeCap = StrokeCap.round
-          ..color = Colors.red.withOpacity(opacity);
-
-        // Debug: afficher les 5 premières flèches
-        if (arrowsDrawn <= 5) {
-          print('[GRIB_VECTORS_PAINTER] Flèche #$arrowsDrawn: p0=(${p0.dx.toStringAsFixed(1)}, ${p0.dy.toStringAsFixed(1)}), p1=(${p1.dx.toStringAsFixed(1)}, ${p1.dy.toStringAsFixed(1)}), mag=${mag.toStringAsFixed(2)} m/s');
-        }
+          ..color = Colors.cyan; // CYAN opaque, très visible sur vert
 
         _drawArrow(canvas, p0, p1, paint);
       }
+    } else {
+      print('[GRIB_VECTORS_PAINTER] 📌 Mode LEGACY (stride): parcours de la grille...');
+      
+      // DEBUG: Afficher les 5 premiers points de la grille
+      print('[GRIB_VECTORS_PAINTER] DEBUG: Premiers points bruts de la grille U/V:');
+      for (int i = 0; i < 5 && i < uGrid.nx * uGrid.ny; i++) {
+        final iy = (i ~/ uGrid.nx);
+        final ix = (i % uGrid.nx);
+        final u = uGrid.valueAtIndex(ix, iy);
+        final v = vGrid.valueAtIndex(ix, iy);
+        final lon = uGrid.lonFromIndex(ix);
+        final lat = uGrid.latFromIndex(iy);
+        print('[GRIB_VECTORS_PAINTER]   #$i: [$ix,$iy] ($lon,$lat) u=$u v=$v');
+      }
+      
+      // ANCIENNE APPROCHE: utiliser samplingStride
+      // SIMPLIFIÉ: Afficher les flèches dans un petit carré au centre, sans projections
+      print('[GRIB_VECTORS_PAINTER] 🎯 MODE SIMPLIFIÉ: Affichage des vecteurs directement au centre');
+      
+      final centerX = size.width * 0.5;
+      final centerY = size.height * 0.5;
+      final gridSize = 200.0; // Taille du carré
+      
+      // Parcourir la grille U/V et afficher les points dans le carré
+      int pointIdx = 0;
+      for (int iy = 0; iy < uGrid.ny; iy += samplingStride) {
+        for (int ix = 0; ix < uGrid.nx; ix += samplingStride) {
+          final u = uGrid.valueAtIndex(ix, iy);
+          final v = vGrid.valueAtIndex(ix, iy);
+
+          if (u.isNaN || v.isNaN) {
+            continue;
+          }
+
+          // Normaliser les indices (0-1)
+          final normX = ix / (uGrid.nx - 1);
+          final normY = iy / (uGrid.ny - 1);
+          
+          // Mapper au carré centré
+          final x = centerX - gridSize/2 + normX * gridSize;
+          final y = centerY - gridSize/2 + normY * gridSize;
+          
+          final mag = math.sqrt(u * u + v * v);
+          
+          if (mag < 0.01) continue;
+          
+          arrowsDrawn++;
+          
+          // Tracer la flèche
+          const arrowScale = 30.0;
+          final uScaled = (u / mag.clamp(1, double.infinity)) * arrowScale;
+          final vScaled = (v / mag.clamp(1, double.infinity)) * arrowScale;
+          
+          final p0 = Offset(x, y);
+          final p1 = Offset(x + uScaled, y - vScaled);
+          
+          final paint = Paint()
+            ..strokeWidth = 2.0
+            ..strokeCap = StrokeCap.round
+            ..color = Colors.cyan;
+          
+          _drawArrow(canvas, p0, p1, paint);
+          pointIdx++;
+        }
+      }
     }
-    
-    print('[GRIB_VECTORS_PAINTER] Flèches dessinées: $arrowsDrawn, skippées: $arrowsSkipped (trop petites), invalides: $arrowsInvalid (dont $arrowsInfinity avec Infinity)');
+
+    print('[GRIB_VECTORS_PAINTER] ✅ RÉSULTAT: $arrowsDrawn dessinées, $arrowsSkipped skippées, $arrowsInvalid invalides');
     if (minMag != double.infinity) {
-      print('[GRIB_VECTORS_PAINTER] Magnitude: $minMag à $maxMag m/s (threshold: 0.1)');
+      print('[GRIB_VECTORS_PAINTER] Magnitude: $minMag à $maxMag m/s');
     }
   }
 
@@ -266,10 +299,11 @@ class GribVectorFieldPainter extends CustomPainter {
         oldDelegate.vmin != vmin ||
         oldDelegate.vmax != vmax ||
         oldDelegate.opacity != opacity ||
-        oldDelegate.samplingStride != samplingStride;
+        oldDelegate.samplingStride != samplingStride ||
+        oldDelegate.targetVectorCount != targetVectorCount;
     
     if (needsRepaint) {
-      print('[GRIB_VECTORS_PAINTER] shouldRepaint=true (grids changed)');
+      print('[GRIB_VECTORS_PAINTER] shouldRepaint=true');
     }
     
     return needsRepaint;

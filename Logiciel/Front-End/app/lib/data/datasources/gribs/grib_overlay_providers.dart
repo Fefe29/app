@@ -96,6 +96,22 @@ final gribVmaxProvider = NotifierProvider<GribVmaxNotifier, double>(
   GribVmaxNotifier.new,
 );
 
+/// Notifier pour le nombre de vecteurs à afficher (mode interpolation)
+/// Si null, utilise samplingStride (mode legacy)
+/// Si défini (ex: 20), affiche ~20 vecteurs interpolés uniformément
+class GribVectorCountNotifier extends Notifier<int?> {
+  @override
+  int? build() => null; // null = mode stride, sinon nombre de vecteurs cible (DÉMARRE EN MODE LEGACY)
+
+  void setCount(int? count) => state = count;
+  void setInterpolated(int count) => state = count;
+  void setLegacy() => state = null;
+}
+
+final gribVectorCountProvider = NotifierProvider<GribVectorCountNotifier, int?>(
+  GribVectorCountNotifier.new,
+);
+
 /// Notifier pour les variables GRIB à afficher
 class GribVariablesNotifier extends Notifier<Set<GribVariable>> {
   @override
@@ -144,4 +160,19 @@ class AutoLoadGribGridNotifier extends AsyncNotifier<void> {
 
 final autoLoadGribGridProvider = AsyncNotifierProvider<AutoLoadGribGridNotifier, void>(
   AutoLoadGribGridNotifier.new,
+);
+
+/// Notifier pour l'heure de prévision GRIB actuelle (en heures)
+/// Par défaut: 0 = analyse (ou .anl ou .f000)
+/// Valeurs possibles: 0, 3, 6, 9, 12, 15, 18, 21, 24, ... 72
+class GribForecastHourNotifier extends Notifier<int> {
+  @override
+  int build() => 0; // Démarrer à l'analyse
+
+  void setForecastHour(int hour) => state = hour;
+  void incrementHour(int delta) => state = (state + delta).clamp(0, 72);
+}
+
+final gribForecastHourProvider = NotifierProvider<GribForecastHourNotifier, int>(
+  GribForecastHourNotifier.new,
 );

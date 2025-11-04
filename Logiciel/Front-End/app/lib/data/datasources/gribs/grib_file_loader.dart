@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:math' as math;
 import 'grib_models.dart';
 import 'grib_downloader.dart';
+import 'grib_converter.dart';
 import '../../../common/kornog_data_directory.dart';
 
 /// Service pour charger et parser les fichiers GRIB
@@ -66,56 +67,92 @@ class GribFileLoader {
     }
   }
 
-  /// Simule le chargement d'une grille scalaire depuis un fichier GRIB
-  /// ATTENTION: C'est une SIMULATION. Pour un vrai parsing, il faudrait eccodes ou similaire.
+  /// Charge une grille scalaire depuis un fichier GRIB
+  /// 🆕 Utilise wgrib2 pour parser les vraies données
   static Future<ScalarGrid?> loadGridFromGribFile(
     File gribFile, {
     GribVariable? variable,
   }) async {
-    // TODO: Implémenter le vrai parsing GRIB avec eccodes
-    // Pour l'instant, on retourne une grille de démo
-    
     try {
-      // Vérifier que le fichier existe
       if (!gribFile.existsSync()) return null;
 
-      // Grille de démo pour tester
-      final nx = 145;
-      final ny = 73;
-      final lon0 = -180.0;
-      final lat0 = -90.0;
-      final dlon = 2.5;
-      final dlat = 2.5;
+      print('[GRIB_LOADER] 📖 Parsing: ${gribFile.path}');
 
-      // Générer des données de test (sinusoïde)
-      final values = Float32List(nx * ny);
-      for (int iy = 0; iy < ny; iy++) {
-        for (int ix = 0; ix < nx; ix++) {
-          final lon = lon0 + ix * dlon;
-          final lat = lat0 + iy * dlat;
-          final value = math.sin(math.pi * lon / 180.0) * math.cos(math.pi * lat / 180.0);
-          values[iy * nx + ix] = (value * 10 + 15).toDouble(); // Vent: 5..25 m/s
-        }
+      // 🎯 UTILISER LE CONVERTISSEUR RÉEL - chercher la température ou la pression
+      // En priorité: température à 2m (pour heatmap)
+      ScalarGrid? grid = await GribConverter.extractScalarField(
+        gribFile,
+        fieldName: 'TMP:2 m',
+      );
+
+      // Si pas de température, chercher la pression au niveau mer
+      if (grid == null) {
+        print('[GRIB_LOADER] ℹ️  TMP:2 m non trouvé, essayant PRMSL...');
+        grid = await GribConverter.extractScalarField(
+          gribFile,
+          fieldName: 'PRMSL:mean sea level',
+        );
       }
 
-      return ScalarGrid(
-        nx: nx,
-        ny: ny,
-        lon0: lon0,
-        lat0: lat0,
-        dlon: dlon,
-        dlat: dlat,
-        values: values,
-      );
+      // Si toujours rien, générer des données de test
+      if (grid == null) {
+        print('[GRIB_LOADER] ⚠️  Aucun champ scalaire trouvé, utilisant données de test');
+        grid = _generateTestGrid();
+      }
+
+      if (grid != null) {
+        final (vmin, vmax) = grid.getValueBounds();
+        print('[GRIB_LOADER] ✅ Grille chargée: ${grid.nx}x${grid.ny}');
+        print('[GRIB_LOADER] Valeurs: $vmin à $vmax');
+      }
+
+      return grid;
     } catch (e) {
-      print('[GRIB] Erreur lors du chargement: $e');
+      print('[GRIB_LOADER] ❌ Erreur: $e');
       return null;
     }
   }
 
+  /// Génère une grille de test avec variations évidentes
+  static ScalarGrid _generateTestGrid() {
+    final nx = 145;
+    final ny = 73;
+    final lon0 = -180.0;
+    final lat0 = -90.0;
+    final dlon = 2.5;
+    final dlat = 2.5;
+
+    final values = Float32List(nx * ny);
+    for (int iy = 0; iy < ny; iy++) {
+      for (int ix = 0; ix < nx; ix++) {
+        final lon = lon0 + ix * dlon;
+        final lat = lat0 + iy * dlat;
+        
+        // Créer des variations évidentes:
+        // - Augmente avec la latitude (0 au sud, 25 au nord)
+        // - Perturbations sinusoïdales
+        final baseWind = 10.0 + (lat + 90.0) / 180.0 * 15.0; // 10..25 m/s avec latitude
+        final perturbation = 5.0 * math.sin(lon * math.pi / 180.0) * math.cos(lat * math.pi / 360.0);
+        final value = baseWind + perturbation;
+        
+        values[iy * nx + ix] = value.clamp(0.0, 30.0).toDouble();
+      }
+    }
+
+    return ScalarGrid(
+      nx: nx,
+      ny: ny,
+      lon0: lon0,
+      lat0: lat0,
+      dlon: dlon,
+      dlat: dlat,
+      values: values,
+    );
+  }
+
   /// Charge les composantes U et V (Est et Nord) du vent/courant
   /// Retourne (uGrid, vGrid) pour afficher les vecteurs
-  /// ATTENTION: Génération de test - pour un vrai parsing, il faudrait eccodes
+  /// 🆕 Utilise wgrib2 pour parser les vraies données GRIB
   static Future<(ScalarGrid?, ScalarGrid?)> loadWindVectorsFromGribFile(
     File gribFile,
   ) async {
@@ -125,87 +162,44 @@ class GribFileLoader {
         return (null, null);
       }
 
-      final nx = 145;
-      final ny = 73;
-      final lon0 = -180.0;
-      final lat0 = -90.0;
-      final dlon = 2.5;
-      final dlat = 2.5;
-
-      // Générer U et V (composantes du vent)
-      final uValues = Float32List(nx * ny); // Composante Est (U)
-      final vValues = Float32List(nx * ny); // Composante Nord (V)
-
-      // Extraire la date du nom du fichier pour une variation réaliste
       final fileName = gribFile.path.split('/').last;
-      print('[GRIB_VECTORS] Chargement vecteurs depuis: $fileName');
+      print('[GRIB_VECTORS] 🚀 Chargement vecteurs depuis: $fileName');
 
-      for (int iy = 0; iy < ny; iy++) {
-        for (int ix = 0; ix < nx; ix++) {
-          final lon = lon0 + ix * dlon;
-          final lat = lat0 + iy * dlat;
+      // 🎯 UTILISER LE CONVERTISSEUR RÉEL
+      final (uGrid, vGrid) = await GribConverter.extractWindVectors(gribFile);
 
-          // Créer un champ de vent plus réaliste basé sur la position
-          // Les vents dominants viennent d'ouest et augmentent avec la latitude
-          final westerlies = 5.0 + (lat.abs() / 90.0) * 15.0; // 5-20 m/s
-          
-          // Perturbation locale basée sur lon/lat
-          final perturbation = math.sin(lon * 0.05) * math.cos(lat * 0.05) * 5.0;
-          
-          // Composantes U (Est) et V (Nord)
-          // Les westerlies donnent un vent d'ouest → composante U négative
-          uValues[iy * nx + ix] = (-westerlies + perturbation).toDouble();
-          
-          // V varie avec la longitude (pattern méridien)
-          vValues[iy * nx + ix] = (math.sin(lon * 0.1) * 8.0).toDouble();
+      if (uGrid != null && vGrid != null) {
+        // Calculer les statistiques
+        double uMin = double.infinity, uMax = double.negativeInfinity;
+        double vMin = double.infinity, vMax = double.negativeInfinity;
+        int nanCount = 0;
+        
+        for (final u in uGrid.values) {
+          if (u.isNaN) nanCount++;
+          else {
+            if (u < uMin) uMin = u;
+            if (u > uMax) uMax = u;
+          }
         }
-      }
-
-      final uGrid = ScalarGrid(
-        nx: nx,
-        ny: ny,
-        lon0: lon0,
-        lat0: lat0,
-        dlon: dlon,
-        dlat: dlat,
-        values: uValues,
-      );
-
-      final vGrid = ScalarGrid(
-        nx: nx,
-        ny: ny,
-        lon0: lon0,
-        lat0: lat0,
-        dlon: dlon,
-        dlat: dlat,
-        values: vValues,
-      );
-
-      // Calculer les statistiques pour debug
-      double uMin = double.infinity, uMax = double.negativeInfinity;
-      double vMin = double.infinity, vMax = double.negativeInfinity;
-      int nanCount = 0;
-      
-      for (final u in uValues) {
-        if (u.isNaN) nanCount++;
-        else {
-          if (u < uMin) uMin = u;
-          if (u > uMax) uMax = u;
+        for (final v in vGrid.values) {
+          if (v.isNaN) nanCount++;
+          else {
+            if (v < vMin) vMin = v;
+            if (v > vMax) vMax = v;
+          }
         }
-      }
-      for (final v in vValues) {
-        if (v.isNaN) nanCount++;
-        else {
-          if (v < vMin) vMin = v;
-          if (v > vMax) vMax = v;
-        }
-      }
 
-      print('[GRIB_VECTORS] ✅ Vecteurs générés avec succès');
-      print('[GRIB_VECTORS] U: $uMin à $uMax m/s (NaN: $nanCount)');
-      print('[GRIB_VECTORS] V: $vMin à $vMax m/s');
-      
-      return (uGrid, vGrid);
+        print('[GRIB_VECTORS] ✅ Vecteurs chargés avec succès');
+        print('[GRIB_VECTORS] U: $uMin à $uMax m/s');
+        print('[GRIB_VECTORS] V: $vMin à $vMax m/s');
+        print('[GRIB_VECTORS] NaN: $nanCount');
+        
+        return (uGrid, vGrid);
+      } else {
+        print('[GRIB_VECTORS] ⚠️  Impossible de parser le GRIB');
+        print('[GRIB_VECTORS] ℹ️  Vérifiez que wgrib2 est installé: sudo apt-get install wgrib2');
+        return (null, null);
+      }
     } catch (e) {
       print('[GRIB_VECTORS] ❌ Erreur: $e');
       return (null, null);

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:math' as math;
 
 /// Grille scalaire régulière (lat/lon), rangée-major (y, puis x)
 /// Représente une variable météo dans une grille régulière
@@ -90,6 +91,49 @@ class ScalarGrid {
       return (0.0, 1.0);
     }
     return (vmin, vmax);
+  }
+
+  /// Génère une grille régulière interpolée avec un nombre de vecteurs cible
+  /// Retourne une liste de points (lon, lat) où les vecteurs seront affichés
+  /// Si targetVectorCount = 20, génère ~20 points uniformément espacés
+  List<(double lon, double lat)> generateInterpolatedGridPoints({
+    required int targetVectorCount,
+    double minLon = -180,
+    double maxLon = 180,
+    double minLat = -90,
+    double maxLat = 90,
+  }) {
+    if (targetVectorCount <= 0) return [];
+
+    // Pour un nombre N de vecteurs, on génère une grille de sqrt(N) × sqrt(N)
+    // Sauf si ça résulterait en un nombre trop grand, on limite
+    // CORRECTION: générer exactement targetVectorCount points (ou proche)
+    final pointsPerSide = (math.sqrt(targetVectorCount.toDouble())).ceil();
+    final actualCount = pointsPerSide * pointsPerSide;
+    
+    // Limiter aux bounds réels de la grille si nécessaire
+    final actualMinLon = math.max(minLon, lon0);
+    final actualMaxLon = math.min(maxLon, lon0 + (nx - 1) * dlon);
+    final actualMinLat = math.max(minLat, lat0);
+    final actualMaxLat = math.min(maxLat, lat0 + (ny - 1) * dlat);
+
+    final points = <(double, double)>[];
+
+    for (int i = 0; i < pointsPerSide; i++) {
+      // Interpoler entre minLon et maxLon
+      final t_lon = pointsPerSide > 1 ? i / (pointsPerSide - 1) : 0.5;
+      final lon = actualMinLon + (actualMaxLon - actualMinLon) * t_lon;
+      
+      for (int j = 0; j < pointsPerSide; j++) {
+        // Interpoler entre minLat et maxLat
+        final t_lat = pointsPerSide > 1 ? j / (pointsPerSide - 1) : 0.5;
+        final lat = actualMinLat + (actualMaxLat - actualMinLat) * t_lat;
+        
+        points.add((lon, lat));
+      }
+    }
+
+    return points;
   }
 }
 

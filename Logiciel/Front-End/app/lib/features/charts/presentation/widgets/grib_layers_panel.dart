@@ -7,6 +7,7 @@ import '../../../../data/datasources/gribs/grib_download_controller.dart';
 import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
 import '../../../../data/datasources/gribs/grib_file_loader.dart';
 import '../../../../common/kornog_data_directory.dart';
+import '../../../grib_overlay/widgets/grib_time_control_panel.dart';
 
 class GribLayersPanel extends ConsumerStatefulWidget {
   const GribLayersPanel({super.key});
@@ -236,6 +237,17 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // === SECTION: Contrôle temporel GRIB ===
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.blue.withOpacity(0.05),
+                ),
+                child: const GribTimeControlPanel(),
+              ),
+              const SizedBox(height: 24),
+
               // Switch d'affichage des GRIBs (heatmap + flèches)
               Row(
                 children: [
@@ -247,6 +259,68 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              
+              // 🎯 CONTRÔLE DES VECTEURS DE VENT
+              const Text('Maillage des Vecteurs de Vent',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 8),
+              const Text(
+                'Nombre de vecteurs à afficher (interpolation)',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              
+              // Slider pour contrôler le nombre de vecteurs
+              StatefulBuilder(
+                builder: (context, setStateLocal) {
+                  final vectorCount = ref.watch(gribVectorCountProvider);
+                  final displayCount = vectorCount ?? 0;
+                  
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Slider(
+                              value: displayCount.toDouble(),
+                              min: 0,
+                              max: 20,
+                              divisions: 20,
+                              label: displayCount == 0 ? 'Mode original' : '$displayCount vecteurs',
+                              onChanged: (value) {
+                                final count = value.toInt();
+                                if (count == 0) {
+                                  ref.read(gribVectorCountProvider.notifier).setLegacy();
+                                } else {
+                                  ref.read(gribVectorCountProvider.notifier).setInterpolated(count);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 60,
+                            child: Text(
+                              displayCount == 0 ? 'Auto' : '$displayCount',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        displayCount == 0 
+                          ? '📍 Mode standard (espacé selon résolution GRIB)'
+                          : '📍 $displayCount vecteurs interpolés uniformément',
+                        style: const TextStyle(fontSize: 11, color: Colors.blue),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              
               const SizedBox(height: 16),
               const Text('Téléchargement météo GRIB',
                   style: TextStyle(fontWeight: FontWeight.bold)),
