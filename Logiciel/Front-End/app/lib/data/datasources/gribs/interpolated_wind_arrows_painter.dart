@@ -71,8 +71,10 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
+    print('[ARROWS_PAINTER] ═══════════════════════════════════════');
+    print('[ARROWS_PAINTER] 🎯 PAINT APPELÉ - Grille ${arrowsPerSide}x${arrowsPerSide}');
     print('[ARROWS_PAINTER] View bounds: minLon=$minLon, maxLon=$maxLon, minLat=$minLat, maxLat=$maxLat');
-    print('[ARROWS_PAINTER] Canvas size: $size, arrowsPerSide: $arrowsPerSide');
+    print('[ARROWS_PAINTER] Canvas size: $size, arrowLength: $arrowLength');
 
     int arrowsDrawn = 0;
     int arrowsNull = 0;
@@ -104,7 +106,10 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
         }
 
         // Projette la position en pixels
-        final pixelPos = view.project(lon, lat, size);
+        // IMPORTANT: d'abord convertir géographique -> local, puis local -> pixels
+        final geoPos = GeographicPosition(latitude: lat, longitude: lon);
+        final localPos = mercatorService.toLocal(geoPos);
+        final pixelPos = view.project(localPos.x, localPos.y, size);
 
         // Check if offscreen
         if (pixelPos.dx < 0 ||
@@ -112,7 +117,14 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
             pixelPos.dy < 0 ||
             pixelPos.dy > size.height) {
           arrowsOffscreen++;
+          if (arrowsOffscreen <= 5) {
+            print('[ARROWS_PAINTER] ⚠️  Arrow ($i,$j) offscreen: pixelPos=$pixelPos, canvasSize=$size');
+          }
           continue;
+        }
+
+        if (arrowsDrawn < 3) {
+          print('[ARROWS_PAINTER] ✅ Arrow ($i,$j): lon=$lon, lat=$lat, pixelPos=$pixelPos, wind=${wind.speed.toStringAsFixed(1)}m/s dir=${wind.direction.toStringAsFixed(0)}°');
         }
 
         // Dessine l'arrow
@@ -120,7 +132,8 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
         arrowsDrawn++;
       }
     }
-    print('[ARROWS_PAINTER] Drawn: $arrowsDrawn, Null: $arrowsNull, Offscreen: $arrowsOffscreen');
+    print('[ARROWS_PAINTER] RÉSUMÉ: Drawn=$arrowsDrawn, Null=$arrowsNull, Offscreen=$arrowsOffscreen (total attemps=${arrowsPerSide*arrowsPerSide})');
+    print('[ARROWS_PAINTER] ═══════════════════════════════════════');
   }
 
   void _drawWindArrow(
@@ -143,31 +156,44 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
     final endY = center.dy - actualLength * math.cos(directionRad);
     final endPoint = Offset(endX, endY);
 
-    // Dessine la ligne principale
+    // === Dessine la tige (ligne principale) ===
+    paint.style = PaintingStyle.stroke;
+    paint.strokeCap = StrokeCap.round;
     canvas.drawLine(center, endPoint, paint);
 
-    // Dessine la pointe de flèche (proportionnelle à la taille)
-    final arrowHeadSize = actualLength * 0.25; // 25% de la longueur
-    const arrowHeadAngle = math.pi / 6; // 30°
-
-    final angle1 = directionRad - math.pi + arrowHeadAngle;
-    final angle2 = directionRad - math.pi - arrowHeadAngle;
-
-    final head1 = Offset(
-      endPoint.dx + arrowHeadSize * math.cos(angle1),
-      endPoint.dy + arrowHeadSize * math.sin(angle1),
+    // === Simple arrowhead: juste deux petites lignes en V ===
+    final arrowHeadSize = actualLength * 0.25; // Taille de la pointe
+    
+    // Deux points formant un V à l'extrémité de la flèche
+    // Angles à 30° de chaque côté de la direction principale
+    final angle1 = directionRad + math.pi / 6;  // +30° par rapport à la direction inverse
+    final angle2 = directionRad - math.pi / 6;  // -30° par rapport à la direction inverse
+    
+    final point1 = Offset(
+      endPoint.dx - arrowHeadSize * math.sin(angle1),
+      endPoint.dy + arrowHeadSize * math.cos(angle1),
     );
-    final head2 = Offset(
-      endPoint.dx + arrowHeadSize * math.cos(angle2),
-      endPoint.dy + arrowHeadSize * math.sin(angle2),
+    final point2 = Offset(
+      endPoint.dx - arrowHeadSize * math.sin(angle2),
+      endPoint.dy + arrowHeadSize * math.cos(angle2),
     );
 
-    canvas.drawLine(endPoint, head1, paint);
-    canvas.drawLine(endPoint, head2, paint);
+    // Dessine les deux lignes du V
+    canvas.drawLine(endPoint, point1, paint);
+    canvas.drawLine(endPoint, point2, paint);
 
-    // Dessine un petit point au centre
-    paint.style = PaintingStyle.fill;
-    canvas.drawCircle(center, 2, paint);
+    // === Cercle central ===
+    final centerCirclePaint = Paint()
+      ..color = arrowColor.withOpacity(opacity)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 3, centerCirclePaint);
+
+    // Contour du cercle
+    final centerCircleStroke = Paint()
+      ..color = arrowColor.withOpacity(opacity * 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawCircle(center, 3, centerCircleStroke);
   }
 
   @override

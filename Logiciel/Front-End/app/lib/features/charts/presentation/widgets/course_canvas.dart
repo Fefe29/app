@@ -298,50 +298,8 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                       );
                     },
                   ),
-                  // Couche GRIB vecteurs
-                  Consumer(
-                    builder: (context, ref, child) {
-                      final gribUGrid = ref.watch(currentGribUGridProvider);
-                      final gribVGrid = ref.watch(currentGribVGridProvider);
-                      final gribOpacity = ref.watch(gribOpacityProvider);
-                      final gribVisible = ref.watch(gribVisibilityProvider);
-                      final gribVectorCount = ref.watch(gribVectorCountProvider);
+                  // Couche GRIB vecteurs - MAINTENANT AVEC LES FLÈCHES INTERPOLÉES
 
-                      if (gribUGrid == null || gribVGrid == null || !gribVisible) return const SizedBox.shrink();
-
-                      return RepaintBoundary(
-                        key: ValueKey('grib-vectors-${gribUGrid.hashCode}-${gribVGrid.hashCode}'),
-                        child: IgnorePointer(
-                          child: Opacity(
-                            opacity: gribOpacity * 0.9,
-                            child: ClipRect(
-                              child: CustomPaint(
-                                size: Size(constraints.maxWidth, constraints.maxHeight),
-                                painter: GribVectorFieldPainter(
-                                  uGrid: gribUGrid,
-                                  vGrid: gribVGrid,
-                                  vmin: 0.0,
-                                  vmax: 20.0,
-                                  projector: (lon, lat, size) {
-                                    final geoPos = GeographicPosition(latitude: lat, longitude: lon);
-                                    final localPos = mercatorService.toLocal(geoPos);
-                                    return view.project(localPos.x, localPos.y, size);
-                                  },
-                                  opacity: gribOpacity * 0.9,
-                                  samplingStride: 3,
-                                  boundsMinX: view.minX,
-                                  boundsMaxX: view.maxX,
-                                  boundsMinY: view.minY,
-                                  boundsMaxY: view.maxY,
-                                  targetVectorCount: gribVectorCount,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
                   // Flèches de vent interpolées
                   Consumer(
                     builder: (context, ref, child) {
@@ -356,20 +314,20 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
 
                       return IgnorePointer(
                         child: Opacity(
-                          opacity: gribOpacity * 0.6,
+                          opacity: 1.0,  // OPACITÉ MAXIMALE pour bien voir les flèches
                           child: CustomPaint(
                             size: Size(constraints.maxWidth, constraints.maxHeight),
                             painter: InterpolatedWindArrowsPainter(
                               uGrids: [gribUGrid],
                               vGrids: [gribVGrid],
-                              timestamps: [DateTime.now()], // FIXME: utiliser les vrais timestamps
+                              timestamps: [DateTime.now()],
                               currentTime: DateTime.now(),
                               view: view,
                               mercatorService: mercatorService,
-                              arrowsPerSide: 6,  // 6x6 = 36 flèches, moins dense
-                              arrowLength: 80,   // Beaucoup plus grand pour bien voir
+                              arrowsPerSide: 6,  // 6x6 = 36 flèches
+                              arrowLength: 120,  // BEAUCOUP PLUS GRAND! (était 80)
                               arrowColor: Colors.deepOrange,
-                              opacity: 0.8,
+                              opacity: 1.0,  // OPACITÉ MAXIMALE des flèches elles-mêmes
                             ),
                           ),
                         ),
@@ -430,7 +388,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
               final gribUGrid = ref.watch(currentGribUGridProvider);
               final gribVGrid = ref.watch(currentGribVGridProvider);
               final gribVisible = ref.watch(gribVisibilityProvider);
-              final gribVectorCount = ref.watch(gribVectorCountProvider);
 
               if (!gribVisible || (gribGrid == null && gribUGrid == null)) {
                 return const SizedBox.shrink();

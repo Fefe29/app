@@ -97,21 +97,6 @@ final gribVmaxProvider = NotifierProvider<GribVmaxNotifier, double>(
 );
 
 /// Notifier pour le nombre de vecteurs à afficher (mode interpolation)
-/// Si null, utilise samplingStride (mode legacy)
-/// Si défini (ex: 20), affiche ~20 vecteurs interpolés uniformément
-class GribVectorCountNotifier extends Notifier<int?> {
-  @override
-  int? build() => null; // null = mode stride, sinon nombre de vecteurs cible (DÉMARRE EN MODE LEGACY)
-
-  void setCount(int? count) => state = count;
-  void setInterpolated(int count) => state = count;
-  void setLegacy() => state = null;
-}
-
-final gribVectorCountProvider = NotifierProvider<GribVectorCountNotifier, int?>(
-  GribVectorCountNotifier.new,
-);
-
 /// Notifier pour les variables GRIB à afficher
 class GribVariablesNotifier extends Notifier<Set<GribVariable>> {
   @override

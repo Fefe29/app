@@ -9,6 +9,17 @@ import 'dart:io';
 class GribTimeSliderWidget extends ConsumerWidget {
   const GribTimeSliderWidget({super.key});
 
+  // Heures de prévision disponibles (en heures)
+  static const List<int> forecastHours = [
+    0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72
+  ];
+
+  /// Convertit l'heure en nom de fichier GRIB (f000, f006, etc.)
+  static String _hourToFileName(int hour) {
+    if (hour == 0) return 'anl';
+    return 'f${hour.toString().padLeft(3, '0')}';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // On observe les timestamps des grilles actuelles
@@ -19,10 +30,7 @@ class GribTimeSliderWidget extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    // Pour maintenant, on simule 25 timestamps (0 à 72 heures avec pas de 3h)
-    // TODO: Récupérer les vrais timestamps depuis les fichiers GRIB
     final forecastHour = ref.watch(gribForecastHourProvider);
-    final maxForecastHour = 72;
     
     return Container(
       height: 50,
@@ -42,18 +50,13 @@ class GribTimeSliderWidget extends ConsumerWidget {
             child: Slider(
               value: forecastHour.toDouble(),
               min: 0,
-              max: maxForecastHour.toDouble(),
-              divisions: maxForecastHour ~/ 3, // Pas de 3 heures
+              max: 72,
+              divisions: 24, // 3h par pas
               label: '+${forecastHour}h',
               onChanged: (value) async {
-                final hour = value.toInt();
-                
-                // Mets à jour l'heure de prévision
-                ref.read(gribForecastHourProvider.notifier)
-                    .setForecastHour(hour);
-                
-                // Charge le fichier GRIB correspondant
-                await _loadGribForForecastHour(ref, hour);
+                // Arrondir à la plus proche heure valide (multiple de 3)
+                final hour = (value / 3).round() * 3;
+                await _loadGribForHour(ref, hour);
               },
             ),
           ),
@@ -71,58 +74,48 @@ class GribTimeSliderWidget extends ConsumerWidget {
   }
   
   /// Charge le fichier GRIB correspondant à l'heure de prévision
-  Future<void> _loadGribForForecastHour(WidgetRef ref, int forecastHour) async {
+  Future<void> _loadGribForHour(WidgetRef ref, int hour) async {
+    print('[GRIB_TIME] 📽️  Chargement prévision: +${hour}h (${_hourToFileName(hour)})');
+    
+    final files = await GribFileLoader.findGribFiles();
+    
+    // Chercher le fichier correspondant à l'heure (exclure les fichiers .idx)
+    final fileName = _hourToFileName(hour);
+    File? gribFile;
+    
     try {
-      // Trouve les fichiers GRIB disponibles
-      final files = await GribFileLoader.findGribFiles();
-      
-      if (files.isEmpty) {
-        print('[GRIB_TIME] Aucun fichier GRIB trouvé');
-        return;
-      }
-      
-      // Cherche un fichier qui correspond à l'heure de prévision (f0XX où XX = heure)
-      // Format typique: gfs.t06z.pgrb2.0p25.f069 (f069 = 69 heures de prévision)
-      File? selectedFile;
-      
-      for (final file in files) {
-        final fileName = file.path.split('/').last;
-        
-        // Extrait le numéro de prévision (f0XX)
-        final match = RegExp(r'\.f(\d+)').firstMatch(fileName);
-        if (match != null) {
-          final fileForecastHour = int.tryParse(match.group(1) ?? '0') ?? 0;
-          
-          if (fileForecastHour == forecastHour) {
-            selectedFile = file;
-            break;
-          }
-        }
-      }
-      
-      if (selectedFile == null) {
-        print('[GRIB_TIME] Pas de fichier GRIB pour f${forecastHour.toString().padLeft(3, '0')}');
-        return;
-      }
-      
-      print('[GRIB_TIME] Chargement GRIB: ${selectedFile.path}');
-      
-      // Charge le GRIB
-      final grid = await GribFileLoader.loadGridFromGribFile(selectedFile);
-      if (grid != null) {
-        ref.read(currentGribGridProvider.notifier).setGrid(grid);
-        final (vmin, vmax) = grid.getValueBounds();
-        ref.read(gribVminProvider.notifier).setVmin(vmin);
-        ref.read(gribVmaxProvider.notifier).setVmax(vmax);
-      }
-      
-      // Charge aussi les grilles U et V
-      final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(selectedFile);
-      if (uGrid != null) ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
-      if (vGrid != null) ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
-      
+      gribFile = files.firstWhere(
+        (f) => !f.path.endsWith('.idx') && 
+               (f.path.contains(fileName) || (hour == 0 && f.path.contains('anl'))),
+      );
     } catch (e) {
-      print('[GRIB_TIME] Erreur en chargeant GRIB: $e');
+      print('[GRIB_TIME] ⚠️  Fichier pas trouvé: $fileName');
+      return;
     }
+
+    print('[GRIB_TIME] 📂 Fichier: ${gribFile.path}');
+
+    // Charger la grille scalaire (heatmap)
+    final grid = await GribFileLoader.loadGridFromGribFile(gribFile);
+    if (grid != null) {
+      ref.read(currentGribGridProvider.notifier).setGrid(grid);
+      final (vmin, vmax) = grid.getValueBounds();
+      ref.read(gribVminProvider.notifier).setVmin(vmin);
+      ref.read(gribVmaxProvider.notifier).setVmax(vmax);
+      print('[GRIB_TIME] ✅ Grille chargée: ${grid.nx}x${grid.ny}');
+    }
+
+    // Charger les vecteurs U/V
+    final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(gribFile);
+    if (uGrid != null && vGrid != null) {
+      ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
+      ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
+      print('[GRIB_TIME] ✅ Vecteurs chargés');
+    } else {
+      print('[GRIB_TIME] ⚠️  Erreur chargement vecteurs');
+    }
+
+    // Mettre à jour le provider de l'heure
+    ref.read(gribForecastHourProvider.notifier).setForecastHour(hour);
   }
 }
