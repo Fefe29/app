@@ -138,22 +138,53 @@ final gribVariablesProvider = NotifierProvider<GribVariablesNotifier, Set<GribVa
 class AutoLoadGribGridNotifier extends AsyncNotifier<void> {
   @override
   Future<void> build() async {
+    print('[AUTO_LOAD] Starting GRIB auto-load...');
+    
     // Au démarrage, charger automatiquement un GRIB si disponible
     final files = await GribFileLoader.findGribFiles();
+    print('[AUTO_LOAD] Found ${files.length} GRIB files');
     
     if (files.isNotEmpty) {
       // Charger le premier fichier
       final grid = await GribFileLoader.loadGridFromGribFile(files.first);
+      print('[AUTO_LOAD] Loaded grid from ${files.first.path}: ${grid != null ? "success" : "failed"}');
       
       if (grid != null) {
+        print('[AUTO_LOAD] Grid: ${grid.nx}x${grid.ny}, values=[${grid.values.length}]');
+        print('[AUTO_LOAD] Grid bounds: lon(${grid.lon0}..${grid.lon0 + grid.dlon * grid.nx}), lat(${grid.lat0}..${grid.lat0 + grid.dlat * grid.ny})');
+        
         // Mettre à jour le provider de grille courante
         ref.read(currentGribGridProvider.notifier).setGrid(grid);
         
         // Calculer et définir les bornes
         final (vmin, vmax) = grid.getValueBounds();
+        print('[AUTO_LOAD] Value bounds: $vmin to $vmax (range: ${(vmax-vmin).abs()})');
         ref.read(gribVminProvider.notifier).setVmin(vmin);
         ref.read(gribVmaxProvider.notifier).setVmax(vmax);
+        
+        // Charger aussi les grilles U et V (vecteur vent)
+        try {
+          final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(files.first);
+          
+          if (uGrid != null) {
+            print('[AUTO_LOAD] U-grid loaded: ${uGrid.nx}x${uGrid.ny}');
+            ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
+          } else {
+            print('[AUTO_LOAD] Failed to load U-grid');
+          }
+          
+          if (vGrid != null) {
+            print('[AUTO_LOAD] V-grid loaded: ${vGrid.nx}x${vGrid.ny}');
+            ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
+          } else {
+            print('[AUTO_LOAD] Failed to load V-grid');
+          }
+        } catch (e) {
+          print('[AUTO_LOAD] Error loading U/V grids: $e');
+        }
       }
+    } else {
+      print('[AUTO_LOAD] No GRIB files found!');
     }
   }
 }

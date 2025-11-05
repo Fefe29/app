@@ -99,6 +99,9 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     final activeMap = ref.watch(activeMapProvider);
     final displayMaps = ref.watch(mapDisplayProvider);
     
+    // Auto-load GRIB grids on startup
+    ref.watch(autoLoadGribGridProvider);
+    
     // Note: Les providers GRIB sont maintenant watchés dans des Consumer séparés
     // pour ne pas déclencher un rebuild entier du LayoutBuilder
 
@@ -360,6 +363,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                               timestamps: [DateTime.now()], // FIXME: utiliser les vrais timestamps
                               currentTime: DateTime.now(),
                               view: view,
+                              mercatorService: mercatorService,
                               arrowsPerSide: 10,  // 10x10 = 100 flèches
                               arrowLength: 35,   // Augmenté pour mieux voir
                               arrowColor: Colors.cyan,

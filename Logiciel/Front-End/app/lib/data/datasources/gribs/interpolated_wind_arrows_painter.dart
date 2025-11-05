@@ -1,9 +1,10 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:kornog/data/datasources/gribs/grib_interpolation_service.dart';
 import 'package:kornog/data/datasources/gribs/grib_models.dart';
 import 'package:kornog/features/charts/presentation/widgets/course_canvas.dart';
+import 'package:kornog/features/charts/providers/mercator_coordinate_system_provider.dart';
+import 'package:kornog/features/charts/domain/models/geographic_position.dart';
 
 /// Dessine des flèches de vent interpolées partout sur l'écran
 /// Contrairement à GribVectorFieldPainter qui suit la grille,
@@ -14,6 +15,7 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
   final List<DateTime> timestamps;
   final DateTime currentTime;
   final ViewTransform view;
+  final MercatorCoordinateSystemService mercatorService;
   final int arrowsPerSide;
   final double arrowLength;
   final Color arrowColor;
@@ -31,6 +33,7 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
     required this.timestamps,
     required this.currentTime,
     required this.view,
+    required this.mercatorService,
     this.arrowsPerSide = 5,
     this.arrowLength = 30,
     this.arrowColor = Colors.blue,
@@ -41,15 +44,21 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
   }
 
   void _computeGeoLimits() {
-    // Inverse la transformation view pour obtenir lon/lat
-    // C'est une approximation - pour plus de précision il faudrait
-    // inverser la projection Mercator complète
-    final grid = uGrids.first;
+    // Convertit les limites du ViewTransform (coordonnées locales Mercator)
+    // vers les coordonnées géographiques (lon/lat)
+    final localMinCorner = LocalPosition(x: view.minX, y: view.minY);
+    final localMaxCorner = LocalPosition(x: view.maxX, y: view.maxY);
     
-    minLon = view.minX;
-    maxLon = view.maxX;
-    minLat = view.minY;
-    maxLat = view.maxY;
+    final geoMin = mercatorService.toGeographic(localMinCorner);
+    final geoMax = mercatorService.toGeographic(localMaxCorner);
+    
+    minLon = geoMin.longitude;
+    maxLon = geoMax.longitude;
+    minLat = geoMin.latitude;
+    maxLat = geoMax.latitude;
+    
+    print('[ARROWS_GEO_LIMITS] Viewport local: (${view.minX}, ${view.minY}) .. (${view.maxX}, ${view.maxY})');
+    print('[ARROWS_GEO_LIMITS] Converted to geo: lon($minLon..$maxLon), lat($minLat..$maxLat)');
   }
 
   @override
@@ -62,11 +71,19 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
+    print('[ARROWS_PAINTER] View bounds: minLon=$minLon, maxLon=$maxLon, minLat=$minLat, maxLat=$maxLat');
+    print('[ARROWS_PAINTER] Canvas size: $size, arrowsPerSide: $arrowsPerSide');
+
+    int arrowsDrawn = 0;
+    int arrowsNull = 0;
+    int arrowsOffscreen = 0;
+
     // Grille d'arrows à travers le viewport
+    final divisor = math.max(1, arrowsPerSide - 1); // Prevent division by zero
     for (int i = 0; i < arrowsPerSide; i++) {
       for (int j = 0; j < arrowsPerSide; j++) {
-        final xNorm = i / (arrowsPerSide - 1);
-        final yNorm = j / (arrowsPerSide - 1);
+        final xNorm = divisor > 0 ? i / divisor : 0.5;
+        final yNorm = divisor > 0 ? j / divisor : 0.5;
 
         final lon = minLon + xNorm * (maxLon - minLon);
         final lat = minLat + yNorm * (maxLat - minLat);
@@ -81,15 +98,29 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
           currentTime,
         );
 
-        if (wind == null) continue;
+        if (wind == null) {
+          arrowsNull++;
+          continue;
+        }
 
         // Projette la position en pixels
         final pixelPos = view.project(lon, lat, size);
 
+        // Check if offscreen
+        if (pixelPos.dx < 0 ||
+            pixelPos.dx > size.width ||
+            pixelPos.dy < 0 ||
+            pixelPos.dy > size.height) {
+          arrowsOffscreen++;
+          continue;
+        }
+
         // Dessine l'arrow
         _drawWindArrow(canvas, paint, pixelPos, wind, size);
+        arrowsDrawn++;
       }
     }
+    print('[ARROWS_PAINTER] Drawn: $arrowsDrawn, Null: $arrowsNull, Offscreen: $arrowsOffscreen');
   }
 
   void _drawWindArrow(
@@ -99,14 +130,6 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
     WindVector wind,
     Size size,
   ) {
-    // Hors écran?
-    if (center.dx < 0 ||
-        center.dx > size.width ||
-        center.dy < 0 ||
-        center.dy > size.height) {
-      return;
-    }
-
     // Convertis la direction en radians (0° = Nord)
     final directionRad = wind.direction * math.pi / 180;
 
@@ -167,6 +190,7 @@ class CachedInterpolatedWindArrowsPainter extends CustomPainter {
   final List<DateTime> timestamps;
   final DateTime currentTime;
   final ViewTransform view;
+  final MercatorCoordinateSystemService mercatorService;
   final int arrowsPerSide;
   final double arrowLength;
   final Color arrowColor;
@@ -178,6 +202,7 @@ class CachedInterpolatedWindArrowsPainter extends CustomPainter {
     required this.timestamps,
     required this.currentTime,
     required this.view,
+    required this.mercatorService,
     this.arrowsPerSide = 5,
     this.arrowLength = 30,
     this.arrowColor = Colors.blue,
@@ -193,6 +218,7 @@ class CachedInterpolatedWindArrowsPainter extends CustomPainter {
       timestamps: timestamps,
       currentTime: currentTime,
       view: view,
+      mercatorService: mercatorService,
       arrowsPerSide: arrowsPerSide,
       arrowLength: arrowLength,
       arrowColor: arrowColor,

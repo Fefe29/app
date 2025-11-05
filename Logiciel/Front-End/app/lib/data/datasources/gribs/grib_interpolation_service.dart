@@ -53,7 +53,12 @@ class GribInterpolationService {
     final u = interpolateScalar(uGrids, timestamps, lon, lat, time);
     final v = interpolateScalar(vGrids, timestamps, lon, lat, time);
 
-    if (u == null || v == null) return null;
+    if (u == null || v == null) {
+      if (u == null || v == null) {
+        print('[INTERP] Wind null at ($lon, $lat): u=$u, v=$v');
+      }
+      return null;
+    }
 
     // Calcule vitesse et direction
     final speed = math.sqrt(u * u + v * v);
