@@ -26,6 +26,8 @@ import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
 import '../../../../data/datasources/gribs/grib_painters.dart';
 import '../../../../data/datasources/gribs/grib_models.dart';
 import '../../../../data/datasources/gribs/interpolated_wind_arrows_painter.dart';
+import '../../../../data/datasources/gribs/grib_time_slider_widget.dart';
+import '../../../../data/datasources/gribs/wind_speed_legend_bar.dart';
 import '../../providers/grib_layers_provider.dart';
 // -------------------------
 // Vue & projection partagées
@@ -442,6 +444,41 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                   ],
                 ),
               );
+            },
+          ),
+        ),
+        // Légende colorimétrique - en haut à droite
+        Positioned(
+          top: 24,
+          right: 16,
+          child: Consumer(
+            builder: (context, ref, child) {
+              final gribUGrid = ref.watch(currentGribUGridProvider);
+              final gribVisible = ref.watch(gribVisibilityProvider);
+              
+              if (!gribVisible || gribUGrid == null) {
+                return const SizedBox.shrink();
+              }
+              
+              return const WindSpeedLegendBar();
+            },
+          ),
+        ),
+        // Slider temporel - en bas de la carte
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: Consumer(
+            builder: (context, ref, child) {
+              final gribUGrid = ref.watch(currentGribUGridProvider);
+              final gribVisible = ref.watch(gribVisibilityProvider);
+              
+              if (!gribVisible || gribUGrid == null) {
+                return const SizedBox.shrink();
+              }
+              
+              return const GribTimeSliderWidget();
             },
           ),
         ),
