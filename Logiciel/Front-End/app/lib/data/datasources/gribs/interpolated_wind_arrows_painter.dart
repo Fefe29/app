@@ -67,7 +67,7 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
 
     final paint = Paint()
       ..color = arrowColor.withOpacity(opacity)
-      ..strokeWidth = 1.5
+      ..strokeWidth = 2.5  // Augmenté pour meilleure visibilité
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
@@ -134,9 +134,9 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
     final directionRad = wind.direction * math.pi / 180;
 
     // Calcule la longueur de l'arrow proportionnelle à la vitesse
-    // Clamp entre 5 et arrowLength pixels
-    final speedNormalized = (wind.speed / 20).clamp(0, 1); // 20 m/s = max
-    final actualLength = 5 + speedNormalized * (arrowLength - 5);
+    // Clamp entre 10% et 100% de arrowLength
+    final speedNormalized = (wind.speed / 25).clamp(0, 1); // 25 m/s = max
+    final actualLength = arrowLength * (0.1 + speedNormalized * 0.9); // Entre 10% et 100%
 
     // Point final de l'arrow
     final endX = center.dx + actualLength * math.sin(directionRad);
@@ -146,8 +146,8 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
     // Dessine la ligne principale
     canvas.drawLine(center, endPoint, paint);
 
-    // Dessine la pointe de flèche
-    final arrowHeadSize = 8.0;
+    // Dessine la pointe de flèche (proportionnelle à la taille)
+    final arrowHeadSize = actualLength * 0.25; // 25% de la longueur
     const arrowHeadAngle = math.pi / 6; // 30°
 
     final angle1 = directionRad - math.pi + arrowHeadAngle;
@@ -165,12 +165,9 @@ class InterpolatedWindArrowsPainter extends CustomPainter {
     canvas.drawLine(endPoint, head1, paint);
     canvas.drawLine(endPoint, head2, paint);
 
-    // Optionnel: Dessine un petit cercle au centre et affiche la vitesse
+    // Dessine un petit point au centre
     paint.style = PaintingStyle.fill;
-    canvas.drawCircle(center, 3, paint);
-    
-    // Affiche la vitesse en texte (optionnel)
-    // _drawWindSpeed(canvas, center, wind);
+    canvas.drawCircle(center, 2, paint);
   }
 
   @override

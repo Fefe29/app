@@ -364,10 +364,10 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                               currentTime: DateTime.now(),
                               view: view,
                               mercatorService: mercatorService,
-                              arrowsPerSide: 10,  // 10x10 = 100 flèches
-                              arrowLength: 35,   // Augmenté pour mieux voir
-                              arrowColor: Colors.cyan,
-                              opacity: gribOpacity * 0.6,
+                              arrowsPerSide: 6,  // 6x6 = 36 flèches, moins dense
+                              arrowLength: 80,   // Beaucoup plus grand pour bien voir
+                              arrowColor: Colors.deepOrange,
+                              opacity: 0.8,
                             ),
                           ),
                         ),
