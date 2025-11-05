@@ -37,10 +37,10 @@ class WindSpeedLegendBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // La légende affiche la vitesse du vent (en m/s ou nds)
-    // Pour maintenant on assume que c'est en m/s et on va montrer 0-25 m/s
+    // La légende affiche la vitesse du vent en nœuds
+    // 1 m/s ≈ 1.94384 nœuds, donc on affiche 0-50 nds (≈ 0-25 m/s)
     final minDisplay = 0;
-    final maxDisplay = 25;
+    final maxDisplay = 50;
     
     return Container(
       padding: const EdgeInsets.all(8),
@@ -65,8 +65,6 @@ class WindSpeedLegendBar extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
-          
-          // Barre colorimétrique verticale
           SizedBox(
             width: 40,
             height: 200,
@@ -86,7 +84,7 @@ class WindSpeedLegendBar extends ConsumerWidget {
             child: Column(
               children: [
                 Text(
-                  '${maxDisplay.toInt()} m/s',
+                  '${maxDisplay.toInt()} nd',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: Colors.white,
                     fontSize: 10,
@@ -101,7 +99,7 @@ class WindSpeedLegendBar extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  '${minDisplay.toInt()} m/s',
+                  '${minDisplay.toInt()} nd',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: Colors.white,
                     fontSize: 10,

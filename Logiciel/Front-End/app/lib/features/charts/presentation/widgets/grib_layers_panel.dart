@@ -7,7 +7,6 @@ import '../../../../data/datasources/gribs/grib_download_controller.dart';
 import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
 import '../../../../data/datasources/gribs/grib_file_loader.dart';
 import '../../../../common/kornog_data_directory.dart';
-import '../../../grib_overlay/widgets/grib_time_control_panel.dart';
 
 class GribLayersPanel extends ConsumerStatefulWidget {
   const GribLayersPanel({super.key});
@@ -239,15 +238,9 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // === SECTION: Contrôle temporel GRIB ===
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.blue.withOpacity(0.05),
-                ),
-                child: const GribTimeControlPanel(),
-              ),
-              const SizedBox(height: 24),
+              // NOTE: Le contrôle temporel a été déplacé en bas de la carte (GribTimeSliderWidget)
+              // pour une meilleure intégration avec la visualisation en temps réel
+              const SizedBox(height: 8),
 
               // Switch d'affichage des GRIBs (heatmap + flèches)
               Row(

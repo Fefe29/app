@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'grib_overlay_providers.dart';
+import 'grib_file_loader.dart';
+import 'dart:io';
 
 /// Widget de contrôle temporel pour naviguer dans les données GRIB
-/// Affiche un curseur pour sélectionner le timestamp et affiche la date/heure
+/// Charge les fichiers GRIB correspondant à l'heure de prévision sélectionnée
 class GribTimeSliderWidget extends ConsumerWidget {
   const GribTimeSliderWidget({super.key});
 
@@ -23,72 +25,104 @@ class GribTimeSliderWidget extends ConsumerWidget {
     final maxForecastHour = 72;
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.black87,
+        color: Colors.black.withOpacity(0.3),
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(8),
-          topRight: Radius.circular(8),
+          topLeft: Radius.circular(4),
+          topRight: Radius.circular(4),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            'Prévision: +${forecastHour}h',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+          // Curseur
+          Expanded(
+            child: Slider(
+              value: forecastHour.toDouble(),
+              min: 0,
+              max: maxForecastHour.toDouble(),
+              divisions: maxForecastHour ~/ 3, // Pas de 3 heures
+              label: '+${forecastHour}h',
+              onChanged: (value) async {
+                final hour = value.toInt();
+                
+                // Mets à jour l'heure de prévision
+                ref.read(gribForecastHourProvider.notifier)
+                    .setForecastHour(hour);
+                
+                // Charge le fichier GRIB correspondant
+                await _loadGribForForecastHour(ref, hour);
+              },
             ),
           ),
-          const SizedBox(height: 8),
-          // Curseur
-          Row(
-            children: [
-              Expanded(
-                child: Slider(
-                  value: forecastHour.toDouble(),
-                  min: 0,
-                  max: maxForecastHour.toDouble(),
-                  divisions: maxForecastHour ~/ 3, // Pas de 3 heures
-                  label: '+${forecastHour}h',
-                  onChanged: (value) {
-                    ref.read(gribForecastHourProvider.notifier)
-                        .setForecastHour(value.toInt());
-                  },
-                ),
-              ),
-              SizedBox(
-                width: 60,
-                child: TextButton(
-                  onPressed: () {
-                    ref.read(gribForecastHourProvider.notifier).setForecastHour(0);
-                  },
-                  child: const Text(
-                    'Reset',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // Info texte
+          // Label avec heure actuelle - très petit
           Text(
-            'Glissez le curseur pour naviguer dans les prévisions',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.grey[400],
+            '+${forecastHour}h',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white,
+              fontSize: 9,
             ),
           ),
         ],
       ),
     );
+  }
+  
+  /// Charge le fichier GRIB correspondant à l'heure de prévision
+  Future<void> _loadGribForForecastHour(WidgetRef ref, int forecastHour) async {
+    try {
+      // Trouve les fichiers GRIB disponibles
+      final files = await GribFileLoader.findGribFiles();
+      
+      if (files.isEmpty) {
+        print('[GRIB_TIME] Aucun fichier GRIB trouvé');
+        return;
+      }
+      
+      // Cherche un fichier qui correspond à l'heure de prévision (f0XX où XX = heure)
+      // Format typique: gfs.t06z.pgrb2.0p25.f069 (f069 = 69 heures de prévision)
+      File? selectedFile;
+      
+      for (final file in files) {
+        final fileName = file.path.split('/').last;
+        
+        // Extrait le numéro de prévision (f0XX)
+        final match = RegExp(r'\.f(\d+)').firstMatch(fileName);
+        if (match != null) {
+          final fileForecastHour = int.tryParse(match.group(1) ?? '0') ?? 0;
+          
+          if (fileForecastHour == forecastHour) {
+            selectedFile = file;
+            break;
+          }
+        }
+      }
+      
+      if (selectedFile == null) {
+        print('[GRIB_TIME] Pas de fichier GRIB pour f${forecastHour.toString().padLeft(3, '0')}');
+        return;
+      }
+      
+      print('[GRIB_TIME] Chargement GRIB: ${selectedFile.path}');
+      
+      // Charge le GRIB
+      final grid = await GribFileLoader.loadGridFromGribFile(selectedFile);
+      if (grid != null) {
+        ref.read(currentGribGridProvider.notifier).setGrid(grid);
+        final (vmin, vmax) = grid.getValueBounds();
+        ref.read(gribVminProvider.notifier).setVmin(vmin);
+        ref.read(gribVmaxProvider.notifier).setVmax(vmax);
+      }
+      
+      // Charge aussi les grilles U et V
+      final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(selectedFile);
+      if (uGrid != null) ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
+      if (vGrid != null) ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
+      
+    } catch (e) {
+      print('[GRIB_TIME] Erreur en chargeant GRIB: $e');
+    }
   }
 }
