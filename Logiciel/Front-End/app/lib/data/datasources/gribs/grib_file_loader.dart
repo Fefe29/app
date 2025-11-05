@@ -78,12 +78,30 @@ class GribFileLoader {
 
       print('[GRIB_LOADER] 📖 Parsing: ${gribFile.path}');
 
-      // 🎯 UTILISER LE CONVERTISSEUR RÉEL - chercher la température ou la pression
-      // En priorité: température à 2m (pour heatmap)
+      // 🎯 PRIORITÉ VENT - afficher la vitesse du vent à 10m (UGRD/VGRD)
+      // En priorité: composante Est du vent (UGRD:10 m)
       ScalarGrid? grid = await GribConverter.extractScalarField(
         gribFile,
-        fieldName: 'TMP:2 m',
+        fieldName: 'UGRD:10 m',
       );
+
+      // Si pas de vent Est, essayer Nord
+      if (grid == null) {
+        print('[GRIB_LOADER] ℹ️  UGRD:10 m non trouvé, essayant VGRD:10 m...');
+        grid = await GribConverter.extractScalarField(
+          gribFile,
+          fieldName: 'VGRD:10 m',
+        );
+      }
+
+      // Si pas de vent 10m, chercher la température à 2m
+      if (grid == null) {
+        print('[GRIB_LOADER] ℹ️  VGRD:10 m non trouvé, essayant TMP:2 m...');
+        grid = await GribConverter.extractScalarField(
+          gribFile,
+          fieldName: 'TMP:2 m',
+        );
+      }
 
       // Si pas de température, chercher la pression au niveau mer
       if (grid == null) {

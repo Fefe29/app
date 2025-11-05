@@ -25,6 +25,7 @@ import 'zoom_button.dart';
 import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
 import '../../../../data/datasources/gribs/grib_painters.dart';
 import '../../../../data/datasources/gribs/grib_models.dart';
+import '../../../../data/datasources/gribs/interpolated_wind_arrows_painter.dart';
 import '../../providers/grib_layers_provider.dart';
 // -------------------------
 // Vue & projection partagées
@@ -64,12 +65,10 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   Offset? _lastPanPosition;
   double _zoomFactor = 1.0; // 1.0 = normal, >1 = zoom in, <1 = zoom out
   int _tileZoomOffset = 0; // Décalage de zoom OSM
-  final double _minZoomFactor = 0.25;
-  final double _maxZoomFactor = 8.0;
 
   void _incrementZoom() {
     setState(() {
-      _zoomFactor = (_zoomFactor * 1.25).clamp(_minZoomFactor, _maxZoomFactor);
+      _zoomFactor *= 1.25;
       print('[ZOOM] _incrementZoom: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
       _adjustTileZoomIfNeeded();
     });
@@ -77,7 +76,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
 
   void _decrementZoom() {
     setState(() {
-      _zoomFactor = (_zoomFactor / 1.25).clamp(_minZoomFactor, _maxZoomFactor);
+      _zoomFactor /= 1.25;
       print('[ZOOM] _decrementZoom: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
       _adjustTileZoomIfNeeded();
     });
@@ -85,7 +84,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
 
   void _adjustTileZoomIfNeeded() {
     // Désactivé : on ne touche plus au tileZoomOffset, le zoom est totalement libre
-    _zoomFactor = _zoomFactor.clamp(_minZoomFactor, _maxZoomFactor);
     // print('[ZOOM] _adjustTileZoomIfNeeded: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
   }
 
@@ -101,25 +99,8 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     final activeMap = ref.watch(activeMapProvider);
     final displayMaps = ref.watch(mapDisplayProvider);
     
-    // GRIB providers
-    final gribGrid = ref.watch(currentGribGridProvider);
-    final gribOpacity = ref.watch(gribOpacityProvider);
-    final gribVmin = ref.watch(gribVminProvider);
-    final gribVmax = ref.watch(gribVmaxProvider);
-    final gribUGrid = ref.watch(currentGribUGridProvider);
-    final gribVGrid = ref.watch(currentGribVGridProvider);
-    final gribVisible = ref.watch(gribVisibilityProvider);
-    final gribVectorCount = ref.watch(gribVectorCountProvider); // Nouveau: nombre de vecteurs cible
-
-    // Debug
-    if (gribGrid != null) {
-      print('[COURSE_CANVAS] 📊 GRIB Heatmap: ${gribGrid.nx}x${gribGrid.ny}, visible=$gribVisible');
-    }
-    if (gribUGrid != null || gribVGrid != null) {
-      print('[COURSE_CANVAS] 🧭 GRIB Vectors: U=${gribUGrid?.nx}x${gribUGrid?.ny}, V=${gribVGrid?.nx}x${gribVGrid?.ny}, visible=$gribVisible, count=$gribVectorCount');
-    } else {
-      print('[COURSE_CANVAS] ⚠️  GRIB Vectors: NULL (U=${gribUGrid != null}, V=${gribVGrid != null})');
-    }
+    // Note: Les providers GRIB sont maintenant watchés dans des Consumer séparés
+    // pour ne pas déclencher un rebuild entier du LayoutBuilder
 
     if (course.buoys.isEmpty && course.startLine == null && course.finishLine == null) {
       return Center(
@@ -133,12 +114,12 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Log pour debug disparition carte
-        if (_zoomFactor <= _minZoomFactor || _zoomFactor >= _maxZoomFactor) {
-          print('[BUG?] _zoomFactor extrême: $_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
-        }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Canvas principal - LayoutBuilder seul, ne dépend que du parcours
+        LayoutBuilder(
+          builder: (context, constraints) {
         final localPoints = <Offset>[];
         for (final b in course.buoys) {
           final l = mercatorService.toLocal(b.position);
@@ -163,29 +144,10 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
             maxY = math.max(maxY, o.dy);
           }
         }
-        
-        // 🆕 ÉTENDRE LES BOUNDS POUR INCLURE LA ZONE GRIB SI CHARGÉE
-        if (gribGrid != null) {
-          // Convertir les 4 coins du GRIB en coordonnées locales
-          final gribCorners = [
-            GeographicPosition(latitude: gribGrid.lat0, longitude: gribGrid.lon0),
-            GeographicPosition(latitude: gribGrid.lat0, longitude: gribGrid.lon0 + (gribGrid.nx - 1) * gribGrid.dlon),
-            GeographicPosition(latitude: gribGrid.lat0 + (gribGrid.ny - 1) * gribGrid.dlat, longitude: gribGrid.lon0),
-            GeographicPosition(latitude: gribGrid.lat0 + (gribGrid.ny - 1) * gribGrid.dlat, longitude: gribGrid.lon0 + (gribGrid.nx - 1) * gribGrid.dlon),
-          ];
-          for (final corner in gribCorners) {
-            final l = mercatorService.toLocal(corner);
-            minX = math.min(minX, l.x);
-            maxX = math.max(maxX, l.x);
-            minY = math.min(minY, l.y);
-            maxY = math.max(maxY, l.y);
-          }
-        }
-        // Fixe des bornes minimales et maximales pour éviter le reset ou la disparition
-        const double minSpan = 100.0;
-        const double maxSpan = 1000000.0;
-        var spanX = (maxX - minX).abs() < 1e-6 ? minSpan : (maxX - minX);
-        var spanY = (maxY - minY).abs() < 1e-6 ? minSpan : (maxY - minY);
+        print('[COURSE_CANVAS_BOUNDS] AVANT ajustements: minX=$minX, maxX=$maxX, minY=$minY, maxY=$maxY, localPoints=${localPoints.length}');
+        // Pas de limites artificielles sur spanX/spanY - laisse le zoom totalement libre
+        var spanX = (maxX - minX).abs() < 1e-6 ? 1.0 : (maxX - minX).abs();
+        var spanY = (maxY - minY).abs() < 1e-6 ? 1.0 : (maxY - minY).abs();
         if (spanX > spanY) {
           final delta = spanX - spanY;
           minY -= delta / 2; maxY += delta / 2;
@@ -195,25 +157,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
           minX -= delta / 2; maxX += delta / 2;
           spanX = spanY;
         }
-        // Clamp la taille de la bbox pour éviter les extrêmes
-        if (spanX < minSpan) {
-          final delta = minSpan - spanX;
-          minX -= delta / 2; maxX += delta / 2;
-          spanX = minSpan;
-        } else if (spanX > maxSpan) {
-          final delta = spanX - maxSpan;
-          minX += delta / 2; maxX -= delta / 2;
-          spanX = maxSpan;
-        }
-        if (spanY < minSpan) {
-          final delta = minSpan - spanY;
-          minY -= delta / 2; maxY += delta / 2;
-          spanY = minSpan;
-        } else if (spanY > maxSpan) {
-          final delta = spanY - maxSpan;
-          minY += delta / 2; maxY -= delta / 2;
-          spanY = maxSpan;
-        }
+        print('[COURSE_CANVAS_BOUNDS] APRES ajustements: minX=$minX, maxX=$maxX, minY=$minY, maxY=$maxY, spanX=$spanX, spanY=$spanY');
         final availW = constraints.maxWidth - 2 * CourseCanvas._margin;
         final availH = constraints.maxHeight - 2 * CourseCanvas._margin;
         final baseScale = math.min(availW / spanX, availH / spanY);
@@ -229,6 +173,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
           offsetX: offsetX,
           offsetY: offsetY,
         );
+        print('[COURSE_CANVAS_BOUNDS] View: scale=$scale, offsetX=$offsetX, offsetY=$offsetY, zoomFactor=$_zoomFactor');
   int baseTileZoom = activeMap?.zoomLevel ?? 10;
   int tileZoom = (baseTileZoom + _tileZoomOffset).clamp(1, 20);
   print('[TILE] baseTileZoom=$baseTileZoom, _tileZoomOffset=$_tileZoomOffset, tileZoom=$tileZoom, _zoomFactor=$_zoomFactor');
@@ -239,9 +184,11 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
             if (event is PointerScrollEvent) {
               setState(() {
                 if (event.scrollDelta.dy < 0) {
-                  _zoomFactor = (_zoomFactor * 1.1).clamp(_minZoomFactor, _maxZoomFactor);
+                  // Zoom in
+                  _zoomFactor *= 1.2;
                 } else if (event.scrollDelta.dy > 0) {
-                  _zoomFactor = (_zoomFactor / 1.1).clamp(_minZoomFactor, _maxZoomFactor);
+                  // Zoom out
+                  _zoomFactor /= 1.2;
                 }
                 _adjustTileZoomIfNeeded();
               });
@@ -266,7 +213,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                   final softenedScale = details.scale > 1.0
                       ? 1 + (details.scale - 1) * 0.4
                       : 1 - (1 - details.scale) * 0.4;
-                  _zoomFactor = (_zoomFactor * softenedScale).clamp(_minZoomFactor, _maxZoomFactor);
+                  _zoomFactor *= softenedScale;
                   _adjustTileZoomIfNeeded();
                 }
               });
@@ -308,69 +255,122 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                         return Center(child: Text('Chargement des tuiles...'));
                       },
                     ),
-                  // Couche GRIB si disponible
-                  if (gribGrid != null && gribVisible)
-                    RepaintBoundary(
-                      key: ValueKey('grib-heatmap-${gribGrid.hashCode}-${gribVmin}-${gribVmax}'),
-                      child: IgnorePointer(
-                        child: Opacity(
-                          opacity: gribOpacity,
-                          child: CustomPaint(
-                            size: Size(constraints.maxWidth, constraints.maxHeight),
-                            painter: GribGridPainter(
-                              grid: gribGrid,
-                              vmin: gribVmin,
-                              vmax: gribVmax,
-                              projector: (lon, lat, size) {
-                                // Convertir lon/lat en coordonnées locales (Mercator)
-                                final geoPos = GeographicPosition(latitude: lat, longitude: lon);
-                                final localPos = mercatorService.toLocal(geoPos);
-                                // Puis en coordonnées écran via ViewTransform
-                                return view.project(localPos.x, localPos.y, size);
-                              },
-                              colorMapName: ColorMap.parula, // Utiliser parula au lieu de blueToRed
-                              opacity: gribOpacity,
+                  // Couche GRIB heatmap - avec Consumer pour watcher indépendamment
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final gribGrid = ref.watch(currentGribGridProvider);
+                      final gribOpacity = ref.watch(gribOpacityProvider);
+                      final gribVmin = ref.watch(gribVminProvider);
+                      final gribVmax = ref.watch(gribVmaxProvider);
+                      final gribVisible = ref.watch(gribVisibilityProvider);
+
+                      if (gribGrid == null || !gribVisible) return const SizedBox.shrink();
+
+                      return RepaintBoundary(
+                        key: ValueKey('grib-heatmap-${gribGrid.hashCode}-${gribVmin}-${gribVmax}'),
+                        child: IgnorePointer(
+                          child: Opacity(
+                            opacity: gribOpacity,
+                            child: ClipRect(
+                              child: CustomPaint(
+                                size: Size(constraints.maxWidth, constraints.maxHeight),
+                                painter: GribGridPainter(
+                                  grid: gribGrid,
+                                  vmin: gribVmin,
+                                  vmax: gribVmax,
+                                  projector: (lon, lat, size) {
+                                    final geoPos = GeographicPosition(latitude: lat, longitude: lon);
+                                    final localPos = mercatorService.toLocal(geoPos);
+                                    return view.project(localPos.x, localPos.y, size);
+                                  },
+                                  colorMapName: ColorMap.parula,
+                                  opacity: gribOpacity,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  // Couche des flèches de vent/courant (vecteurs)
-                  if (gribUGrid != null && gribVGrid != null && gribVisible)
-                    RepaintBoundary(
-                      key: ValueKey('grib-vectors-${gribUGrid.hashCode}-${gribVGrid.hashCode}'),
-                      child: Builder(
-                        builder: (_) {
-                          print('[COURSE_CANVAS] Affichage des vecteurs: U=${gribUGrid?.nx}x${gribUGrid?.ny}, V=${gribVGrid?.nx}x${gribVGrid?.ny}, vectorCount=$gribVectorCount');
-                          return IgnorePointer(
-                            child: Opacity(
-                              opacity: gribOpacity * 0.9, // Légèrement plus transparent
+                      );
+                    },
+                  ),
+                  // Couche GRIB vecteurs
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final gribUGrid = ref.watch(currentGribUGridProvider);
+                      final gribVGrid = ref.watch(currentGribVGridProvider);
+                      final gribOpacity = ref.watch(gribOpacityProvider);
+                      final gribVisible = ref.watch(gribVisibilityProvider);
+                      final gribVectorCount = ref.watch(gribVectorCountProvider);
+
+                      if (gribUGrid == null || gribVGrid == null || !gribVisible) return const SizedBox.shrink();
+
+                      return RepaintBoundary(
+                        key: ValueKey('grib-vectors-${gribUGrid.hashCode}-${gribVGrid.hashCode}'),
+                        child: IgnorePointer(
+                          child: Opacity(
+                            opacity: gribOpacity * 0.9,
+                            child: ClipRect(
                               child: CustomPaint(
                                 size: Size(constraints.maxWidth, constraints.maxHeight),
                                 painter: GribVectorFieldPainter(
                                   uGrid: gribUGrid,
                                   vGrid: gribVGrid,
                                   vmin: 0.0,
-                                  vmax: 20.0, // Vitesse max en m/s
+                                  vmax: 20.0,
                                   projector: (lon, lat, size) {
                                     final geoPos = GeographicPosition(latitude: lat, longitude: lon);
                                     final localPos = mercatorService.toLocal(geoPos);
                                     return view.project(localPos.x, localPos.y, size);
                                   },
                                   opacity: gribOpacity * 0.9,
-                                  samplingStride: 3, // Un vecteur tous les 3 points (mode legacy)
+                                  samplingStride: 3,
                                   boundsMinX: view.minX,
                                   boundsMaxX: view.maxX,
                                   boundsMinY: view.minY,
                                   boundsMaxY: view.maxY,
-                                  targetVectorCount: gribVectorCount, // Nouveau: nombre de vecteurs interpolés cible
+                                  targetVectorCount: gribVectorCount,
                                 ),
                               ),
                             ),
-                          );
-                        },
-                      ),
-                    ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Flèches de vent interpolées
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final gribUGrid = ref.watch(currentGribUGridProvider);
+                      final gribVGrid = ref.watch(currentGribVGridProvider);
+                      final gribOpacity = ref.watch(gribOpacityProvider);
+                      final gribVisible = ref.watch(gribVisibilityProvider);
+
+                      if (gribUGrid == null || gribVGrid == null || !gribVisible) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return IgnorePointer(
+                        child: Opacity(
+                          opacity: gribOpacity * 0.6,
+                          child: CustomPaint(
+                            size: Size(constraints.maxWidth, constraints.maxHeight),
+                            painter: InterpolatedWindArrowsPainter(
+                              uGrids: [gribUGrid],
+                              vGrids: [gribVGrid],
+                              timestamps: [DateTime.now()], // FIXME: utiliser les vrais timestamps
+                              currentTime: DateTime.now(),
+                              view: view,
+                              arrowsPerSide: 10,  // 10x10 = 100 flèches
+                              arrowLength: 35,   // Augmenté pour mieux voir
+                              arrowColor: Colors.cyan,
+                              opacity: gribOpacity * 0.6,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  // Parcours et debug
                   RepaintBoundary(
                     child: CustomPaint(
                       size: Size(constraints.maxWidth, constraints.maxHeight),
@@ -410,7 +410,38 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
             ),
           ),
         );
-      },
+        },
+      ),
+        // Overlay GRIB - complètement en dehors du LayoutBuilder
+        Positioned.fill(
+          child: Consumer(
+            builder: (context, ref, child) {
+              // Watch les providers GRIB
+              final gribGrid = ref.watch(currentGribGridProvider);
+              final gribOpacity = ref.watch(gribOpacityProvider);
+              final gribVmin = ref.watch(gribVminProvider);
+              final gribVmax = ref.watch(gribVmaxProvider);
+              final gribUGrid = ref.watch(currentGribUGridProvider);
+              final gribVGrid = ref.watch(currentGribVGridProvider);
+              final gribVisible = ref.watch(gribVisibilityProvider);
+              final gribVectorCount = ref.watch(gribVectorCountProvider);
+
+              if (!gribVisible || (gribGrid == null && gribUGrid == null)) {
+                return const SizedBox.shrink();
+              }
+
+              return IgnorePointer(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Les flèches de vent interpolées seront dans le LayoutBuilder
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
