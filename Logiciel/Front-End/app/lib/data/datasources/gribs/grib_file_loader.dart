@@ -19,25 +19,34 @@ class GribFileLoader {
       // Utiliser getGribDataDirectory() au lieu d'un chemin relatif
       final gribDir = await getGribDataDirectory();
       
-      print('[GRIB_LOADER] Cherchant les fichiers GRIB dans: ${gribDir.path}');
+      print('[GRIB_LOADER] ════════════════════════════════════════');
+      print('[GRIB_LOADER] 🔍 CHERCHANT LES FICHIERS GRIB');
+      print('[GRIB_LOADER] Chemin: ${gribDir.path}');
+      print('[GRIB_LOADER] Existe: ${gribDir.existsSync()}');
       
       if (!gribDir.existsSync()) {
-        print('[GRIB_LOADER] Répertoire non trouvé: ${gribDir.path}');
+        print('[GRIB_LOADER] ❌ Répertoire non trouvé!');
+        print('[GRIB_LOADER] ❌ ERREUR: ${gribDir.path} n\'existe pas');
+        print('[GRIB_LOADER] ❌ Crée le dossier manuellement sur ta tablette:');
+        print('[GRIB_LOADER] ❌   /data/data/com.kornog.app/files/KornogData/grib/');
+        print('[GRIB_LOADER] ════════════════════════════════════════');
         return [];
       }
       
-      print('[GRIB_LOADER] Répertoire trouvé, listing...');
+      print('[GRIB_LOADER] ✅ Répertoire trouvé, listing les fichiers...');
 
       final files = <File>[];
       
       // Parcourir les sous-dossiers (GFS_0p25/20251025T12/gfs.t12z.pgrb2.0p25.f042, etc.)
       for (final modelDir in gribDir.listSync().whereType<Directory>()) {
+        print('[GRIB_LOADER] 📁 Modèle: ${modelDir.path.split('/').last}');
         // Filtrer par modèle si spécifié
         if (model != null && !modelDir.path.contains(_modelDirName(model))) {
           continue;
         }
 
         for (final cycleDir in modelDir.listSync().whereType<Directory>()) {
+          print('[GRIB_LOADER]   📅 Cycle: ${cycleDir.path.split('/').last}');
           for (final file in cycleDir.listSync().whereType<File>()) {
             if (file.path.endsWith('.anl') || 
                 file.path.endsWith('.f000') ||
@@ -50,19 +59,25 @@ class GribFileLoader {
                 file.path.endsWith('.f021') ||
                 file.path.endsWith('.f024') ||
                 file.path.contains('pgrb2')) {
+              print('[GRIB_LOADER]     ✅ ${file.path.split('/').last} (${file.lengthSync() / 1024 / 1024} MB)');
               files.add(file);
             }
           }
         }
       }
 
-      print('[GRIB_LOADER] Trouvé ${files.length} fichiers GRIB');
+      print('[GRIB_LOADER] ✅ Trouvé ${files.length} fichiers GRIB');
+      if (files.isEmpty) {
+        print('[GRIB_LOADER] ⚠️  ATTENTION: Aucun fichier trouvé!');
+        print('[GRIB_LOADER] ⚠️  Place tes fichiers GRIB dans: ${gribDir.path}');
+      }
       for (final f in files.take(5)) {
         print('[GRIB_LOADER]   - ${f.path}');
       }
       return files;
     } catch (e) {
-      print('[GRIB_LOADER] Erreur lors de la recherche: $e');
+      print('[GRIB_LOADER] ❌ ERREUR lors de la recherche: $e');
+      print('[GRIB_LOADER] ❌ Stack trace: $e');
       return [];
     }
   }

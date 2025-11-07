@@ -137,12 +137,12 @@ class GribInterpolationService {
     DateTime time,
   ) {
     // Si avant le premier timestamp
-    if (time.isBefore(timestamps.first)) {
+    if (time.compareTo(timestamps.first) < 0) {
       return (0, 0, 0.0);
     }
 
     // Si après le dernier timestamp
-    if (time.isAfter(timestamps.last)) {
+    if (time.compareTo(timestamps.last) > 0) {
       final idx = timestamps.length - 1;
       return (idx, idx, 0.0);
     }
@@ -152,7 +152,7 @@ class GribInterpolationService {
       final t0 = timestamps[i];
       final t1 = timestamps[i + 1];
 
-      if (time.isAfter(t0) && time.isBefore(t1)) {
+      if (time.compareTo(t0) > 0 && time.compareTo(t1) < 0) {
         final totalDuration = t1.difference(t0).inMilliseconds;
         final elapsedDuration = time.difference(t0).inMilliseconds;
         final alpha = elapsedDuration / totalDuration;
@@ -167,6 +167,50 @@ class GribInterpolationService {
     // Dernier timestamp exactement
     final idx = timestamps.length - 1;
     return (idx, idx, 0.0);
+  }
+
+  /// ============================================================
+  /// API PUBLIQUE POUR LE ROUTAGE
+  /// ============================================================
+  /// Récupère le vent à un point géographique pour un temps donné
+  /// À utiliser pour le calcul de routage: pour chaque point de la trajectoire,
+  /// récupérer le vent et l'inclure dans l'optimisation
+  /// 
+  /// Exemple:
+  /// ```dart
+  /// final wind = GribInterpolationService.getWindAt(
+  ///   uGrids: gridsU, vGrids: gridsV, timestamps: times,
+  ///   longitude: 7.5, latitude: 43.5,
+  ///   time: DateTime.now()
+  /// );
+  /// if (wind != null) {
+  ///   print('Vent: ${wind.speed} m/s, direction: ${wind.direction}°');
+  /// }
+  /// ```
+  static WindVector? getWindAt({
+    required List<ScalarGrid> uGrids,
+    required List<ScalarGrid> vGrids,
+    required List<DateTime> timestamps,
+    required double longitude,
+    required double latitude,
+    required DateTime time,
+  }) {
+    return interpolateWind(uGrids, vGrids, timestamps, longitude, latitude, time);
+  }
+
+  /// Version batch: récupère le vent pour plusieurs points à la fois
+  /// Utile pour interpoler une trajectoire entière
+  static List<WindVector?> getWindAtMultiplePoints({
+    required List<ScalarGrid> uGrids,
+    required List<ScalarGrid> vGrids,
+    required List<DateTime> timestamps,
+    required List<(double lon, double lat)> points,
+    required DateTime time,
+  }) {
+    return [
+      for (final (lon, lat) in points)
+        interpolateWind(uGrids, vGrids, timestamps, lon, lat, time),
+    ];
   }
 }
 
@@ -191,6 +235,7 @@ class WindVector {
 
 /// Extension helper pour DateTime
 extension DateTimeComparison on DateTime {
-  bool isBefore(DateTime other) => isBefore(other);
-  bool isAfter(DateTime other) => isAfter(other);
+  bool isBeforeDateTime(DateTime other) => isBefore(other);
+  bool isAfterDateTime(DateTime other) => isAfter(other);
 }
+

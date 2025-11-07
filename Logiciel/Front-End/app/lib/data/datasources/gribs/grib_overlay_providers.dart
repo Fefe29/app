@@ -3,6 +3,7 @@ import 'dart:io';
 import 'grib_models.dart';
 import 'grib_file_loader.dart';
 import 'grib_downloader.dart';
+import 'grib_test_data_generator.dart';
 
 // ============================================================
 // PROVIDERS POUR GÉRER LES DONNÉES GRIB AFFICHÉES SUR LA CARTE
@@ -151,25 +152,29 @@ class AutoLoadGribGridNotifier extends AsyncNotifier<void> {
         try {
           final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(files.first);
           
-          if (uGrid != null) {
+          if (uGrid != null && vGrid != null) {
             print('[AUTO_LOAD] U-grid loaded: ${uGrid.nx}x${uGrid.ny}');
-            ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
-          } else {
-            print('[AUTO_LOAD] Failed to load U-grid');
-          }
-          
-          if (vGrid != null) {
             print('[AUTO_LOAD] V-grid loaded: ${vGrid.nx}x${vGrid.ny}');
+            ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
             ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
           } else {
-            print('[AUTO_LOAD] Failed to load V-grid');
+            print('[AUTO_LOAD] Failed to load U/V grids, using test data as fallback');
+            final (testU, testV) = GribTestDataGenerator.generateTestWindVectors();
+            ref.read(currentGribUGridProvider.notifier).setGrid(testU);
+            ref.read(currentGribVGridProvider.notifier).setGrid(testV);
           }
         } catch (e) {
-          print('[AUTO_LOAD] Error loading U/V grids: $e');
+          print('[AUTO_LOAD] Error loading U/V grids: $e, using test data');
+          final (testU, testV) = GribTestDataGenerator.generateTestWindVectors();
+          ref.read(currentGribUGridProvider.notifier).setGrid(testU);
+          ref.read(currentGribVGridProvider.notifier).setGrid(testV);
         }
       }
     } else {
-      print('[AUTO_LOAD] No GRIB files found!');
+      print('[AUTO_LOAD] No GRIB files found! Using test data as fallback');
+      final (testU, testV) = GribTestDataGenerator.generateTestWindVectors();
+      ref.read(currentGribUGridProvider.notifier).setGrid(testU);
+      ref.read(currentGribVGridProvider.notifier).setGrid(testV);
     }
   }
 }

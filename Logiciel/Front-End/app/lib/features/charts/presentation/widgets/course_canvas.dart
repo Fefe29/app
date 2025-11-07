@@ -26,6 +26,11 @@ import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
 import '../../../../data/datasources/gribs/grib_painters.dart';
 import '../../../../data/datasources/gribs/grib_models.dart';
 import '../../../../data/datasources/gribs/interpolated_wind_arrows_painter.dart';
+import '../../../../data/datasources/gribs/viewport_wind_grid.dart';
+import '../../../../data/datasources/gribs/viewport_wind_arrows_painter.dart';
+import '../../../../data/datasources/gribs/viewport_wind_heatmap_painter.dart';
+import '../../../../data/datasources/gribs/grib_interpolation_service.dart';
+import '../../../../data/datasources/gribs/viewport_wind_grid_provider.dart';
 import '../../../../data/datasources/gribs/grib_time_slider_widget.dart';
 import '../../../../data/datasources/gribs/wind_speed_legend_bar.dart';
 import '../../providers/grib_layers_provider.dart';
@@ -67,6 +72,65 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   Offset? _lastPanPosition;
   double _zoomFactor = 1.0; // 1.0 = normal, >1 = zoom in, <1 = zoom out
   int _tileZoomOffset = 0; // Décalage de zoom OSM
+  
+  // Mouse tracking pour le vent sous le curseur
+  Offset? _mousePosition;
+  WindPoint? _windAtMouse;
+  
+  // Sauvegarde de la vue et des données pour le tooltip
+  ViewTransform? _lastView;
+  Size? _lastCanvasSize;
+  MercatorCoordinateSystemService? _lastMercatorService;
+  List<ScalarGrid>? _lastUGrids;
+  List<ScalarGrid>? _lastVGrids;
+  DateTime? _lastForecastTime;
+  
+  // Viewport courant pour convertir pixel → géo
+  ViewTransform? _currentView;
+  Size? _currentCanvasSize;
+  
+  /// Convertit un pixel en vent au point de la souris
+  /// pixel (screen coordinates) → local mercator → geographic → GRIB interpolation
+  Future<WindPoint?> getWindAtPixel(
+    Offset pixelPos,
+    ViewTransform view,
+    Size canvasSize,
+    MercatorCoordinateSystemService mercatorService,
+    List<ScalarGrid>? uGrids,
+    List<ScalarGrid>? vGrids,
+  ) async {
+    if (uGrids == null || vGrids == null || uGrids.isEmpty || vGrids.isEmpty) {
+      return null;
+    }
+
+    // Convertir pixel → local Mercator
+    // pixelPos.x = offsetX + (localX - minX) * scale
+    // pixelPos.y = height - offsetY - (localY - minY) * scale
+    
+    final localX = (pixelPos.dx - view.offsetX) / view.scale + view.minX;
+    final localY = (canvasSize.height - pixelPos.dy - view.offsetY) / view.scale + view.minY;
+
+    // Convertir local Mercator → geographic
+    final geoPos = mercatorService.toGeographic(LocalPosition(x: localX, y: localY));
+
+    // Interroger le vent via l'API de routage
+    final wind = GribInterpolationService.getWindAt(
+      uGrids: uGrids,
+      vGrids: vGrids,
+      timestamps: [DateTime.now()],
+      longitude: geoPos.longitude,
+      latitude: geoPos.latitude,
+      time: DateTime.now(),
+    );
+
+    if (wind != null) {
+      return WindPoint(
+        position: geoPos,
+        wind: wind,
+      );
+    }
+    return null;
+  }
 
   void _incrementZoom() {
     setState(() {
@@ -87,6 +151,38 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   void _adjustTileZoomIfNeeded() {
     // Désactivé : on ne touche plus au tileZoomOffset, le zoom est totalement libre
     // print('[ZOOM] _adjustTileZoomIfNeeded: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
+  }
+
+  /// Convertit pixel → local → géographique
+  GeographicPosition? _pixelToGeographic(Offset pixelPos, Size canvasSize) {
+    if (_lastView == null || _lastMercatorService == null) return null;
+    
+    final view = _lastView!;
+    final mercatorService = _lastMercatorService!;
+    
+    // Inverse de view.project: pixel → local
+    final x = ((pixelPos.dx - view.offsetX) / view.scale) + view.minX;
+    final y = ((canvasSize.height - pixelPos.dy - view.offsetY) / view.scale) + view.minY;
+    
+    final localPos = LocalPosition(x: x, y: y);
+    return mercatorService.toGeographic(localPos);
+  }
+
+  /// Interroge le vent à la position de la souris
+  Future<WindVector?> _getWindAtMouse(Offset pixelPos, Size canvasSize) async {
+    final geoPos = _pixelToGeographic(pixelPos, canvasSize);
+    if (geoPos == null || _lastUGrids == null || _lastVGrids == null || _lastForecastTime == null) {
+      return null;
+    }
+
+    return GribInterpolationService.getWindAt(
+      uGrids: _lastUGrids!,
+      vGrids: _lastVGrids!,
+      timestamps: _lastForecastTime != null ? [_lastForecastTime!] : [],
+      longitude: geoPos.longitude,
+      latitude: geoPos.latitude,
+      time: _lastForecastTime ?? DateTime.now(),
+    );
   }
 
   @override
@@ -178,6 +274,11 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
           offsetX: offsetX,
           offsetY: offsetY,
         );
+        
+        // Sauvegarde pour convertir pixel → géo dans le tooltip
+        _currentView = view;
+        _currentCanvasSize = Size(constraints.maxWidth, constraints.maxHeight);
+        
         print('[COURSE_CANVAS_BOUNDS] View: scale=$scale, offsetX=$offsetX, offsetY=$offsetY, zoomFactor=$_zoomFactor');
   int baseTileZoom = activeMap?.zoomLevel ?? 10;
   int tileZoom = (baseTileZoom + _tileZoomOffset).clamp(1, 20);
@@ -226,7 +327,20 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
             onScaleEnd: (details) {
               _lastPanPosition = null;
             },
-            child: SizedBox(
+            child: MouseRegion(
+              onEnter: (_) {},
+              onExit: (_) {
+                setState(() {
+                  _mousePosition = null;
+                  _windAtMouse = null;
+                });
+              },
+              onHover: (event) {
+                setState(() {
+                  _mousePosition = event.localPosition;
+                });
+              },
+              child: SizedBox(
               width: constraints.maxWidth,
               height: constraints.maxHeight,
               child: Stack(
@@ -260,80 +374,125 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                         return Center(child: Text('Chargement des tuiles...'));
                       },
                     ),
-                  // Couche GRIB heatmap - avec Consumer pour watcher indépendamment
-                  Consumer(
-                    builder: (context, ref, child) {
-                      final gribGrid = ref.watch(currentGribGridProvider);
-                      final gribOpacity = ref.watch(gribOpacityProvider);
-                      final gribVmin = ref.watch(gribVminProvider);
-                      final gribVmax = ref.watch(gribVmaxProvider);
-                      final gribVisible = ref.watch(gribVisibilityProvider);
-
-                      if (gribGrid == null || !gribVisible) return const SizedBox.shrink();
-
-                      return RepaintBoundary(
-                        key: ValueKey('grib-heatmap-${gribGrid.hashCode}-${gribVmin}-${gribVmax}'),
-                        child: IgnorePointer(
-                          child: Opacity(
-                            opacity: gribOpacity,
-                            child: ClipRect(
-                              child: CustomPaint(
-                                size: Size(constraints.maxWidth, constraints.maxHeight),
-                                painter: GribGridPainter(
-                                  grid: gribGrid,
-                                  vmin: gribVmin,
-                                  vmax: gribVmax,
-                                  projector: (lon, lat, size) {
-                                    final geoPos = GeographicPosition(latitude: lat, longitude: lon);
-                                    final localPos = mercatorService.toLocal(geoPos);
-                                    return view.project(localPos.x, localPos.y, size);
-                                  },
-                                  colorMapName: ColorMap.parula,
-                                  opacity: gribOpacity,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  // Couche GRIB vecteurs - MAINTENANT AVEC LES FLÈCHES INTERPOLÉES
-
-                  // Flèches de vent interpolées
+                  
+                  // ✅ ANCIEN GRIB HEATMAP SUPPRIMÉ - Remplacé par le nouveau système 50 points
+                  
+                  // 🆕 NOUVEAU HEATMAP VIEWPORT - gradient basé sur 50 points (10x5)
                   Consumer(
                     builder: (context, ref, child) {
                       final gribUGrid = ref.watch(currentGribUGridProvider);
                       final gribVGrid = ref.watch(currentGribVGridProvider);
                       final gribOpacity = ref.watch(gribOpacityProvider);
-                      final gribVisible = ref.watch(gribVisibilityProvider);
 
-                      if (gribUGrid == null || gribVGrid == null || !gribVisible) {
+                      if (gribUGrid == null || gribVGrid == null) {
                         return const SizedBox.shrink();
                       }
 
-                      return IgnorePointer(
-                        child: Opacity(
-                          opacity: 1.0,  // OPACITÉ MAXIMALE pour bien voir les flèches
-                          child: CustomPaint(
-                            size: Size(constraints.maxWidth, constraints.maxHeight),
-                            painter: InterpolatedWindArrowsPainter(
-                              uGrids: [gribUGrid],
-                              vGrids: [gribVGrid],
-                              timestamps: [DateTime.now()],
-                              currentTime: DateTime.now(),
-                              view: view,
-                              mercatorService: mercatorService,
-                              arrowsPerSide: 6,  // 6x6 = 36 flèches
-                              arrowLength: 120,  // BEAUCOUP PLUS GRAND! (était 80)
-                              arrowColor: Colors.deepOrange,
-                              opacity: 1.0,  // OPACITÉ MAXIMALE des flèches elles-mêmes
-                            ),
-                          ),
+                      // ⚠️ Clé unique basée sur la vue ET les grids pour forcer recalcul au zoom/pan ET changement de temps
+                      final viewKey = '${view.scale}_${view.offsetX}_${view.offsetY}_${gribUGrid.hashCode}_${gribVGrid.hashCode}';
+
+                      // Interroger le vent aux 50 points (10x5)
+                      return FutureBuilder<List<WindPoint>>(
+                        key: ValueKey(viewKey),
+                        future: ViewportWindGrid.generateWindPointsFromPixels(
+                          canvasSize: Size(constraints.maxWidth, constraints.maxHeight),
+                          view: view,
+                          mercatorService: mercatorService,
+                          uGrids: [gribUGrid],
+                          vGrids: [gribVGrid],
+                          timestamps: [DateTime.now()],
+                          forecastTime: DateTime.now(),
                         ),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          final windPoints = snapshot.data!;
+
+                          // Map position géo → pixel
+                          final positionToPixel = <GeographicPosition, Offset>{};
+                          for (final wp in windPoints) {
+                            final localPos = mercatorService.toLocal(wp.position);
+                            final pixelPos = view.project(localPos.x, localPos.y, Size(constraints.maxWidth, constraints.maxHeight));
+                            positionToPixel[wp.position] = pixelPos;
+                          }
+
+                          return IgnorePointer(
+                            child: Opacity(
+                              opacity: gribOpacity * 0.6, // Heatmap semi-transparent
+                              child: CustomPaint(
+                                size: Size(constraints.maxWidth, constraints.maxHeight),
+                                painter: ViewportWindHeatmapPainter(
+                                  windPoints: windPoints,
+                                  positionToPixel: positionToPixel,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
+
+                  // 🆕 NOUVEAU PAINTER FLÈCHES VIEWPORT - 50 flèches (10x5) uniformément réparties
+                  Consumer(
+                    builder: (context, ref, child) {
+                      final gribUGrid = ref.watch(currentGribUGridProvider);
+                      final gribVGrid = ref.watch(currentGribVGridProvider);
+
+                      if (gribUGrid == null || gribVGrid == null) {
+                        return const SizedBox.shrink();
+                      }
+
+                      // 🔥 NOUVELLE APPROCHE: générer depuis les pixels directement!
+                      // ⚠️ Clé unique basée sur la vue ET les grids pour forcer recalcul au zoom/pan ET changement de temps
+                      final viewKey = '${view.scale}_${view.offsetX}_${view.offsetY}_${gribUGrid.hashCode}_${gribVGrid.hashCode}';
+                      
+                      return FutureBuilder<List<WindPoint>>(
+                        key: ValueKey(viewKey),
+                        future: ViewportWindGrid.generateWindPointsFromPixels(
+                          canvasSize: Size(constraints.maxWidth, constraints.maxHeight),
+                          view: view,
+                          mercatorService: mercatorService,
+                          uGrids: [gribUGrid],
+                          vGrids: [gribVGrid],
+                          timestamps: [DateTime.now()],
+                          forecastTime: DateTime.now(),
+                        ),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          final windPoints = snapshot.data!;
+
+                          // Map position géo → pixel
+                          final positionToPixel = <GeographicPosition, Offset>{};
+                          for (final wp in windPoints) {
+                            final localPos = mercatorService.toLocal(wp.position);
+                            final pixelPos = view.project(localPos.x, localPos.y, Size(constraints.maxWidth, constraints.maxHeight));
+                            positionToPixel[wp.position] = pixelPos;
+                          }
+
+                          return IgnorePointer(
+                            child: RepaintBoundary(
+                              child: CustomPaint(
+                                size: Size(constraints.maxWidth, constraints.maxHeight),
+                                painter: ViewportWindArrowsPainter(
+                                  windPoints: windPoints,
+                                  positionToPixel: positionToPixel,
+                                  arrowLength: 50.0, // Réduit de 80 à 50 pour 50 flèches
+                                  arrowColor: Colors.black,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+
                   // Parcours et debug
                   RepaintBoundary(
                     child: CustomPaint(
@@ -371,6 +530,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                   ),
                 ],
               ),
+            ),
             ),
           ),
         );
@@ -439,6 +599,58 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
             },
           ),
         ),
+        // 🆕 Tooltip du vent sous la souris
+        if (_mousePosition != null && _currentView != null && _currentCanvasSize != null)
+          Positioned(
+            left: _mousePosition!.dx + 16,
+            top: _mousePosition!.dy - 30,
+            child: Consumer(
+              builder: (context, ref, child) {
+                final gribUGrid = ref.watch(currentGribUGridProvider);
+                final gribVGrid = ref.watch(currentGribVGridProvider);
+                final mercatorService = ref.watch(mercatorCoordinateSystemProvider);
+
+                // Asynchrone: interroger le vent au pixel de la souris
+                if (gribUGrid != null && gribVGrid != null && _mousePosition != null && _currentView != null && _currentCanvasSize != null) {
+                  return FutureBuilder<WindPoint?>(
+                    future: getWindAtPixel(
+                      _mousePosition!,
+                      _currentView!,
+                      _currentCanvasSize!,
+                      mercatorService,
+                      [gribUGrid],
+                      [gribVGrid],
+                    ),
+                    builder: (context, snapshot) {
+                      String windText = "Vent: -- m/s @ --°";
+                      
+                      if (snapshot.hasData && snapshot.data != null) {
+                        final windPt = snapshot.data!;
+                        if (windPt.wind != null) {
+                          windText = "Vent: ${windPt.wind!.speed.toStringAsFixed(1)} m/s @ ${windPt.wind!.direction.toStringAsFixed(0)}°";
+                        }
+                      }
+                      
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.8),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        child: Text(
+                          windText,
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
+                        ),
+                      );
+                    },
+                  );
+                }
+
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
       ],
     );
   }
