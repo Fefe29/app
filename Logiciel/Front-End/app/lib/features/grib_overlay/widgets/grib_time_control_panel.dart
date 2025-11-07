@@ -75,7 +75,12 @@ class _GribTimeControlPanelState extends ConsumerState<GribTimeControlPanel> {
     final currentHour = ref.watch(gribForecastHourProvider);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         // === Titre ===
@@ -234,7 +239,7 @@ class _GribTimeControlPanelState extends ConsumerState<GribTimeControlPanel> {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: Colors.blue.withOpacity(0.3)),
             ),
@@ -256,6 +261,7 @@ class _GribTimeControlPanelState extends ConsumerState<GribTimeControlPanel> {
           ),
         ),
       ],
+      ),
     );
   }
 }

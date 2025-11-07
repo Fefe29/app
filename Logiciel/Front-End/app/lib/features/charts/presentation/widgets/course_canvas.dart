@@ -482,7 +482,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                                 painter: ViewportWindArrowsPainter(
                                   windPoints: windPoints,
                                   positionToPixel: positionToPixel,
-                                  arrowLength: 50.0, // Réduit de 80 à 50 pour 50 flèches
+                                  arrowLength: 80.0, // Longueur max de la flèche (varie selon vitesse)
                                   arrowColor: Colors.black,
                                 ),
                               ),
@@ -622,12 +622,14 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                       [gribVGrid],
                     ),
                     builder: (context, snapshot) {
-                      String windText = "Vent: -- m/s @ --°";
+                      String windText = "Vent: -- nd -- °";
                       
                       if (snapshot.hasData && snapshot.data != null) {
                         final windPt = snapshot.data!;
                         if (windPt.wind != null) {
-                          windText = "Vent: ${windPt.wind!.speed.toStringAsFixed(1)} m/s @ ${windPt.wind!.direction.toStringAsFixed(0)}°";
+                          // Convertir m/s en nœuds: 1 m/s ≈ 1.94384 nœuds
+                          final speedInKnots = windPt.wind!.speed * 1.94384;
+                          windText = "Vent: ${speedInKnots.toStringAsFixed(1)} nd ${windPt.wind!.direction.toStringAsFixed(0)}°";
                         }
                       }
                       

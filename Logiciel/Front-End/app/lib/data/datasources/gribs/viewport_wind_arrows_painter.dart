@@ -26,10 +26,9 @@ class ViewportWindArrowsPainter extends CustomPainter {
     
     print('[WIND_ARROWS] Painting ${windPoints.length} arrows, positionToPixel size=${positionToPixel.length}');
     
-    // Paint pour les flèches
-    final arrowPaint = Paint()
+    // Paint pour les flèches (sera modifié selon la vitesse)
+    final arrowBasePaint = Paint()
       ..color = arrowColor
-      ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
@@ -64,6 +63,15 @@ class ViewportWindArrowsPainter extends CustomPainter {
       // Normaliser: 0-20 m/s → 0-arrowLength pixels
       final windLength = (windPoint.windSpeed / 20.0 * arrowLength).clamp(5.0, arrowLength);
 
+      // Épaisseur de la ligne variable selon la vitesse (0.5 à 3.5 points)
+      final lineWidth = (windPoint.windSpeed / 20.0 * 3.0).clamp(0.5, 3.5);
+      
+      final arrowPaint = Paint()
+        ..color = arrowColor
+        ..strokeWidth = lineWidth
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+
       // Calculer le vecteur de la flèche (direction du vent)
       final directionRad = windPoint.windDirection * math.pi / 180.0;
       final endX = pixelPos.dx + windLength * math.sin(directionRad);
@@ -75,7 +83,7 @@ class ViewportWindArrowsPainter extends CustomPainter {
       canvas.drawLine(pixelPos, endPoint, arrowPaint);
 
       // Dessiner la pointe de flèche (V pointant dans la direction du vent)
-      _drawArrowHead(canvas, pixelPos, endPoint, arrowPaint);
+      _drawArrowHead(canvas, pixelPos, endPoint, arrowPaint, windPoint.windSpeed);
 
       drawn++;
     }
@@ -83,13 +91,14 @@ class ViewportWindArrowsPainter extends CustomPainter {
     print('[WIND_ARROWS] Drawn=$drawn, Offscreen=$offscreen, NoWind=$noWind');
   }
 
-  /// Dessine une pointe de flèche (V) au point final
-  void _drawArrowHead(Canvas canvas, Offset start, Offset end, Paint paint) {
+  /// Dessine une pointe de flèche (V) au point final, avec taille variable selon la vitesse
+  void _drawArrowHead(Canvas canvas, Offset start, Offset end, Paint paint, double windSpeed) {
     final dx = end.dx - start.dx;
     final dy = end.dy - start.dy;
     final angle = math.atan2(dy, dx);
     
-    const arrowHeadSize = 8.0;
+    // Taille de la pointe variable selon la vitesse du vent (0-20 m/s), divisée par 2
+    final arrowHeadSize = (windSpeed / 20.0 * 10.0).clamp(4.0, 10.0);
     const arrowHeadAngle = math.pi / 6; // 30 degrés
 
     // Deux points de la pointe du V

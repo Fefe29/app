@@ -45,14 +45,8 @@ class WindSpeedLegendBar extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.black87,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 8,
-          ),
-        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -61,10 +55,20 @@ class WindSpeedLegendBar extends ConsumerWidget {
           Text(
             'Vitesse vent',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: Colors.white,
+              color: Colors.black,
             ),
           ),
           const SizedBox(height: 8),
+          // Label "50 nds" au-dessus
+          Text(
+            '${maxDisplay.toInt()} nd',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.black,
+              fontSize: 10,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
           SizedBox(
             width: 40,
             height: 200,
@@ -78,36 +82,14 @@ class WindSpeedLegendBar extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           
-          // Labels min et max
-          SizedBox(
-            width: 50,
-            child: Column(
-              children: [
-                Text(
-                  '${maxDisplay.toInt()} nd',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
-                    fontSize: 10,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    '...',
-                    style: TextStyle(color: Colors.grey, fontSize: 8),
-                  ),
-                ),
-                Text(
-                  '${minDisplay.toInt()} nd',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
-                    fontSize: 10,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+          // Label min
+          Text(
+            '${minDisplay.toInt()} nd',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.black,
+              fontSize: 10,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
