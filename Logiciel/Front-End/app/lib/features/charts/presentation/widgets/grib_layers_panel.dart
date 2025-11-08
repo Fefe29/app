@@ -25,124 +25,14 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
   @override
   void initState() {
     super.initState();
+    print('[GRIB_PANEL] 🚀 INIT - GribLayersPanel initState appelé');
     _selectedModel = GribModel.gfs025;
-  }
-
-  Future<void> _showGribManagerDialog() async {
-    final availableFiles = await GribFileLoader.findGribFiles();
-    
-    if (!mounted) return;
-    
-    if (availableFiles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Aucun fichier GRIB trouvé')),
-      );
-      return;
-    }
-
-    // Organiser les fichiers par modèle et cycle
-    final grouped = <String, List<File>>{};
-    for (final file in availableFiles) {
-      final parts = file.path.split('/');
-      if (parts.length >= 2) {
-        final modelCycle = '${parts[parts.length - 3]}/${parts[parts.length - 2]}';
-        grouped.putIfAbsent(modelCycle, () => []).add(file);
-      }
-    }
-
-    if (!mounted) return;
-
-    final selectedFile = await showDialog<File>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sélectionner un fichier GRIB'),
-        content: SizedBox(
-          width: 500,
-          height: 400,
-          child: ListView.builder(
-            itemCount: availableFiles.length,
-            itemBuilder: (context, index) {
-              final file = availableFiles[index];
-              final fileName = file.path.split('/').last;
-              final fileSize = file.lengthSync() / 1024 / 1024;
-              final path = file.path;
-              
-              return ListTile(
-                title: Text(
-                  fileName,
-                  style: const TextStyle(fontSize: 11),
-                ),
-                subtitle: Text(
-                  '${(fileSize).toStringAsFixed(1)} MB • ${path.split('/').sublist(path.split('/').length - 3).join('/')}',
-                  style: const TextStyle(fontSize: 10),
-                ),
-                onTap: () => Navigator.pop(ctx, file),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-        ],
-      ),
-    );
-
-    if (selectedFile == null) return;
-
-    await _loadGribFile(selectedFile);
-  }
-
-  Future<void> _loadGribFile(File file) async {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chargement du GRIB...')),
-      );
-    }
-
-    final fileName = file.path.split('/').last;
-    print('[GRIB_PANEL] Chargement de: $fileName');
-
-    // Charger la grille
-    final grid = await GribFileLoader.loadGridFromGribFile(file);
-    if (grid != null) {
-      final (vmin, vmax) = grid.getValueBounds();
-      ref.read(currentGribGridProvider.notifier).setGrid(grid);
-      ref.read(gribVminProvider.notifier).setVmin(vmin);
-      ref.read(gribVmaxProvider.notifier).setVmax(vmax);
-      
-      // Stocker le dernier fichier chargé
-      ref.read(lastLoadedGribFileProvider.notifier).setFile(file);
-      
-      print('[GRIB_PANEL] ✅ Grid chargée: ${grid.nx}x${grid.ny}, values: $vmin..$vmax');
-
-      // Charger aussi les vecteurs U/V automatiquement
-      print('[GRIB_PANEL] Chargement des vecteurs U/V...');
-      final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(file);
-      if (uGrid != null && vGrid != null) {
-        ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
-        ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
-        print('[GRIB_PANEL] ✅ Vecteurs U/V chargés');
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ GRIB chargé: $fileName')),
-        );
-      }
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Erreur: impossible de charger le GRIB')),
-        );
-      }
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    print('[GRIB_PANEL] 🏗️ BUILD - GribLayersPanel est en train de se construire');
+    
     final selectedVars = _selected[_selectedModel] ?? <GribVariable>{};
     final dlState = ref.watch(gribDownloadControllerProvider);
     final isBusy = dlState.isLoading;
@@ -150,13 +40,6 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Couches GRIB'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.folder_open),
-            onPressed: _showGribManagerDialog,
-            tooltip: 'Gérer les fichiers GRIB',
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -164,22 +47,76 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // === SECTION: Contrôle temporel GRIB ===
-              // NOTE: Le contrôle temporel a été déplacé en bas de la carte (GribTimeSliderWidget)
-              // pour une meilleure intégration avec la visualisation en temps réel
-              const SizedBox(height: 8),
-
-              // Switch d'affichage des GRIBs (heatmap + flèches)
-              Row(
-                children: [
-                  const Text('Afficher les GRIBs'),
-                  const SizedBox(width: 8),
-                  Switch(
-                    value: ref.watch(gribVisibilityProvider),
-                    onChanged: (v) => ref.read(gribVisibilityProvider.notifier).setVisible(v),
-                  ),
-                ],
+              // === SECTION: Dossier GRIB actif ===
+              Consumer(
+                builder: (context, ref, child) {
+                  final activeDir = ref.watch(activeGribDirectoryProvider);
+                  
+                  if (activeDir != null) {
+                    final parts = activeDir.path.split('/');
+                    final cycleName = parts.last;
+                    final modelName = parts.length > 1 ? parts[parts.length - 2] : 'UNKNOWN';
+                    
+                    return Card(
+                      color: Colors.cyan.shade50,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Dossier GRIB actif',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              cycleName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              modelName,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  
+                  return Card(
+                    color: Colors.orange.shade50,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning, color: Colors.orange[700], size: 20),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Aucun dossier GRIB sélectionné. Allez dans "Gérer les fichiers météo" pour en sélectionner un.',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
+              
+              // === SECTION: Configuration du téléchargement ===
               const SizedBox(height: 16),
               DropdownButtonFormField<GribModel>(
                 initialValue: _selectedModel,

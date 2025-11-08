@@ -197,7 +197,8 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     final activeMap = ref.watch(activeMapProvider);
     final displayMaps = ref.watch(mapDisplayProvider);
     
-    // Auto-load GRIB grids on startup
+    // Auto-load GRIB grids on startup ONLY
+    // (autoLoadGribFromActiveDirectoryProvider removed - was causing continuous re-triggers)
     ref.watch(autoLoadGribGridProvider);
     
     // Note: Les providers GRIB sont maintenant watchés dans des Consumer séparés

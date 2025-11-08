@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'grib_downloader.dart';
+import 'grib_overlay_providers.dart';
 import 'package:http/http.dart' as http;
 import '../../../common/kornog_data_directory.dart';
 
@@ -149,6 +150,15 @@ class GribDownloadController extends Notifier<GribDownloadState> {
           lastFiles: files,
           message: 'Téléchargé ${files.length} fichier(s).',
         );
+        
+        // Charger automatiquement le premier fichier téléchargé
+        print('[GRIB_DL] 📥 Chargement automatique du premier fichier téléchargé');
+        try {
+          await loadGribFile(files.first, ref);
+          print('[GRIB_DL] ✅ Fichier chargé avec succès');
+        } catch (e) {
+          print('[GRIB_DL] ❌ Erreur lors du chargement: $e');
+        }
       }
     } catch (e) {
       state = state.copyWith(

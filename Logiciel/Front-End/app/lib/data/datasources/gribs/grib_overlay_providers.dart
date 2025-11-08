@@ -60,6 +60,23 @@ final lastLoadedGribFileProvider = NotifierProvider<LastLoadedGribFileNotifier, 
   LastLoadedGribFileNotifier.new,
 );
 
+/// Provider pour stocker le dossier GRIB actuellement actif (ex: GFS_0p25/20251103T12)
+class ActiveGribDirectoryNotifier extends Notifier<Directory?> {
+  @override
+  Directory? build() => null;
+
+  void setDirectory(Directory? dir) => state = dir;
+  void clear() => state = null;
+}
+
+final activeGribDirectoryProvider = NotifierProvider<ActiveGribDirectoryNotifier, Directory?>(
+  ActiveGribDirectoryNotifier.new,
+);
+
+// SUPPRIMÉ: ManualGribFileSelectionProvider
+// Raison: Flags ne persistent pas correctement entre watcher re-triggers
+// Nouvelle approche: Pas de watchers continus, seulement des appels directs à loadGribFile()
+
 /// Notifier pour l'opacité des gribs (0..1)
 class GribOpacityNotifier extends Notifier<double> {
   @override
@@ -131,38 +148,7 @@ class AutoLoadGribGridNotifier extends AsyncNotifier<void> {
     
     if (files.isNotEmpty) {
       // Charger le premier fichier
-      final grid = await GribFileLoader.loadGridFromGribFile(files.first);
-      print('[AUTO_LOAD] Loaded grid from ${files.first.path}: ${grid != null ? "success" : "failed"}');
-      
-      if (grid != null) {
-        print('[AUTO_LOAD] Grid: ${grid.nx}x${grid.ny}, values=[${grid.values.length}]');
-        print('[AUTO_LOAD] Grid bounds: lon(${grid.lon0}..${grid.lon0 + grid.dlon * grid.nx}), lat(${grid.lat0}..${grid.lat0 + grid.dlat * grid.ny})');
-        
-        // Mettre à jour le provider de grille courante
-        ref.read(currentGribGridProvider.notifier).setGrid(grid);
-        
-        // Calculer et définir les bornes
-        final (vmin, vmax) = grid.getValueBounds();
-        print('[AUTO_LOAD] Value bounds: $vmin to $vmax (range: ${(vmax-vmin).abs()})');
-        ref.read(gribVminProvider.notifier).setVmin(vmin);
-        ref.read(gribVmaxProvider.notifier).setVmax(vmax);
-        
-        // Charger aussi les grilles U et V (vecteur vent)
-        try {
-          final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(files.first);
-          
-          if (uGrid != null && vGrid != null) {
-            print('[AUTO_LOAD] U-grid loaded: ${uGrid.nx}x${uGrid.ny}');
-            print('[AUTO_LOAD] V-grid loaded: ${vGrid.nx}x${vGrid.ny}');
-            ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
-            ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
-          } else {
-            print('[AUTO_LOAD] Failed to load U/V grids - NO FALLBACK to test data');
-          }
-        } catch (e) {
-          print('[AUTO_LOAD] Error loading U/V grids: $e - NO FALLBACK to test data');
-        }
-      }
+      await loadGribFile(files.first, ref);
     } else {
       print('[AUTO_LOAD] No GRIB files found - NO FALLBACK to test data');
     }
@@ -172,6 +158,13 @@ class AutoLoadGribGridNotifier extends AsyncNotifier<void> {
 final autoLoadGribGridProvider = AsyncNotifierProvider<AutoLoadGribGridNotifier, void>(
   AutoLoadGribGridNotifier.new,
 );
+
+// SUPPRIMÉ: autoLoadGribFromActiveDirectoryProvider
+// Raison: Watchers continus causaient des re-déclenchements infinies
+// Nouvelle approche: 
+// - Auto-load une SEULE FOIS au démarrage (autoLoadGribGridProvider)
+// - Sélections manuelles via appels directs à loadGribFile() (pas de watcher)
+// - Pas de "magic" - l'utilisateur garde le dernier fichier qu'il a choisi jusqu'à redémarrage
 
 /// Notifier pour l'heure de prévision GRIB actuelle (en heures)
 /// Par défaut: 0 = analyse (ou .anl ou .f000)
@@ -187,3 +180,63 @@ class GribForecastHourNotifier extends Notifier<int> {
 final gribForecastHourProvider = NotifierProvider<GribForecastHourNotifier, int>(
   GribForecastHourNotifier.new,
 );
+
+/// Fonction helper pour charger un fichier GRIB et mettre à jour tous les providers
+/// Cette fonction est appelée depuis AutoLoadGribGridNotifier et les watchers
+/// [isManualSelection] = true si l'utilisateur a sélectionné manuellement le fichier
+/// [ref] peut être soit un Ref (async) soit un WidgetRef (widget)
+Future<void> loadGribFile(
+  File file,
+  dynamic ref,
+) async {
+  print('[GRIB_LOAD] 📥 === CHARGEMENT D\'UN GRIB ===');
+  print('[GRIB_LOAD] Fichier: ${file.path}');
+  print('[GRIB_LOAD] Existe: ${file.existsSync()}');
+  print('[GRIB_LOAD] Taille: ${file.lengthSync()} bytes');
+
+  print('[GRIB_LOAD] 📖 Appel GribFileLoader.loadGridFromGribFile()...');
+
+  // Charger la grille
+  final grid = await GribFileLoader.loadGridFromGribFile(file);
+  print('[GRIB_LOAD] Grid result: $grid');
+  
+  if (grid != null) {
+    final (vmin, vmax) = grid.getValueBounds();
+    print('[GRIB_LOAD] ✅ Grid chargée: ${grid.nx}x${grid.ny}, values: $vmin..$vmax');
+    
+    ref.read(currentGribGridProvider.notifier).setGrid(grid);
+    ref.read(gribVminProvider.notifier).setVmin(vmin);
+    ref.read(gribVmaxProvider.notifier).setVmax(vmax);
+    
+    // Stocker le dernier fichier chargé
+    // Cela permet de reprendre le dernier fichier chargé si l'app redémarre
+    print('[GRIB_LOAD] � Stockage du fichier dans lastLoadedGribFileProvider');
+    ref.read(lastLoadedGribFileProvider.notifier).setFile(file);
+
+    // Mettre à jour le dossier GRIB actif (parent du fichier)
+    final parts = file.path.split('/');
+    if (parts.length >= 2) {
+      // Construire le chemin du dossier parent (model/cycle)
+      final dirPath = parts.sublist(0, parts.length - 1).join('/');
+      final directory = Directory(dirPath);
+      print('[GRIB_LOAD] 📁 Mise à jour du dossier actif: ${directory.path}');
+      ref.read(activeGribDirectoryProvider.notifier).setDirectory(directory);
+    }
+
+    // Charger aussi les vecteurs U/V automatiquement
+    print('[GRIB_LOAD] 🧭 Appel GribFileLoader.loadWindVectorsFromGribFile()...');
+    final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(file);
+    print('[GRIB_LOAD] Vecteurs: U=$uGrid, V=$vGrid');
+    
+    if (uGrid != null && vGrid != null) {
+      ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
+      ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
+      print('[GRIB_LOAD] ✅ Vecteurs U/V chargés et stockés');
+    } else {
+      print('[GRIB_LOAD] ⚠️ Vecteurs U/V null: U=$uGrid, V=$vGrid');
+    }
+  } else {
+    print('[GRIB_LOAD] ❌ Impossible de charger la grid');
+  }
+}
+

@@ -8,6 +8,7 @@ import '../../../../data/datasources/maps/models/map_bounds.dart';
 import '../../../../data/datasources/maps/providers/map_providers.dart';
 import '../../../../data/datasources/maps/widgets/map_download_dialog.dart';
 import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
+import '../../../../data/datasources/gribs/grib_file_loader.dart';
 import '../../providers/grib_layers_provider.dart';
 import '../../../../common/kornog_data_directory.dart';
 import 'grib_layers_panel.dart';
@@ -212,6 +213,69 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
             
             const PopupMenuDivider(),
             
+            // Titre section GRIB actif
+            PopupMenuItem(
+              enabled: false,
+              child: Text(
+                'Dossier GRIB actif',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            
+            // Afficher le dossier GRIB actuellement actif
+            PopupMenuItem(
+              enabled: false,
+              child: Consumer(
+                builder: (context, ref, child) {
+                  final activeDir = ref.watch(activeGribDirectoryProvider);
+                  
+                  if (activeDir == null) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'Aucun dossier sélectionné',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    );
+                  }
+                  
+                  final parts = activeDir.path.split('/');
+                  final cycleName = parts.last;
+                  final modelName = parts.length > 1 ? parts[parts.length - 2] : 'UNKNOWN';
+                  
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        cycleName,
+                        style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        modelName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            
+            const PopupMenuDivider(),
+            
             // Option télécharger GRIB
             PopupMenuItem(
               value: 'download_grib',
@@ -312,7 +376,7 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
   Future<void> _showGribManageDialog() async {
     await showDialog(
       context: context,
-      builder: (context) => const GribFilesManagementDialog(),
+      builder: (context) => const GribDirectorySelectorDialog(),
     );
   }
 }
@@ -674,6 +738,196 @@ class _GribFilesManagementDialogState extends State<GribFilesManagementDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Erreur: impossible de supprimer le fichier')),
+          );
+        }
+      }
+    }
+  }
+}
+
+/// Dialog pour la sélection du dossier GRIB actif
+class GribDirectorySelectorDialog extends ConsumerStatefulWidget {
+  const GribDirectorySelectorDialog({super.key});
+
+  @override
+  ConsumerState<GribDirectorySelectorDialog> createState() => _GribDirectorySelectorDialogState();
+}
+
+class _GribDirectorySelectorDialogState extends ConsumerState<GribDirectorySelectorDialog> {
+  late Future<List<Directory>> _directoriesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _directoriesFuture = GribFileLoader.findGribDirectories();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeDir = ref.watch(activeGribDirectoryProvider);
+
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.cloud_queue, color: Colors.cyan),
+          SizedBox(width: 8),
+          Text('Sélectionner le dossier GRIB'),
+        ],
+      ),
+      content: SizedBox(
+        width: 500,
+        height: 400,
+        child: FutureBuilder<List<Directory>>(
+          future: _directoriesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return Center(
+                child: Text('Erreur: ${snapshot.error}'),
+              );
+            }
+
+            final directories = snapshot.data ?? [];
+
+            if (directories.isEmpty) {
+              return const Center(
+                child: Text('Aucun dossier GRIB trouvé'),
+              );
+            }
+
+            return ListView.builder(
+              itemCount: directories.length,
+              itemBuilder: (context, index) {
+                final dir = directories[index];
+                final parts = dir.path.split('/');
+                final cycleName = parts.last;
+                final modelName = parts.length > 1 ? parts[parts.length - 2] : 'UNKNOWN';
+                final isActive = activeDir?.path == dir.path;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  color: isActive ? Colors.cyan.shade50 : null,
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.folder,
+                      color: isActive ? Colors.cyan : Colors.grey,
+                    ),
+                    title: Text(
+                      cycleName,
+                      style: TextStyle(
+                        fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    subtitle: Text(modelName),
+                    trailing: isActive
+                        ? const Icon(Icons.check_circle, color: Colors.cyan)
+                        : PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_vert, size: 20),
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text('Supprimer', style: TextStyle(color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            onSelected: (action) async {
+                              if (action == 'delete') {
+                                await _confirmDeleteDirectory(context, dir, cycleName);
+                              }
+                            },
+                          ),
+                    onTap: () async {
+                      ref.read(activeGribDirectoryProvider.notifier).setDirectory(dir);
+                      
+                      // Charger le premier fichier du dossier sélectionné manuellement
+                      print('[GRIB_SELECTOR] 🔷 Sélection manuelle du dossier: ${dir.path}');
+                      final allFiles = await GribFileLoader.findGribFiles();
+                      final dirFiles = allFiles.where((f) => f.path.startsWith(dir.path)).toList();
+                      
+                      if (dirFiles.isNotEmpty) {
+                        print('[GRIB_SELECTOR] 📥 Chargement du premier fichier');
+                        await loadGribFile(dirFiles.first, ref);
+                      }
+                      
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Dossier GRIB sélectionné: $cycleName')),
+                        );
+                      }
+                    },
+                  ),
+                );
+              },
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fermer'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirmDeleteDirectory(BuildContext context, Directory dir, String cycleName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer le dossier GRIB'),
+        content: Text(
+          'Êtes-vous sûr de vouloir supprimer le dossier "$cycleName" ?\n\n'
+          'Tous les fichiers GRIB de ce dossier seront supprimés.\n'
+          'Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        // Si c'est le dossier actif, le désélectionner
+        if (ref.read(activeGribDirectoryProvider)?.path == dir.path) {
+          ref.read(activeGribDirectoryProvider.notifier).setDirectory(null);
+        }
+
+        // Supprimer le dossier et tous ses contenus
+        await dir.delete(recursive: true);
+        
+        // Rafraîchir la liste
+        setState(() {
+          _directoriesFuture = GribFileLoader.findGribDirectories();
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Dossier "$cycleName" supprimé avec succès')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: impossible de supprimer le dossier ($e)')),
           );
         }
       }

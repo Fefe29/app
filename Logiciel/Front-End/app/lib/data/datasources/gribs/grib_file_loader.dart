@@ -203,6 +203,39 @@ class GribFileLoader {
     }
   }
 
+  /// Liste tous les dossiers GRIB disponibles (model/cycle)
+  /// Retourne une liste de répertoires triés par date (plus récent en premier)
+  static Future<List<Directory>> findGribDirectories() async {
+    try {
+      final gribDir = await getGribDataDirectory();
+      
+      if (!gribDir.existsSync()) {
+        return [];
+      }
+
+      final directories = <Directory>[];
+      
+      // Parcourir les sous-dossiers (GFS_0p25/20251025T12, etc.)
+      for (final modelDir in gribDir.listSync().whereType<Directory>()) {
+        for (final cycleDir in modelDir.listSync().whereType<Directory>()) {
+          directories.add(cycleDir);
+        }
+      }
+      
+      // Trier par date (plus récent en premier)
+      directories.sort((a, b) {
+        final aName = a.path.split('/').last;
+        final bName = b.path.split('/').last;
+        return bName.compareTo(aName);
+      });
+      
+      return directories;
+    } catch (e) {
+      print('[GRIB_LOADER] ❌ Erreur lors de la recherche des dossiers: $e');
+      return [];
+    }
+  }
+
   static String _modelDirName(GribModel model) {
     return switch (model) {
       GribModel.gfs025 => 'GFS_0p25',
