@@ -188,30 +188,54 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
                 ],
               ),
               const SizedBox(height: 12),
+              // Durée et pas de temps
+              const Text('Période de prévision', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
-                    child: Slider(
-                      value: _days.toDouble(),
-                      min: 1,
-                      max: 10,
-                      divisions: 9,
-                      label: 'Jours: $_days',
-                      onChanged: isBusy ? null : (v) => setState(() => _days = v.round()),
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Durée: $_days jour${_days > 1 ? 's' : ''}',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                        Slider(
+                          value: _days.toDouble(),
+                          min: 1,
+                          max: 10,
+                          divisions: 9,
+                          label: '$_days j',
+                          onChanged: isBusy ? null : (v) => setState(() => _days = v.round()),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 16),
                   Expanded(
-                    child: DropdownButton<int?>(
-                      isExpanded: true,
-                      value: _stepHours,
-                      items: const [
-                        DropdownMenuItem(value: 1, child: Text('1h')),
-                        DropdownMenuItem(value: 3, child: Text('3h')),
-                        DropdownMenuItem(value: 6, child: Text('6h')),
-                        DropdownMenuItem(value: 12, child: Text('12h')),
+                    flex: 1,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Pas horaire',
+                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 4),
+                        DropdownButton<int?>(
+                          isExpanded: true,
+                          value: _stepHours,
+                          items: const [
+                            DropdownMenuItem(value: 1, child: Text('1h')),
+                            DropdownMenuItem(value: 3, child: Text('3h')),
+                            DropdownMenuItem(value: 6, child: Text('6h')),
+                            DropdownMenuItem(value: 12, child: Text('12h')),
+                          ],
+                          onChanged: isBusy ? null : (v) => setState(() => _stepHours = v ?? _stepHours),
+                        ),
                       ],
-                      onChanged: isBusy ? null : (v) => setState(() => _stepHours = v ?? _stepHours),
                     ),
                   ),
                 ],
