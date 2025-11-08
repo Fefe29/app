@@ -6,7 +6,6 @@ import '../../../../data/datasources/gribs/grib_downloader.dart';
 import '../../../../data/datasources/gribs/grib_download_controller.dart';
 import '../../../../data/datasources/gribs/grib_overlay_providers.dart';
 import '../../../../data/datasources/gribs/grib_file_loader.dart';
-import '../../../../common/kornog_data_directory.dart';
 
 class GribLayersPanel extends ConsumerStatefulWidget {
   const GribLayersPanel({super.key});
@@ -30,129 +29,57 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
   }
 
   Future<void> _showGribManagerDialog() async {
-    final gribDir = await getGribDataDirectory();
+    final availableFiles = await GribFileLoader.findGribFiles();
+    
+    if (!mounted) return;
+    
+    if (availableFiles.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucun fichier GRIB trouvé')),
+      );
+      return;
+    }
 
-    // Lister les dossiers des modèles (GFS_0p25, GFS_0p50, etc.)
-    final modelDirs = <Directory>[];
-    if (gribDir.existsSync()) {
-      modelDirs.addAll(gribDir.listSync().whereType<Directory>());
+    // Organiser les fichiers par modèle et cycle
+    final grouped = <String, List<File>>{};
+    for (final file in availableFiles) {
+      final parts = file.path.split('/');
+      if (parts.length >= 2) {
+        final modelCycle = '${parts[parts.length - 3]}/${parts[parts.length - 2]}';
+        grouped.putIfAbsent(modelCycle, () => []).add(file);
+      }
     }
 
     if (!mounted) return;
 
-    // Premier dialogue: sélectionner le modèle
-    final selectedModel = await showDialog<Directory>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sélectionner un modèle GRIB'),
-        content: SizedBox(
-          width: 400,
-          height: 300, // Limiter la hauteur pour éviter l'overflow
-          child: modelDirs.isEmpty
-              ? const Text('Aucun modèle GRIB trouvé dans ~/.local/share/kornog/KornogData/grib/')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: modelDirs.length,
-                  itemBuilder: (context, index) {
-                    final modelDir = modelDirs[index];
-                    final modelName = modelDir.path.split('/').last;
-                    return ListTile(
-                      title: Text(modelName),
-                      subtitle: Text('${modelDir.listSync().length} dates disponibles'),
-                      onTap: () => Navigator.pop(ctx, modelDir),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-        ],
-      ),
-    );
-
-    if (selectedModel == null || !mounted) return;
-
-    // Deuxième dialogue: sélectionner la date
-    final cycleDirs = selectedModel.listSync().whereType<Directory>().toList()
-      ..sort((a, b) => b.path.compareTo(a.path)); // Plus récent en premier
-
-    final selectedCycle = await showDialog<Directory>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sélectionner une date'),
-        content: SizedBox(
-          width: 400,
-          height: 300, // Limiter la hauteur
-          child: cycleDirs.isEmpty
-              ? const Text('Aucune date trouvée.')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: cycleDirs.length,
-                  itemBuilder: (context, index) {
-                    final cycleDir = cycleDirs[index];
-                    final cycleName = cycleDir.path.split('/').last;
-                    final fileCount = cycleDir.listSync().whereType<File>().length;
-                    return ListTile(
-                      title: Text(cycleName),
-                      subtitle: Text('$fileCount fichiers'),
-                      onTap: () => Navigator.pop(ctx, cycleDir),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annuler'),
-          ),
-        ],
-      ),
-    );
-
-    if (selectedCycle == null || !mounted) return;
-
-    // Troisième dialogue: sélectionner le fichier
-    final files = selectedCycle.listSync().whereType<File>().where((f) {
-      final path = f.path.toLowerCase();
-      return path.endsWith('.anl') ||
-          path.endsWith('.f000') ||
-          path.endsWith('.f003') ||
-          path.endsWith('.f006') ||
-          path.endsWith('.f009') ||
-          path.endsWith('.f012') ||
-          path.endsWith('.f015') ||
-          path.endsWith('.f018') ||
-          path.endsWith('.f021') ||
-          path.endsWith('.f024') ||
-          path.contains('pgrb2');
-    }).toList();
-
     final selectedFile = await showDialog<File>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sélectionner un fichier'),
+        title: const Text('Sélectionner un fichier GRIB'),
         content: SizedBox(
-          width: 400,
-          height: 400, // Limiter la hauteur
-          child: files.isEmpty
-              ? const Text('Aucun fichier GRIB trouvé.')
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: files.length,
-                  itemBuilder: (context, index) {
-                    final file = files[index];
-                    final fileName = file.path.split('/').last;
-                    final fileSize = file.lengthSync();
-                    return ListTile(
-                      title: Text(fileName, style: const TextStyle(fontSize: 12)),
-                      subtitle: Text('${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB'),
-                      onTap: () => Navigator.pop(ctx, file),
-                    );
-                  },
+          width: 500,
+          height: 400,
+          child: ListView.builder(
+            itemCount: availableFiles.length,
+            itemBuilder: (context, index) {
+              final file = availableFiles[index];
+              final fileName = file.path.split('/').last;
+              final fileSize = file.lengthSync() / 1024 / 1024;
+              final path = file.path;
+              
+              return ListTile(
+                title: Text(
+                  fileName,
+                  style: const TextStyle(fontSize: 11),
                 ),
+                subtitle: Text(
+                  '${(fileSize).toStringAsFixed(1)} MB • ${path.split('/').sublist(path.split('/').length - 3).join('/')}',
+                  style: const TextStyle(fontSize: 10),
+                ),
+                onTap: () => Navigator.pop(ctx, file),
+              );
+            },
+          ),
         ),
         actions: [
           TextButton(
@@ -165,51 +92,51 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
 
     if (selectedFile == null) return;
 
-    // Charger le fichier sélectionné
+    await _loadGribFile(selectedFile);
+  }
+
+  Future<void> _loadGribFile(File file) async {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Chargement du GRIB...')),
       );
+    }
 
-      final fileName = selectedFile.path.split('/').last;
-      print('[GRIB_PANEL] Chargement de: $fileName');
+    final fileName = file.path.split('/').last;
+    print('[GRIB_PANEL] Chargement de: $fileName');
 
-      // Charger la grille
-      final grid = await GribFileLoader.loadGridFromGribFile(selectedFile);
-      if (grid != null) {
-        final (vmin, vmax) = grid.getValueBounds();
-        ref.read(currentGribGridProvider.notifier).setGrid(grid);
-        ref.read(gribVminProvider.notifier).setVmin(vmin);
-        ref.read(gribVmaxProvider.notifier).setVmax(vmax);
-        
-        // Stocker le dernier fichier chargé pour pouvoir accéder aux vecteurs
-        ref.read(lastLoadedGribFileProvider.notifier).setFile(selectedFile);
-        
-        print('[GRIB_PANEL] ✅ Grid chargée: ${grid.nx}x${grid.ny}, values: $vmin..$vmax');
-        print('[GRIB_PANEL] 💾 Dernier fichier stocké: ${selectedFile.path}');
+    // Charger la grille
+    final grid = await GribFileLoader.loadGridFromGribFile(file);
+    if (grid != null) {
+      final (vmin, vmax) = grid.getValueBounds();
+      ref.read(currentGribGridProvider.notifier).setGrid(grid);
+      ref.read(gribVminProvider.notifier).setVmin(vmin);
+      ref.read(gribVmaxProvider.notifier).setVmax(vmax);
+      
+      // Stocker le dernier fichier chargé
+      ref.read(lastLoadedGribFileProvider.notifier).setFile(file);
+      
+      print('[GRIB_PANEL] ✅ Grid chargée: ${grid.nx}x${grid.ny}, values: $vmin..$vmax');
 
-        // Charger aussi les vecteurs U/V automatiquement
-        print('[GRIB_PANEL] Chargement des vecteurs U/V...');
-        final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(selectedFile);
-        if (uGrid != null && vGrid != null) {
-          ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
-          ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
-          print('[GRIB_PANEL] ✅ Vecteurs U/V chargés et stockés dans providers');
-        } else {
-          print('[GRIB_PANEL] ⚠️ Vecteurs U/V non chargés (null)');
-        }
+      // Charger aussi les vecteurs U/V automatiquement
+      print('[GRIB_PANEL] Chargement des vecteurs U/V...');
+      final (uGrid, vGrid) = await GribFileLoader.loadWindVectorsFromGribFile(file);
+      if (uGrid != null && vGrid != null) {
+        ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
+        ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
+        print('[GRIB_PANEL] ✅ Vecteurs U/V chargés');
+      }
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('GRIB chargé: $fileName')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erreur: impossible de charger le GRIB')),
-          );
-        }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✅ GRIB chargé: $fileName')),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ Erreur: impossible de charger le GRIB')),
+        );
       }
     }
   }
@@ -254,9 +181,6 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
                 ],
               ),
               const SizedBox(height: 16),
-              const Text('Téléchargement météo GRIB',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
               DropdownButtonFormField<GribModel>(
                 initialValue: _selectedModel,
                 decoration: const InputDecoration(labelText: 'Modèle météo'),
@@ -362,7 +286,7 @@ class _GribLayersPanelState extends ConsumerState<GribLayersPanel> {
                 children: [
                   for (final variable in GribVariable.values)
                     CheckboxListTile(
-                      title: Text(variable.name),
+                      title: Text(variable.displayName),
                       value: selectedVars.contains(variable),
                       onChanged: isBusy
                           ? null

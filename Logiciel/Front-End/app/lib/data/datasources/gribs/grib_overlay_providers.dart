@@ -3,7 +3,6 @@ import 'dart:io';
 import 'grib_models.dart';
 import 'grib_file_loader.dart';
 import 'grib_downloader.dart';
-import 'grib_test_data_generator.dart';
 
 // ============================================================
 // PROVIDERS POUR GÉRER LES DONNÉES GRIB AFFICHÉES SUR LA CARTE
@@ -158,23 +157,14 @@ class AutoLoadGribGridNotifier extends AsyncNotifier<void> {
             ref.read(currentGribUGridProvider.notifier).setGrid(uGrid);
             ref.read(currentGribVGridProvider.notifier).setGrid(vGrid);
           } else {
-            print('[AUTO_LOAD] Failed to load U/V grids, using test data as fallback');
-            final (testU, testV) = GribTestDataGenerator.generateTestWindVectors();
-            ref.read(currentGribUGridProvider.notifier).setGrid(testU);
-            ref.read(currentGribVGridProvider.notifier).setGrid(testV);
+            print('[AUTO_LOAD] Failed to load U/V grids - NO FALLBACK to test data');
           }
         } catch (e) {
-          print('[AUTO_LOAD] Error loading U/V grids: $e, using test data');
-          final (testU, testV) = GribTestDataGenerator.generateTestWindVectors();
-          ref.read(currentGribUGridProvider.notifier).setGrid(testU);
-          ref.read(currentGribVGridProvider.notifier).setGrid(testV);
+          print('[AUTO_LOAD] Error loading U/V grids: $e - NO FALLBACK to test data');
         }
       }
     } else {
-      print('[AUTO_LOAD] No GRIB files found! Using test data as fallback');
-      final (testU, testV) = GribTestDataGenerator.generateTestWindVectors();
-      ref.read(currentGribUGridProvider.notifier).setGrid(testU);
-      ref.read(currentGribVGridProvider.notifier).setGrid(testV);
+      print('[AUTO_LOAD] No GRIB files found - NO FALLBACK to test data');
     }
   }
 }

@@ -424,3 +424,34 @@ String _yyyymmdd(DateTime dt) {
 }
 String _encode(Map<String, String> p) =>
     p.entries.map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}').join('&');
+
+/// Extension pour afficher les noms lisibles des variables GRIB
+extension GribVariableDisplay on GribVariable {
+  String get displayName {
+    switch (this) {
+      case GribVariable.wind10m:
+        return 'Vent à 10 m';
+      case GribVariable.windVectors:
+        return 'Vecteurs de vent';
+      case GribVariable.mslp:
+        return 'Pression au niveau de la mer';
+      case GribVariable.windGust:
+        return 'Rafales de vent';
+      case GribVariable.precip:
+        return 'Précipitations';
+      case GribVariable.cloudTotal:
+        return 'Couverture nuageuse totale';
+      case GribVariable.airTemp2m:
+        return 'Température à 2 m';
+      case GribVariable.cape:
+        return 'CAPE (Énergie potentielle convective)';
+      case GribVariable.waves:
+        return 'Vagues (WW3)';
+      case GribVariable.current:
+        return 'Courants (RTOFS)';
+      case GribVariable.seaTemp:
+        return 'Température de la mer (SST)';
+    }
+  }
+}
+

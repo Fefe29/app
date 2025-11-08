@@ -383,8 +383,9 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                       final gribUGrid = ref.watch(currentGribUGridProvider);
                       final gribVGrid = ref.watch(currentGribVGridProvider);
                       final gribOpacity = ref.watch(gribOpacityProvider);
+                      final gribVisible = ref.watch(gribVisibilityProvider);
 
-                      if (gribUGrid == null || gribVGrid == null) {
+                      if (!gribVisible || gribUGrid == null || gribVGrid == null) {
                         return const SizedBox.shrink();
                       }
 
@@ -440,8 +441,9 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                     builder: (context, ref, child) {
                       final gribUGrid = ref.watch(currentGribUGridProvider);
                       final gribVGrid = ref.watch(currentGribVGridProvider);
+                      final gribVisible = ref.watch(gribVisibilityProvider);
 
-                      if (gribUGrid == null || gribVGrid == null) {
+                      if (!gribVisible || gribUGrid == null || gribVGrid == null) {
                         return const SizedBox.shrink();
                       }
 
