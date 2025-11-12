@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
+import 'package:kornog/common/services/position_formatter.dart';
 
 class MetricTile extends ConsumerStatefulWidget {
   final String metricKey;
@@ -30,8 +31,25 @@ class _MetricTileState extends ConsumerState<MetricTile>
   Widget build(BuildContext context) {
     super.build(context);
 
-  final asyncM = ref.watch(metricProvider(widget.metricKey));
     final cs = Theme.of(context).colorScheme;
+
+    // Cas spécial: position (combine lat et lon)
+    if (widget.metricKey == 'nav.position') {
+      final asyncLat = ref.watch(metricProvider('nav.lat'));
+      final asyncLon = ref.watch(metricProvider('nav.lon'));
+      
+      String posText = '--';
+      if (asyncLat.hasValue && asyncLon.hasValue) {
+        final lat = asyncLat.value!.value;
+        final lon = asyncLon.value!.value;
+        posText = formatPositionShort(lat, lon);
+      }
+      
+      return _buildPositionTile(context, cs, posText);
+    }
+
+    // Cas standard: métrique unique
+    final asyncM = ref.watch(metricProvider(widget.metricKey));
 
     if (asyncM.hasValue) {
       final m = asyncM.value!;
@@ -47,10 +65,10 @@ class _MetricTileState extends ConsumerState<MetricTile>
     final valueText = _lastValue ?? '--';
     final unitText  = _lastUnit ?? '';
 
-  // Fond selon le thème : noir en mode nuit, gris clair sinon
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  final bgColor = isDark ? Colors.black : Colors.grey[200]!;
-  final borderColor = isDark ? Colors.grey[800]! : Colors.grey[400]!;
+    // Fond selon le thème : noir en mode nuit, gris clair sinon
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? Colors.black : Colors.grey[200]!;
+    final borderColor = isDark ? Colors.grey[800]! : Colors.grey[400]!;
 
     return RepaintBoundary(
       child: Card(
@@ -113,6 +131,67 @@ class _MetricTileState extends ConsumerState<MetricTile>
                               unit: unitText,
                               colorScheme: cs,
                             ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Construire le cadran spécial pour la position
+  Widget _buildPositionTile(BuildContext context, ColorScheme cs, String posText) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? Colors.black : Colors.grey[200]!;
+    final borderColor = isDark ? Colors.grey[800]! : Colors.grey[400]!;
+
+    return RepaintBoundary(
+      child: Card(
+        elevation: 0,
+        color: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    border: Border.all(color: borderColor, width: 1.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'POSITION',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                          color: cs.onSurface.withOpacity(.80),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: Text(
+                          posText,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface.withOpacity(posText == '--' ? 0.5 : 1),
                           ),
                         ),
                       ),

@@ -148,6 +148,40 @@ class NmeaParser {
     final status = parts[2].trim();
     if (status != 'A') return; // Ignore invalid status
 
+    // Latitude (position 3, format: ddmm.mmmm, N/S at position 4)
+    try {
+      final latStr = parts[3].trim();
+      final latNS = parts[4].trim();
+      if (latStr.isNotEmpty && latNS.isNotEmpty) {
+        final lat = _parseLatLon(latStr);
+        if (lat != null) {
+          final latValue = latNS == 'S' ? -lat : lat;
+          measurements['nav.lat'] = Measurement(
+            value: latValue,
+            unit: Unit.degree,
+            ts: now,
+          );
+        }
+      }
+    } catch (_) {}
+
+    // Longitude (position 5, format: dddmm.mmmm, E/W at position 6)
+    try {
+      final lonStr = parts[5].trim();
+      final lonEW = parts[6].trim();
+      if (lonStr.isNotEmpty && lonEW.isNotEmpty) {
+        final lon = _parseLatLon(lonStr);
+        if (lon != null) {
+          final lonValue = lonEW == 'W' ? -lon : lon;
+          measurements['nav.lon'] = Measurement(
+            value: lonValue,
+            unit: Unit.degree,
+            ts: now,
+          );
+        }
+      }
+    } catch (_) {}
+
     // Speed Over Ground (nœuds)
     try {
       final sog = double.parse(parts[7].trim());
@@ -338,11 +372,12 @@ class NmeaParser {
       final latStr = parts[1].trim();
       final latHemi = parts[2].trim();
       if (latStr.isNotEmpty && latHemi.isNotEmpty) {
-        final lat = _parseDMS(latStr);
-        if (latHemi == 'S') {
+        final lat = _parseLatLon(latStr);
+        if (lat != null) {
+          final latValue = latHemi == 'S' ? -lat : lat;
           measurements['nav.lat'] = Measurement(
-            value: -lat,
-            unit: Unit.none,
+            value: latValue,
+            unit: Unit.degree,
             ts: now,
           );
         }
@@ -352,11 +387,12 @@ class NmeaParser {
       final lonStr = parts[3].trim();
       final lonHemi = parts[4].trim();
       if (lonStr.isNotEmpty && lonHemi.isNotEmpty) {
-        final lon = _parseDMS(lonStr);
-        if (lonHemi == 'W') {
+        final lon = _parseLatLon(lonStr);
+        if (lon != null) {
+          final lonValue = lonHemi == 'W' ? -lon : lon;
           measurements['nav.lon'] = Measurement(
-            value: -lon,
-            unit: Unit.none,
+            value: lonValue,
+            unit: Unit.degree,
             ts: now,
           );
         }
@@ -365,6 +401,34 @@ class NmeaParser {
   }
 
   /// Convertir format DMS (ddmm.mmmm) vers degrés décimaux
+  static double? _parseLatLon(String value) {
+    // Format NMEA: ddmm.mmmm (lat) or dddmm.mmmm (lon)
+    // Returns decimal degrees
+    if (value.isEmpty) return null;
+    
+    try {
+      final dotIdx = value.indexOf('.');
+      if (dotIdx == -1) return null;
+      
+      // Déterminer si c'est lat (2 degrés) ou lon (3 degrés)
+      // On suppose que tout avant "mm." est les degrés
+      // Pour lat: ddmm.xxxx -> 4 chars avant le point = 2 degrés
+      // Pour lon: dddmm.xxxx -> 5 chars avant le point = 3 degrés
+      int degreeDigits = dotIdx - 2;
+      if (degreeDigits < 2) return null;
+      
+      final degreesStr = value.substring(0, degreeDigits);
+      final minutesStr = value.substring(degreeDigits);
+      
+      final degrees = int.parse(degreesStr);
+      final minutes = double.parse(minutesStr);
+      
+      return degrees + (minutes / 60.0);
+    } catch (_) {
+      return null;
+    }
+  }
+
   static double _parseDMS(String dms) {
     if (dms.length < 5) return 0.0;
     

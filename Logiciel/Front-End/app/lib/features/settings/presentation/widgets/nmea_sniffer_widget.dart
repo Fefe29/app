@@ -79,6 +79,8 @@ class NmeaSnifferWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sentences = ref.watch(nmeaSentencesProvider);
+    // ignore: avoid_print
+    print('🖼️ NmeaSnifferWidget rebuild: ${sentences.length} trames visibles');
 
     return Column(
       children: [

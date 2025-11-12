@@ -7,11 +7,11 @@ const selectedKeysPref = 'selected_metric_keys';
 
 const allMetricKeys = <String>[
   'nav.sog','nav.cog','wind.twa','wind.twd','wind.tws','wind.awa','wind.aws',
-  'nav.hdg','env.depth','env.waterTemp','nav.lat','nav.lon',
+  'nav.hdg','env.depth','env.waterTemp','nav.position',
 ];
 
 const defaultMetricKeys = <String>[
-  'nav.sog','nav.cog','wind.twa','wind.twd','wind.tws','nav.hdg','env.depth','env.waterTemp','nav.lat','nav.lon',
+  'nav.sog','nav.cog','wind.twa','wind.twd','wind.tws','nav.hdg','env.depth','env.waterTemp','nav.position',
 ];
 
 class SelectedMetricsNotifier extends AsyncNotifier<Set<String>> {

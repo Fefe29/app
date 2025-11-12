@@ -12,6 +12,7 @@ import 'package:kornog/data/datasources/telemetry/network_telemetry_bus.dart';
 import 'package:kornog/config/telemetry_config.dart';
 import 'package:kornog/common/providers/telemetry_providers.dart';
 import 'package:kornog/common/providers/nmea_stream_provider.dart';
+import 'package:kornog/common/services/position_formatter.dart';
 
 
 /// Bus + émulation centralisée : toutes les métriques (y compris vent) naissent ici.
@@ -75,19 +76,32 @@ final Provider<TelemetryBus> telemetryBusProvider = Provider<TelemetryBus>((ref)
 			Future.microtask(() {
 				// ignore: avoid_print
 				print('📡 Démarrage de l\'écoute du stream NMEA...');
-				networkBus.nmeaFrames().listen(
+				final subscription = networkBus.nmeaFrames().listen(
 					(frame) {
 						// ignore: avoid_print
 						print('🎯 Trame NMEA reçue: ${frame.raw}');
-						ref
-							.read(nmeaSentencesProvider.notifier)
-							.addSentence(frame.raw, isValid: frame.isValid, error: frame.errorMessage);
+						try {
+							ref
+								.read(nmeaSentencesProvider.notifier)
+								.addSentence(frame.raw, isValid: frame.isValid, error: frame.errorMessage);
+							// ignore: avoid_print
+							print('✅ Trame ajoutée au notifier');
+						} catch (e) {
+							// ignore: avoid_print
+							print('❌ Erreur ajout trame: $e');
+						}
 					},
 					onError: (error) {
 						// ignore: avoid_print
 						print('❌ Erreur stream NMEA: $error');
 					},
+					onDone: () {
+						// ignore: avoid_print
+						print('⚠️ Stream NMEA fermé');
+					},
 				);
+				// Garder la subscription active
+				ref.onDispose(() => subscription.cancel());
 			});
 			
 			ref.onDispose(() => networkBus.dispose());

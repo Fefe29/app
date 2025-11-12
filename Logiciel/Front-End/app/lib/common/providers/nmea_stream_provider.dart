@@ -42,6 +42,8 @@ class NmeaSentencesNotifier extends Notifier<List<NmeaSentence>> {
 
     // Ajouter au début et limiter la taille
     state = [sentence, ...state].take(_maxHistoryLength).toList();
+    // ignore: avoid_print
+    print('📝 Trame ajoutée au notifier, total: ${state.length}');
   }
 
   void clear() {

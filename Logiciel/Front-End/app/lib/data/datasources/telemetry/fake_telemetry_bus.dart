@@ -25,6 +25,14 @@ class FakeTelemetryBus implements TelemetryBus {
 	double _elapsedMin = 0;
 	final double _baseTws = WindTestConfig.baseSpeed;
 
+	// --------------- Position Simulator ---------------
+	// Position de départ (Baie de Morlaix, approximation)
+	double _latitude = 48.6275;
+	double _longitude = -3.9337;
+	// Vitesse de déplacement simulée (environ 0.001 deg/sec = ~100m/sec drifting)
+	static const double _latVelocity = 0.0000167; // ~1.8 m/s
+	static const double _lonVelocity = 0.0000133; // ~1.4 m/s
+
 	FakeTelemetryBus({this.mode = TwaSimMode.irregular}) {
 		_start = DateTime.now();
 		_timer = Timer.periodic(Duration(milliseconds: WindTestConfig.updateIntervalMs), (_) => _tick());
@@ -45,6 +53,10 @@ class FakeTelemetryBus implements TelemetryBus {
 		final hdg = 90.0;
 		final sog = 6 + _rng.nextDouble() * 1.5;
 		final cog = (hdg + _rng.nextDouble() * 4 - 2) % 360;
+
+		// Update position simulée (drift graduel)
+		_latitude += _latVelocity * (_rng.nextDouble() - 0.5) * 0.2;
+		_longitude += _lonVelocity * (_rng.nextDouble() - 0.5) * 0.2;
 
 		// Direction vent selon configuration et mode automatique
 		double twd;
@@ -78,6 +90,9 @@ class FakeTelemetryBus implements TelemetryBus {
 		_emit('nav.sog', Measurement(value: sog, unit: Unit.knot, ts: now), m);
 		_emit('nav.hdg', Measurement(value: hdg, unit: Unit.degree, ts: now), m);
 		_emit('nav.cog', Measurement(value: cog, unit: Unit.degree, ts: now), m);
+		// Position simulée
+		_emit('nav.lat', Measurement(value: _latitude, unit: Unit.none, ts: now), m);
+		_emit('nav.lon', Measurement(value: _longitude, unit: Unit.none, ts: now), m);
 
 		_emit('wind.twd', Measurement(value: twd, unit: Unit.degree, ts: now), m);
 		_emit('wind.tws', Measurement(value: tws, unit: Unit.knot, ts: now), m);
