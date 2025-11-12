@@ -8,6 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/data/datasources/telemetry/telemetry_bus.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
 import 'package:kornog/data/datasources/telemetry/fake_telemetry_bus.dart'; // contains TwaSimMode & FakeTelemetryBus
+import 'package:kornog/data/datasources/telemetry/network_telemetry_bus.dart';
+import 'package:kornog/config/telemetry_config.dart';
+import 'package:kornog/common/providers/telemetry_providers.dart';
+import 'package:kornog/common/providers/nmea_stream_provider.dart';
 
 
 /// Bus + émulation centralisée : toutes les métriques (y compris vent) naissent ici.
@@ -34,9 +38,74 @@ final twaSimModeProvider = NotifierProvider<TwaSimModeNotifier, TwaSimMode>(TwaS
 // (Un futur flag pourra être réintroduit pour basculer vers une source réseau réelle.)
 
 final Provider<TelemetryBus> telemetryBusProvider = Provider<TelemetryBus>((ref) {
-	final mode = ref.watch(twaSimModeProvider);
-	final bus = FakeTelemetryBus(mode: mode);
+	final sourceModeAsync = ref.watch(telemetrySourceModeProvider);
+	final networkConfig = ref.watch(telemetryNetworkConfigProvider);
+	
+	// Gérer AsyncValue de sourceMode - utiliser maybeWhen pour extraire la valeur
+	final mode = sourceModeAsync.maybeWhen(
+		data: (m) {
+			// ignore: avoid_print
+			print('🔄 TelemetryBusProvider: sourceMode.data = $m');
+			return m;
+		},
+		orElse: () {
+			// ignore: avoid_print
+			print('🔄 TelemetryBusProvider: sourceMode non prête, utilisant defaut');
+			return defaultTelemetrySourceMode;
+		},
+	);
+	
+	// ignore: avoid_print
+	print('🔄 TelemetryBusProvider recalcul: mode=$mode, networkEnabled=${networkConfig.enabled}');
+	
+	if (mode == TelemetrySourceMode.network && networkConfig.enabled) {
+		// Mode réseau : tenter de créer NetworkTelemetryBus
+		try {
+			final networkBus = NetworkTelemetryBus(
+				config: NetworkConfig(
+					host: networkConfig.host,
+					port: networkConfig.port,
+				),
+			);
+			// Initialiser connexion de manière asynchrone (sans attendre)
+			networkBus.connect();
+			
+			// Écouter le stream NMEA et alimenter le notifier
+			// (sans bloquer cette fonction)
+			Future.microtask(() {
+				// ignore: avoid_print
+				print('📡 Démarrage de l\'écoute du stream NMEA...');
+				networkBus.nmeaFrames().listen(
+					(frame) {
+						// ignore: avoid_print
+						print('🎯 Trame NMEA reçue: ${frame.raw}');
+						ref
+							.read(nmeaSentencesProvider.notifier)
+							.addSentence(frame.raw, isValid: frame.isValid, error: frame.errorMessage);
+					},
+					onError: (error) {
+						// ignore: avoid_print
+						print('❌ Erreur stream NMEA: $error');
+					},
+				);
+			});
+			
+			ref.onDispose(() => networkBus.dispose());
+			// ignore: avoid_print
+			print('🌐 TelemetryBus: Mode RÉSEAU activé');
+			return networkBus;
+		} catch (e) {
+			// ignore: avoid_print
+			print('❌ Erreur création NetworkTelemetryBus: $e, basculage vers FakeTelemetryBus');
+		}
+	}
+
+	// Mode simulation (par défaut ou fallback)
+	final simMode = ref.watch(twaSimModeProvider);
+	final bus = FakeTelemetryBus(mode: simMode);
 	ref.onDispose(() => bus.dispose());
+	// ignore: avoid_print
+	print('🎮 TelemetryBus: Mode SIMULATION activé');
 	return bus;
 });
 

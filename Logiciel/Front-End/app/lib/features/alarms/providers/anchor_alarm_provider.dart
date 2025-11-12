@@ -2,6 +2,8 @@
 /// See ARCHITECTURE_DOCS.md (section: anchor_alarm_provider.dart).
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' show sqrt, cos, pi;
+import '../../../services/sound_player_factory.dart';
+import '../../../services/sound_player.dart';
 
 class AnchorAlarmState {
   final bool enabled;
@@ -33,6 +35,8 @@ class AnchorAlarmState {
 }
 
 class AnchorAlarmNotifier extends Notifier<AnchorAlarmState> {
+  final SoundPlayer _sound = createSoundPlayer();
+
   @override
   AnchorAlarmState build() => const AnchorAlarmState(enabled: false, radiusMeters: 30, triggered: false);
 
@@ -44,6 +48,8 @@ class AnchorAlarmNotifier extends Notifier<AnchorAlarmState> {
     if (!state.enabled || state.anchorLat == null || state.anchorLon == null) return;
     final d = _distanceMeters(state.anchorLat!, state.anchorLon!, lat, lon);
     if (d > state.radiusMeters && !state.triggered) {
+      // Alarme dérive ancre : bip double
+      _sound.playDoubleShort();
       state = state.copyWith(triggered: true);
     }
   }

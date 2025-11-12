@@ -34,6 +34,7 @@ class RegattaTimerState {
 class RegattaTimerNotifier extends Notifier<RegattaTimerState> {
   DateTime? _lastTick;
   final SoundPlayer _sound = createSoundPlayer();
+  final Set<int> _soundPlayedAt = {}; // Tracker les secondes où on a joué des sons
 
   @override
   RegattaTimerState build() {
@@ -43,18 +44,23 @@ class RegattaTimerNotifier extends Notifier<RegattaTimerState> {
 
   void selectSequence(RegattaSequence seq) {
     state = RegattaTimerState(running: false, remaining: seq.total, sequence: seq);
+    _soundPlayedAt.clear();
   }
 
   void start() {
     _lastTick = DateTime.now();
     state = state.copyWith(running: true);
-    // play medium start sound (e.g. when sequence begins)
-    _sound.playMedium();
+    _soundPlayedAt.clear();
+    // 🔔 Démarrage: bip long
+    _sound.playLong();
   }
 
   void stop() => state = state.copyWith(running: false);
 
-  void reset() => state = state.copyWith(remaining: state.sequence.total, running: false);
+  void reset() {
+    state = state.copyWith(remaining: state.sequence.total, running: false);
+    _soundPlayedAt.clear();
+  }
 
   void tick() {
     if (!state.running) return;
@@ -72,37 +78,44 @@ class RegattaTimerNotifier extends Notifier<RegattaTimerState> {
   }
 
   void _handleSoundsForTransition({required int oldRemaining, required int newRemaining}) {
-    // If we crossed an exact sequence mark (e.g., 300,240,60,0), play medium beep
-    for (final mark in state.sequence.marks) {
-      if (oldRemaining > mark && newRemaining <= mark) {
-        // For the 0 mark (Go), play a long beep; other marks get the medium beep
-        if (mark == 0) {
-          _sound.playLong();
-        } else {
-          _sound.playMedium();
-        }
-        return;
-      }
-    }
-
-    // If we're in the last 10 seconds, play double short beep each second
-    if (newRemaining <= 10 && newRemaining >= 0 && newRemaining < oldRemaining) {
-      _sound.playDoubleShort();
+    // ✅ Départ! (0 secondes)
+    if (oldRemaining > 0 && newRemaining <= 0 && !_soundPlayedAt.contains(0)) {
+      _soundPlayedAt.add(0);
+      _sound.playLong();
       return;
     }
 
-    // Minute-level notifications: for marks that are full minutes (multiple of 60), play medium beep when crossing their minute
-    final oldMin = (oldRemaining / 60).floor();
-    final newMin = (newRemaining / 60).floor();
-    if (oldMin != newMin) {
-      for (final m in state.sequence.marks) {
-        if (m % 60 == 0) {
-          final mm = m ~/ 60;
-            if (mm == newMin) {
-            _sound.playMedium();
-            return;
-          }
-        }
+    // ✅ À 1 minute exactement: bip moyen
+    if (oldRemaining > 60 && newRemaining <= 60 && !_soundPlayedAt.contains(60)) {
+      _soundPlayedAt.add(60);
+      _sound.playMedium();
+      return;
+    }
+
+    // ✅ Compte à rebours dans les 10 dernières secondes
+    if (newRemaining >= 0 && newRemaining <= 10 && oldRemaining > newRemaining) {
+      if (_soundPlayedAt.contains(newRemaining)) return;
+      _soundPlayedAt.add(newRemaining);
+
+      // 5 premières secondes (10, 9, 8, 7, 6): double bips rapides
+      if (newRemaining >= 6 && newRemaining <= 10) {
+        _sound.playDoubleShort();
+      }
+      // 5 dernières secondes (5, 4, 3, 2, 1): de plus en plus rapide
+      else if (newRemaining >= 1 && newRemaining <= 5) {
+        final frequency = 6 - newRemaining; // 1→5 reps, 2→4 reps, 3→3 reps, 4→2 reps, 5→1 rep
+        _playRepeatedShort(frequency);
+      }
+      return;
+    }
+  }
+
+  /// Jouer rapidement N bips courts en séquence
+  Future<void> _playRepeatedShort(int count) async {
+    for (int i = 0; i < count; i++) {
+      await _sound.playShort();
+      if (i < count - 1) {
+        await Future.delayed(const Duration(milliseconds: 150));
       }
     }
   }

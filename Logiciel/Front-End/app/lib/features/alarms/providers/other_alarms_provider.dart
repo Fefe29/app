@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/common/utils/angle_utils.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
 import 'package:kornog/common/providers/app_providers.dart';
+import '../../../services/sound_player_factory.dart';
+import '../../../services/sound_player.dart';
 
 // Individual alarm slices -------------------------------------------------
 
@@ -102,6 +104,8 @@ class OtherAlarmsState {
 }
 
 class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
+  final SoundPlayer _sound = createSoundPlayer();
+
   @override
   OtherAlarmsState build() {
     // Listen to metrics
@@ -150,6 +154,7 @@ class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
     if (!state.depth.enabled) return;
     final shallow = m.value < state.depth.minDepthMeters;
     if (shallow && !state.depth.triggered) {
+      _sound.playMedium(); // Alarme profondeur
       state = state.copyWith(depth: state.depth.copyWith(triggered: true, lastDepth: m.value));
     } else {
       state = state.copyWith(depth: state.depth.copyWith(lastDepth: m.value));
@@ -162,6 +167,9 @@ class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
     final baseline = ws.baselineDir ?? m.value;
     final diff = _angleDiffAbs(baseline, m.value);
     final triggered = diff >= ws.thresholdDeg;
+    if (triggered && !ws.triggered) {
+      _sound.playMedium(); // Alarme shift vent
+    }
     state = state.copyWith(
       windShift: ws.copyWith(
         baselineDir: baseline,
@@ -176,6 +184,7 @@ class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
     if (state.windDrop.enabled) {
       final dropTrig = m.value < state.windDrop.threshold;
       if (dropTrig && !state.windDrop.triggered) {
+        _sound.playShort(); // Alarme vent faible
         state = state.copyWith(windDrop: state.windDrop.copyWith(triggered: true, lastValue: m.value));
       } else {
         state = state.copyWith(windDrop: state.windDrop.copyWith(lastValue: m.value));
@@ -185,6 +194,7 @@ class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
     if (state.windRaise.enabled) {
       final raiseTrig = m.value > state.windRaise.threshold;
       if (raiseTrig && !state.windRaise.triggered) {
+        _sound.playShort(); // Alarme vent fort
         state = state.copyWith(windRaise: state.windRaise.copyWith(triggered: true, lastValue: m.value));
       } else {
         state = state.copyWith(windRaise: state.windRaise.copyWith(lastValue: m.value));
