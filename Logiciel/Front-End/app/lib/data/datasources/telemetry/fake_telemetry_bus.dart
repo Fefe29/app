@@ -29,9 +29,19 @@ class FakeTelemetryBus implements TelemetryBus {
 	// Position de départ (Rade de Brest, décalée 300m à l'est)
 	double _latitude = 48.369485;
 	double _longitude = -4.480326; // 300m à l'est de -4.483626
-	// Vitesse de déplacement simulée (environ 0.001 deg/sec = ~100m/sec drifting)
-	static const double _latVelocity = 0.0000167; // ~1.8 m/s
-	static const double _lonVelocity = 0.0000133; // ~1.4 m/s
+	
+	// Simulation d'aller-retour entre la ligne de départ et la bouée 1
+	// Bouée 1: 48.369485°N, -4.483626°W (au vent)
+	// Viseur (ligne départ): 48.3614850°N, -4.4714260°W
+	static const double _buoy1Lat = 48.369485;
+	static const double _buoy1Lon = -4.483626;
+	static const double _startLineLat = 48.3614850;
+	static const double _startLineLon = -4.4714260;
+	
+	double _elapsedTime = 0; // Temps écoulé en secondes
+	double _currentHeading = 90.0; // Cap actuel du bateau
+	static const double _oscillationPeriod = 480.0; // Période d'aller-retour en secondes (8 minutes pour mouvement très lent)
+	static const double _boatSpeed = 3.0; // Vitesse du bateau en nœuds (~1.5 m/s)
 
 	FakeTelemetryBus({this.mode = TwaSimMode.irregular}) {
 		_start = DateTime.now();
@@ -48,15 +58,47 @@ class FakeTelemetryBus implements TelemetryBus {
 	void _tick() {
 		final now = DateTime.now();
 		_elapsedMin = DateTime.now().difference(_start).inSeconds / 60.0;
+		_elapsedTime += WindTestConfig.updateIntervalMs / 1000.0; // Convertir en secondes
 
-		// Heading stable arbitraire pour cohérence visuelle (ex: 90°)
-		final hdg = 90.0;
-		final sog = 6 + _rng.nextDouble() * 1.5;
+		// ========== SIMULATION D'ALLER-RETOUR ==========
+		// Calculer la phase d'oscillation (entre 0 et 1, puis revenir)
+		final phase = (_elapsedTime % _oscillationPeriod) / _oscillationPeriod;
+		
+		// Interpolation linéaire entre deux points
+		// phase [0, 0.5] : aller vers bouée 1
+		// phase [0.5, 1] : retour vers ligne départ
+		double interpolationFactor;
+		if (phase < 0.5) {
+			// Aller vers bouée 1
+			interpolationFactor = phase * 2.0; // [0, 1]
+		} else {
+			// Retour vers ligne départ
+			interpolationFactor = (1.0 - phase) * 2.0; // [1, 0]
+		}
+		
+		// Positionner le bateau entre la ligne de départ et la bouée 1
+		_latitude = _startLineLat + (_buoy1Lat - _startLineLat) * interpolationFactor;
+		_longitude = _startLineLon + (_buoy1Lon - _startLineLon) * interpolationFactor;
+		
+		// ========== CALCUL DU CAP ==========
+		// Calculer le vecteur de direction
+		double targetHeading;
+		if (phase < 0.5) {
+			// En allant vers la bouée 1 (Nord-Ouest)
+			targetHeading = _calculateHeading(_startLineLat, _startLineLon, _buoy1Lat, _buoy1Lon);
+		} else {
+			// En revenant vers la ligne de départ (Sud-Est)
+			targetHeading = _calculateHeading(_buoy1Lat, _buoy1Lon, _startLineLat, _startLineLon);
+		}
+		
+		// Lissage du cap avec une petite variation pour réalisme
+		_currentHeading = targetHeading + (_rng.nextDouble() * 2 - 1);
+		if (_currentHeading < 0) _currentHeading += 360;
+		if (_currentHeading >= 360) _currentHeading -= 360;
+		
+		final hdg = _currentHeading;
+		final sog = _boatSpeed + _rng.nextDouble() * 0.5 - 0.25;
 		final cog = (hdg + _rng.nextDouble() * 4 - 2) % 360;
-
-		// Update position simulée (drift graduel)
-		_latitude += _latVelocity * (_rng.nextDouble() - 0.5) * 0.2;
-		_longitude += _lonVelocity * (_rng.nextDouble() - 0.5) * 0.2;
 
 		// Direction vent selon configuration et mode automatique
 		double twd;
@@ -125,6 +167,27 @@ class FakeTelemetryBus implements TelemetryBus {
 			default:
 				return TwaSimMode.irregular;
 		}
+	}
+
+	/// Calcule le cap (heading) entre deux points géographiques
+	/// Retourne un angle en degrés (0° = Nord, 90° = Est, 180° = Sud, 270° = Ouest)
+	double _calculateHeading(double fromLat, double fromLon, double toLat, double toLon) {
+		// Différences en latitude et longitude
+		double dLat = toLat - fromLat;
+		double dLon = toLon - fromLon;
+		
+		// Calcul du cap initial (en radians)
+		// Formule: cap = atan2(dLon, dLat) convertie pour système géographique
+		double headingRad = math.atan2(dLon, dLat);
+		
+		// Convertir en degrés
+		double headingDeg = headingRad * 180.0 / math.pi;
+		
+		// Normaliser entre 0 et 360
+		if (headingDeg < 0) headingDeg += 360;
+		if (headingDeg >= 360) headingDeg -= 360;
+		
+		return headingDeg;
 	}
 
 	double _gaussian({double mean = 0, double stdDev = 1, double clampAbs = double.infinity}) {
