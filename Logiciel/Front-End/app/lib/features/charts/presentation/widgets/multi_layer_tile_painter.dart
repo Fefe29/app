@@ -6,10 +6,7 @@ import '../../domain/models/geographic_position.dart';
 import '../../providers/mercator_coordinate_system_provider.dart';
 import '../../../../data/datasources/maps/services/multi_layer_tile_service.dart';
 import '../../../../data/datasources/maps/models/map_layers.dart';
-
-// ⚠️ Importe ViewTransform depuis l’endroit où tu l’as défini
-// Si tu l’as laissée dans course_canvas.dart :
-import 'course_canvas.dart'; // pour ViewTransform
+import '../models/view_transform.dart';
 
 class MultiLayerTilePainter extends CustomPainter {
   MultiLayerTilePainter(

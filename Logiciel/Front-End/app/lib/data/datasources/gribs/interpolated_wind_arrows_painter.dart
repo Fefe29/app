@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:kornog/data/datasources/gribs/grib_interpolation_service.dart';
 import 'package:kornog/data/datasources/gribs/grib_models.dart';
-import 'package:kornog/features/charts/presentation/widgets/course_canvas.dart';
+import 'package:kornog/features/charts/presentation/models/view_transform.dart';
 import 'package:kornog/features/charts/providers/mercator_coordinate_system_provider.dart';
 import 'package:kornog/features/charts/domain/models/geographic_position.dart';
 

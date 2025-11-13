@@ -59,7 +59,13 @@ class GribFileLoader {
                 file.path.endsWith('.f021') ||
                 file.path.endsWith('.f024') ||
                 file.path.contains('pgrb2')) {
-              print('[GRIB_LOADER]     ✅ ${file.path.split('/').last} (${file.lengthSync() / 1024 / 1024} MB)');
+              // ⚠️ FILTRER LES FICHIERS VIDES
+              final size = file.lengthSync();
+              if (size == 0) {
+                print('[GRIB_LOADER]     ⚠️  ${file.path.split('/').last} est VIDE (${size} bytes) - IGNORÉ');
+                continue;
+              }
+              print('[GRIB_LOADER]     ✅ ${file.path.split('/').last} (${size / 1024 / 1024} MB)');
               files.add(file);
             }
           }

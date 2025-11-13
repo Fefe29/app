@@ -269,17 +269,17 @@ class CourseNotifier extends Notifier<CourseState> {
     state = state.copyWith(buoys: updatedBuoys);
   }
 
-  /// Crée un parcours de test géographique réaliste en Méditerranée (baie de Cannes).
+  /// Crée un parcours de test géographique réaliste en Rade de Brest.
   /// Parcours olympique triangulaire avec vraies coordonnées géographiques.
   CourseState _createTestCourse() {
-    // Coordonnées réelles dans la baie de Cannes (43.5°N, 7.0°E environ)
+    // Coordonnées réelles en Rade de Brest (48.369485°N, -4.483626°W)
     
     return CourseState(
       buoys: [
-        // Bouée 1 - Marque au vent (500m au nord)
+        // Bouée 1 - Marque au vent (au nord)
         Buoy(
           id: 1, 
-          position: const GeographicPosition(latitude: 43.548, longitude: 7.000), 
+          position: const GeographicPosition(latitude: 48.369485, longitude: -4.483626), 
           passageOrder: 1, 
           role: BuoyRole.regular
         ),
@@ -287,43 +287,43 @@ class CourseNotifier extends Notifier<CourseState> {
         // Viseur - Extrémité tribord de la ligne de départ
         Buoy(
           id: 2, 
-          position: const GeographicPosition(latitude: 43.5400, longitude: 7.0120), 
+          position: const GeographicPosition(latitude: 48.3614850, longitude: -4.4714260), 
           role: BuoyRole.target
         ),
         
         // Comité - Extrémité bâbord de la ligne de départ  
         Buoy(
           id: 3, 
-          position: const GeographicPosition(latitude: 43.5430, longitude: 7.0180), 
+          position: const GeographicPosition(latitude: 48.3644850, longitude: -4.4655260), 
           role: BuoyRole.committee
         ),
         
-        // Bouée 2 - Marque sous le vent bâbord (600m au sud-ouest)
+        // Bouée 2 - Marque sous le vent bâbord (sud-ouest)
         Buoy(
           id: 4, 
-          position: const GeographicPosition(latitude: 43.53606, longitude: 7.010), 
+          position: const GeographicPosition(latitude: 48.3555850, longitude: -4.4936260), 
           passageOrder: 2, 
           role: BuoyRole.regular
         ),
         
-        // Bouée 3 - Marque sous le vent tribord (600m au sud-est)
+        // Bouée 3 - Marque sous le vent tribord (sud-est)
         Buoy(
           id: 5, 
-          position: const GeographicPosition(latitude: 43.53606, longitude: 7.0210), 
+          position: const GeographicPosition(latitude: 48.3555850, longitude: -4.4736260), 
           passageOrder: 3, 
           role: BuoyRole.regular
         ),
       ],
-      // Ligne de départ entre viseur et comité (ligne de 400m est-ouest)
+      // Ligne de départ entre viseur et comité
       startLine: LineSegment(
-        point1: const GeographicPosition(latitude: 43.540, longitude: 7.0120), // Viseur (tribord)
-        point2: const GeographicPosition(latitude: 43.543, longitude: 7.0180), // Comité (bâbord)
+        point1: const GeographicPosition(latitude: 48.3614850, longitude: -4.4714260), // Viseur (tribord)
+        point2: const GeographicPosition(latitude: 48.3644850, longitude: -4.4655260), // Comité (bâbord)
         type: LineType.start,
       ),
-      // Ligne d'arrivée
+      // Ligne d'arrivée horizontale entre Bouée 3 et la ligne de départ
       finishLine: LineSegment(
-        point1: const GeographicPosition(latitude: 43.539, longitude: 7.020), 
-        point2: const GeographicPosition(latitude: 43.539, longitude: 7.023),
+        point1: const GeographicPosition(latitude: 48.3585350, longitude: -4.4714260), // À l'ouest (Viseur)
+        point2: const GeographicPosition(latitude: 48.3585350, longitude: -4.4736260), // À l'est (Bouée 3)
         type: LineType.finish,
       ),
     );

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/data/datasources/gribs/grib_interpolation_service.dart';
 import 'package:kornog/data/datasources/gribs/grib_overlay_providers.dart';
 import 'package:kornog/features/charts/domain/services/screen_to_geo_service.dart';
-import 'package:kornog/features/charts/presentation/widgets/course_canvas.dart';
+import 'package:kornog/features/charts/presentation/models/view_transform.dart';
 
 /// Provider pour obtenir le vent interpolé à une position pixel
 /// 

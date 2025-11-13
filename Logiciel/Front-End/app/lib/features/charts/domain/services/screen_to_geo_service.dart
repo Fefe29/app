@@ -1,4 +1,4 @@
-import 'package:kornog/features/charts/presentation/widgets/course_canvas.dart';
+import 'package:kornog/features/charts/presentation/models/view_transform.dart';
 import 'package:kornog/features/charts/domain/models/geographic_position.dart';
 import 'package:flutter/material.dart';
 

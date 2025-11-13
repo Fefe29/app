@@ -26,9 +26,9 @@ class FakeTelemetryBus implements TelemetryBus {
 	final double _baseTws = WindTestConfig.baseSpeed;
 
 	// --------------- Position Simulator ---------------
-	// Position de départ (Baie de Morlaix, approximation)
-	double _latitude = 48.6275;
-	double _longitude = -3.9337;
+	// Position de départ (Rade de Brest, décalée 300m à l'est)
+	double _latitude = 48.369485;
+	double _longitude = -4.480326; // 300m à l'est de -4.483626
 	// Vitesse de déplacement simulée (environ 0.001 deg/sec = ~100m/sec drifting)
 	static const double _latVelocity = 0.0000167; // ~1.8 m/s
 	static const double _lonVelocity = 0.0000133; // ~1.4 m/s

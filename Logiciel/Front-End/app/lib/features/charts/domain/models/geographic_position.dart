@@ -174,6 +174,9 @@ class CoordinateConverter {
 
 /// Default coordinate system configurations for different sailing areas
 class CoordinateSystemPresets {
+  /// Rade de Brest (Brittany, France)
+  static final brest = GeographicPosition(latitude: 48.38, longitude: -4.50);
+  
   /// Mediterranean (around French Riviera)
   static final mediterranean = GeographicPosition(latitude: 43.5, longitude: 7.0);
   

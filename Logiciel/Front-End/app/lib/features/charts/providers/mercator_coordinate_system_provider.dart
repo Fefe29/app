@@ -83,12 +83,12 @@ class MercatorCoordinateSystemService {
 class MercatorCoordinateSystemNotifier extends Notifier<MercatorCoordinateSystemService> {
   @override
   MercatorCoordinateSystemService build() {
-    // Utiliser la même origine par défaut que les cartes téléchargées
+    // Utiliser Brest (Rade de Brest) comme origine par défaut
     return MercatorCoordinateSystemService(
       config: const MercatorCoordinateSystemConfig(
-        origin: GeographicPosition(latitude: 43.535, longitude: 6.999),
-        name: 'Mercator - Carte téléchargée',
-        description: 'Zone des tuiles OpenSeaMap téléchargées avec projection Mercator',
+        origin: GeographicPosition(latitude: 48.38, longitude: -4.50),
+        name: 'Mercator - Rade de Brest',
+        description: 'Rade de Brest, Bretagne (Mercator)',
       ),
     );
   }
@@ -111,6 +111,11 @@ class MercatorCoordinateSystemNotifier extends Notifier<MercatorCoordinateSystem
     String description;
 
     switch (presetName.toLowerCase()) {
+      case 'brest':
+        origin = const GeographicPosition(latitude: 48.38, longitude: -4.50);
+        name = 'Mercator - Rade de Brest';
+        description = 'Rade de Brest, Bretagne, France (Mercator)';
+        break;
       case 'mediterranean':
         origin = const GeographicPosition(latitude: 43.5, longitude: 7.0);
         name = 'Mercator - Méditerranée';

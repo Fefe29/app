@@ -29,33 +29,17 @@ import '../../../../data/datasources/gribs/interpolated_wind_arrows_painter.dart
 import '../../../../data/datasources/gribs/viewport_wind_grid.dart';
 import '../../../../data/datasources/gribs/viewport_wind_arrows_painter.dart';
 import '../../../../data/datasources/gribs/viewport_wind_heatmap_painter.dart';
+import 'boat_indicator.dart';
 import '../../../../data/datasources/gribs/grib_interpolation_service.dart';
 import '../../../../data/datasources/gribs/viewport_wind_grid_provider.dart';
 import '../../../../data/datasources/gribs/grib_time_slider_widget.dart';
 import '../../../../data/datasources/gribs/wind_speed_legend_bar.dart';
 import '../../providers/grib_layers_provider.dart';
 // -------------------------
+import '../../presentation/models/view_transform.dart';
+
 // Vue & projection partagées
 // -------------------------
-class ViewTransform {
-  const ViewTransform({
-    required this.minX, required this.maxX,
-    required this.minY, required this.maxY,
-    required this.scale, required this.offsetX, required this.offsetY,
-  });
-
-  final double minX, maxX, minY, maxY;
-  final double scale, offsetX, offsetY;
-
-  Offset project(double x, double y, Size size) {
-    final px = offsetX + (x - minX) * scale;
-    final py = size.height - offsetY - (y - minY) * scale; // Y logique vers le haut
-    return Offset(px, py);
-  }
-
-  double get spanX => maxX - minX;
-  double get spanY => maxY - minY;
-}
 
 class CourseCanvas extends ConsumerStatefulWidget {
   const CourseCanvas({super.key});
@@ -512,6 +496,16 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                       ),
                     ),
                   ),
+
+                  // Position du bateau avec indicateur visuel
+                  BoatIndicator(
+                    view: view,
+                    canvasSize: Size(constraints.maxWidth, constraints.maxHeight),
+                    mercatorService: mercatorService,
+                    boatSize: 24.0,
+                    boatColor: Colors.purple,
+                  ),
+
                   Positioned(
                     right: 16,
                     bottom: 32,
