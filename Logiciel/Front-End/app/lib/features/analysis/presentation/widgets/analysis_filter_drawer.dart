@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Import corrigé vers le provider (fichier déplacé dans providers/analysis_filters.dart)
 import '../../providers/analysis_filters.dart';
+import '../widgets/telemetry_widgets.dart';
+import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_providers.dart';
 
 class AnalysisFilterDrawer extends ConsumerWidget {
   const AnalysisFilterDrawer({super.key});
@@ -252,6 +254,90 @@ class AnalysisFilterDrawer extends ConsumerWidget {
                 ],
               ),
             ),
+            
+            const SizedBox(height: 24),
+            const Divider(thickness: 2),
+            const SizedBox(height: 8),
+            
+            // Section Enregistrement
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.fiber_manual_record, size: 20, color: Colors.red),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Enregistrement',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _showRecordingDialog(context);
+                  },
+                  icon: const Icon(Icons.fiber_manual_record),
+                  label: const Text('⏱️ Enregistrement'),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Section Gestion des sessions
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.folder, size: 20, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Gestion des Sessions',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _showSessionManagementDialog(context);
+                  },
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('📂 Gérer les Sessions'),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -275,5 +361,62 @@ class AnalysisFilterDrawer extends ConsumerWidget {
     }
     
     return '${selected.length} métriques: ${selected.take(2).join(', ')}${selected.length > 2 ? '...' : ''}';
+  }
+
+  void _showRecordingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('⏱️ Enregistrement'),
+        content: const SizedBox(
+          height: 300,
+          width: 400,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                RecordingControlsWidget(),
+                SizedBox(height: 24),
+                Text(
+                  '''• Cliquez sur "Démarrer" pour commencer un nouvel enregistrement
+• Le système sauvegarde automatiquement les données du bateau
+• Utilisez "Pause" pour interrompre temporairement
+• Cliquez sur "Arrêter" quand vous avez terminé
+• Les sessions sont stockées en format compressé dans ~/.kornog/telemetry/
+
+Une fois arrêtée, la session est disponible dans la gestion pour export ou analyse.''',
+                  style: TextStyle(color: Colors.grey, height: 1.6, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSessionManagementDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('📂 Gestion des sessions'),
+        content: const SizedBox(
+          height: 400,
+          width: 500,
+          child: SessionManagementWidget(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -5,7 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/router.dart';
 import 'theme/app_theme.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'package:kornog/data/datasources/telemetry/json_telemetry_storage.dart';
+import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +20,12 @@ void main() async {
       await windowManager.focus();
     });
   }
-  runApp(const ProviderScope(child: App()));
+  
+  runApp(
+    const ProviderScope(
+      child: App(),
+    ),
+  );
 }
 
 class App extends ConsumerWidget {

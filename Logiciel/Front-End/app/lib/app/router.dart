@@ -9,6 +9,7 @@ import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/charts/presentation/pages/chart_page.dart';
 import '../features/analysis/presentation/pages/analysis_page.dart'; // Page Analysis
 import '../features/alarms/presentation/pages/alarms_page.dart';
+import '../features/telemetry_recording/presentation/telemetry_recording_page.dart';
 
 /// Fournit la configuration de navigation à l’application.
 /// On utilise un ShellRoute pour afficher la barre de navigation globale.
@@ -39,6 +40,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/analysis', // 👈 route vers ta page
             name: 'analysis',
             builder: (_, __) => const AnalysisPage(),
+          ),
+          GoRoute(
+            path: '/telemetry-recording', // 🆕 Recording & Analysis
+            name: 'telemetryRecording',
+            builder: (_, __) => const TelemetryRecordingPage(),
           ),
           GoRoute(
             path: '/settings',

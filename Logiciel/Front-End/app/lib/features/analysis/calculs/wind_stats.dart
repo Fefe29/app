@@ -26,7 +26,7 @@ List<double> exponentialMovingAverage(List<double> data, double alpha) {
 double windowStd(List<double> data) {
   if (data.isEmpty) return 0.0;
   double mean = data.reduce((a, b) => a + b) / data.length;
-  double sumSq = data.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b);
+  double sumSq = data.map((x) => pow(x - mean, 2) as double).reduce((a, b) => a + b);
   return sqrt(sumSq / data.length);
 }
 
