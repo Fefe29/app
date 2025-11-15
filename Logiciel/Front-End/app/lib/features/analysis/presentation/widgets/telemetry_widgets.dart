@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_providers.dart';
+import 'package:kornog/features/analysis/providers/analysis_filters.dart';
 import 'package:kornog/data/datasources/telemetry/telemetry_recorder.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
 
@@ -89,14 +90,20 @@ class RecordingControlsWidget extends ConsumerWidget {
     final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
     final recorder = ref.read(recordingStateProvider.notifier);
     
+    print('🎬 [RecordingControlsWidget] Démarrage enregistrement: $sessionId');
+    
     try {
+      print('📱 [RecordingControlsWidget] Appel recorder.startRecording()...');
       await recorder.startRecording(sessionId);
+      print('✅ [RecordingControlsWidget] Enregistrement démarré avec succès');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('✅ Enregistrement démarré: $sessionId')),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      print('❌ [RecordingControlsWidget] Erreur démarrage: $e');
+      print('   StackTrace: $st');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ Erreur: $e'), backgroundColor: Colors.red),
@@ -108,14 +115,29 @@ class RecordingControlsWidget extends ConsumerWidget {
   Future<void> _stopRecording(BuildContext context, WidgetRef ref) async {
     final recorder = ref.read(recordingStateProvider.notifier);
     
+    print('🛑 [RecordingControlsWidget] Arrêt enregistrement demandé');
+    
     try {
+      print('📱 [RecordingControlsWidget] Appel recorder.stopRecording()...');
       final metadata = await recorder.stopRecording();
+      print('✅ [RecordingControlsWidget] Enregistrement arrêté:');
+      print('   - Snapshots: ${metadata.snapshotCount}');
+      print('   - Taille: ${metadata.sizeBytes} bytes');
+      print('   - SessionId: ${metadata.sessionId}');
+      
+      // Invalider le cache des sessions pour afficher la nouvelle
+      print('🔄 [RecordingControlsWidget] Invalidation du cache sessions...');
+      ref.invalidate(sessionsListProvider);
+      ref.invalidate(totalStorageSizeProvider);
+      
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('✅ Enregistrement arrêté: ${metadata.snapshotCount} points')),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      print('❌ [RecordingControlsWidget] Erreur arrêt: $e');
+      print('   StackTrace: $st');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ Erreur: $e'), backgroundColor: Colors.red),
@@ -125,11 +147,23 @@ class RecordingControlsWidget extends ConsumerWidget {
   }
 
   void _pauseRecording(WidgetRef ref) {
-    ref.read(recordingStateProvider.notifier).pauseRecording();
+    print('⏸️ [RecordingControlsWidget] Pause demandée');
+    try {
+      ref.read(recordingStateProvider.notifier).pauseRecording();
+      print('✅ [RecordingControlsWidget] Pause activée');
+    } catch (e) {
+      print('❌ [RecordingControlsWidget] Erreur pause: $e');
+    }
   }
 
   void _resumeRecording(WidgetRef ref) {
-    ref.read(recordingStateProvider.notifier).resumeRecording();
+    print('▶️ [RecordingControlsWidget] Reprise demandée');
+    try {
+      ref.read(recordingStateProvider.notifier).resumeRecording();
+      print('✅ [RecordingControlsWidget] Reprise activée');
+    } catch (e) {
+      print('❌ [RecordingControlsWidget] Erreur reprise: $e');
+    }
   }
 }
 
@@ -143,6 +177,7 @@ class SessionManagementWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsAsync = ref.watch(sessionsListProvider);
+    final selectedSessionId = ref.watch(selectedSessionProvider);
     
     return Card(
       child: Padding(
@@ -150,11 +185,28 @@ class SessionManagementWidget extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '📂 Gestion des sessions',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
+            // Bouton pour basculer mode temps réel / session
+            if (selectedSessionId != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          ref.read(selectedSessionProvider.notifier).clearSelection();
+                        },
+                        icon: const Icon(Icons.clear),
+                        label: const Text('Retour au Temps Réel'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade100,
+                          foregroundColor: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: sessionsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -168,26 +220,49 @@ class SessionManagementWidget extends ConsumerWidget {
                     itemCount: sessions.length,
                     itemBuilder: (context, index) {
                       final session = sessions[index];
-                      return ListTile(
-                        title: Text(session.sessionId),
-                        subtitle: Text(
-                          '${session.snapshotCount} points • ${(session.sizeBytes / 1024).toStringAsFixed(1)} KB',
+                      final isSelected = session.sessionId == selectedSessionId;
+                      
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+                          border: isSelected ? Border.all(color: Colors.blue, width: 2) : null,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        trailing: PopupMenuButton(
-                          itemBuilder: (context) => [
-                            PopupMenuItem(
-                              child: const Text('Exporter CSV'),
-                              onTap: () => _exportSession(context, ref, session.sessionId, 'csv'),
+                        child: ListTile(
+                          leading: isSelected
+                              ? const Icon(Icons.check_circle, color: Colors.blue)
+                              : const Icon(Icons.folder, color: Colors.grey),
+                          title: Text(
+                            _formatSessionTitle(session),
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 14,
                             ),
-                            PopupMenuItem(
-                              child: const Text('Exporter JSON'),
-                              onTap: () => _exportSession(context, ref, session.sessionId, 'json'),
-                            ),
-                            PopupMenuItem(
-                              child: const Text('Supprimer'),
-                              onTap: () => _deleteSession(context, ref, session.sessionId),
-                            ),
-                          ],
+                          ),
+                          subtitle: Text(
+                            '${session.snapshotCount} points • ${(session.sizeBytes / 1024).toStringAsFixed(1)} KB • ${_formatDuration(session.endTime.difference(session.startTime))}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onTap: () {
+                            // Sélectionner la session pour charger ses données
+                            ref.read(selectedSessionProvider.notifier).selectSession(session.sessionId);
+                          },
+                          trailing: PopupMenuButton(
+                            itemBuilder: (context) => [
+                              PopupMenuItem(
+                                child: const Text('Exporter CSV'),
+                                onTap: () => _exportSession(context, ref, session.sessionId, 'csv'),
+                              ),
+                              PopupMenuItem(
+                                child: const Text('Exporter JSON'),
+                                onTap: () => _exportSession(context, ref, session.sessionId, 'json'),
+                              ),
+                              PopupMenuItem(
+                                child: const Text('Supprimer'),
+                                onTap: () => _deleteSession(context, ref, session.sessionId),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -247,6 +322,25 @@ class SessionManagementWidget extends ConsumerWidget {
           SnackBar(content: Text('❌ Erreur suppression: $e'), backgroundColor: Colors.red),
         );
       }
+    }
+  }
+
+  /// Formate le titre d'une session avec le format: YYYY-MM-DD HH:MM:SS → HH:MM:SS
+  String _formatSessionTitle(SessionMetadata session) {
+    final startStr = DateFormat('yyyy-MM-dd HH:mm:ss').format(session.startTime);
+    final endStr = DateFormat('HH:mm:ss').format(session.endTime);
+    return '$startStr → $endStr';
+  }
+
+  /// Formate la durée: "1m 23s" ou "45s"
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    
+    if (minutes > 0) {
+      return '${minutes}m ${seconds}s';
+    } else {
+      return '${seconds}s';
     }
   }
 }

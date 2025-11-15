@@ -91,3 +91,34 @@ Future<Directory> getMapDataDirectory() async {
   return mapDir;
 }
 
+/// Fournit le dossier de stockage pour la télémétrie, dans KornogData/telemetry
+Future<Directory> getTelemetryDataDirectory() async {
+  print('[TELEMETRY_DATA] ════════════════════════════════════════');
+  print('[TELEMETRY_DATA] 📂 ENTERING getTelemetryDataDirectory');
+  final kornogDir = await getKornogDataDirectory();
+  final telemetryDir = Directory('${kornogDir.path}/telemetry');
+  print('[TELEMETRY_DATA] 📍 Chemin télémétrie complet: ${telemetryDir.path}');
+  
+  if (!(await telemetryDir.exists())) {
+    print('[TELEMETRY_DATA] ⚠️  Dossier n\'existe pas, création...');
+    await telemetryDir.create(recursive: true);
+    print('[TELEMETRY_DATA] ✅ Dossier créé');
+  } else {
+    print('[TELEMETRY_DATA] ✅ Dossier existe déjà');
+    // List contents
+    try {
+      final contents = telemetryDir.listSync();
+      print('[TELEMETRY_DATA] 📦 Fichiers dans le dossier: ${contents.length}');
+      for (final item in contents.take(5)) {
+        print('[TELEMETRY_DATA]   - ${item.path}');
+      }
+    } catch (e) {
+      print('[TELEMETRY_DATA] ⚠️  Erreur listing: $e');
+    }
+  }
+  
+  print('[TELEMETRY_DATA] ✅ READY: ${telemetryDir.path}');
+  print('[TELEMETRY_DATA] ════════════════════════════════════════');
+  return telemetryDir;
+}
+

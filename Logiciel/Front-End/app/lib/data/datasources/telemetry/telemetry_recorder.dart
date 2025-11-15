@@ -71,6 +71,8 @@ class TelemetryRecorder {
   DateTime? _recordingStartTime;
   int _snapshotCount = 0;
   final List<RecorderError> _errors = [];
+  Future<void>? _saveFuture; // 🆕 Track la Future de saveSession
+  StreamController<TelemetrySnapshot>? _controller; // 🆕 Pour fermer le stream
 
   /// État actuel
   RecorderState get state => _state;
@@ -95,13 +97,17 @@ class TelemetryRecorder {
   /// Lance une exception si une session est déjà en cours d'enregistrement.
   /// Crée une nouvelle session et commence à sauvegarder les snapshots du bus.
   Future<void> startRecording(String sessionId) async {
+    print('🔴 [TelemetryRecorder] Démarrage enregistrement: $sessionId');
+    
     if (_state != RecorderState.idle) {
+      print('❌ [TelemetryRecorder] État invalide: $_state');
       throw Exception('Enregistrement déjà en cours (état: $_state). '
           'Appelez stopRecording() d\'abord.');
     }
 
     // Vérifier que la session n'existe pas déjà
     if (await storage.sessionExists(sessionId)) {
+      print('❌ [TelemetryRecorder] Session existe déjà: $sessionId');
       throw Exception('Session $sessionId existe déjà');
     }
 
@@ -110,9 +116,13 @@ class TelemetryRecorder {
     _recordingStartTime = DateTime.now();
     _snapshotCount = 0;
     _errors.clear();
+    
+    print('✅ [TelemetryRecorder] État: RECORDING');
+    print('⏱️ [TelemetryRecorder] Heure début: $_recordingStartTime');
 
     // Controller pour accumuler les snapshots
     final controller = StreamController<TelemetrySnapshot>.broadcast();
+    _controller = controller; // Stocker pour fermer dans stopRecording()
 
     // S'abonner au bus et ajouter les snapshots au contrôleur
     _subscription = telemetryBus.snapshots().listen(
@@ -120,10 +130,15 @@ class TelemetryRecorder {
         controller.add(snapshot);
         _snapshotCount++;
 
+        if (_snapshotCount % 50 == 0) {
+          print('📡 [TelemetryRecorder] $_snapshotCount snapshots reçus');
+        }
+
         // Notifier du progrès
         onProgress?.call(_snapshotCount, elapsedTime);
       },
       onError: (error, stackTrace) {
+        print('❌ [TelemetryRecorder] Erreur du bus: $error');
         _addError(
           'Erreur réception du bus: $error',
           error,
@@ -132,17 +147,24 @@ class TelemetryRecorder {
         controller.addError(error, stackTrace);
       },
       onDone: () {
+        print('✅ [TelemetryRecorder] Stream du bus fermé');
         controller.close();
       },
     );
 
     // Sauvegarder les snapshots dans le stockage
+    // NOTE: On NE attend PAS cette Future ici!
+    // Elle sera attendue dans stopRecording() après fermeture du stream
     try {
-      await storage.saveSession(sessionId, controller.stream);
+      print('💾 [TelemetryRecorder] Appel storage.saveSession()...');
+      _saveFuture = storage.saveSession(sessionId, controller.stream);
+      print('✅ [TelemetryRecorder] saveSession lancé (pas attendu)');
+      // Ne pas await ici ! Le stream doit rester ouvert
     } catch (e, st) {
       _state = RecorderState.error;
-      _addError('Erreur sauvegarde session: $e', e, st);
-      await stopRecording();
+      print('❌ [TelemetryRecorder] Erreur appel saveSession: $e');
+      print('   StackTrace: $st');
+      _addError('Erreur lancement saveSession: $e', e, st);
       rethrow;
     }
   }
@@ -152,29 +174,73 @@ class TelemetryRecorder {
   /// Retourne les métadonnées de la session enregistrée.
   /// Lance une exception s'il n'y a pas d'enregistrement en cours.
   Future<SessionMetadata> stopRecording() async {
+    print('⏹️ [TelemetryRecorder] Arrêt enregistrement demandé');
+    
     if (_state != RecorderState.recording && _state != RecorderState.error) {
+      print('❌ [TelemetryRecorder] État invalide pour stop: $_state');
       throw Exception('Aucun enregistrement en cours (état: $_state)');
     }
 
     final sessionId = _currentSessionId;
     if (sessionId == null) {
+      print('❌ [TelemetryRecorder] Pas de session active');
       throw Exception('Pas de session active');
     }
 
+    print('🛑 [TelemetryRecorder] Arrêt session: $sessionId');
+    print('📊 [TelemetryRecorder] Snapshots enregistrés: $_snapshotCount');
+    print('⏱️ [TelemetryRecorder] Durée: ${elapsedTime.inSeconds}s');
+
     // Arrêter la souscription au bus
+    print('📡 [TelemetryRecorder] Annulation subscription du bus...');
     await _subscription?.cancel();
     _subscription = null;
+    print('✅ [TelemetryRecorder] Subscription annulée');
+
+    // Fermer le controller pour signaler la fin du stream
+    print('🔐 [TelemetryRecorder] Fermeture du controller...');
+    await _controller?.close();
+    _controller = null;
+    print('✅ [TelemetryRecorder] Controller fermé');
+
+    // IMPORTANT: Attendre que saveSession() se termine
+    // C'est crucial - saveSession() écoute le stream qu'on vient de fermer
+    if (_saveFuture != null) {
+      print('⏳ [TelemetryRecorder] Attente fin saveSession()...');
+      try {
+        // Ajouter un timeout pour éviter l'attente infinie
+        await _saveFuture!.timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            print('⚠️ [TelemetryRecorder] Timeout saveSession après 5s');
+          },
+        );
+        print('✅ [TelemetryRecorder] saveSession() terminé');
+      } catch (e) {
+        print('⚠️ [TelemetryRecorder] Erreur saveSession: $e');
+        // Ne pas rethrow ici, on veut quand même essayer de récupérer les métadonnées
+      }
+      _saveFuture = null;
+    }
 
     // Attendre que la sauvegarde soit terminée
     _state = RecorderState.idle;
+    print('✅ [TelemetryRecorder] État: IDLE');
 
     // Récupérer les métadonnées
+    print('📂 [TelemetryRecorder] Récupération metadata...');
     final metadata = await storage.getSessionMetadata(sessionId);
+    print('✅ [TelemetryRecorder] Metadata récupérée:');
+    print('   - ID: ${metadata.sessionId}');
+    print('   - Snapshots: ${metadata.snapshotCount}');
+    print('   - Taille: ${metadata.sizeBytes} bytes');
+    print('   - Durée: ${metadata.endTime.difference(metadata.startTime).inSeconds}s');
 
     // Réinitialiser l'état
     _currentSessionId = null;
     _recordingStartTime = null;
 
+    print('✅ [TelemetryRecorder] Session arrêtée avec succès');
     return metadata;
   }
 

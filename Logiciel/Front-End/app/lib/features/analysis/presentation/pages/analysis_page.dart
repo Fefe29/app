@@ -54,9 +54,6 @@ class AnalysisPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('📊 Analyse'),
-      ),
       drawer: const AnalysisFilterDrawer(),
       body: const _AnalysisTab(),
     );

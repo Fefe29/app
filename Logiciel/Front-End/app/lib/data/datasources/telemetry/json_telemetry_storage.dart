@@ -66,28 +66,34 @@ class JsonTelemetryStorage implements TelemetryStorage {
     String sessionId,
     Stream<TelemetrySnapshot> snapshots,
   ) async {
+    print('📝 [TelemetryStorage] Démarrage saveSession: $sessionId');
+    
     await _ensureDirectories();
 
     final sessionFile = File(_sessionFilePath(sessionId));
     if (await sessionFile.exists()) {
+      print('❌ [TelemetryStorage] Session $sessionId existe déjà');
       throw Exception('Session $sessionId already exists');
     }
+
+    print('📂 [TelemetryStorage] Chemin fichier: ${sessionFile.path}');
 
     // Buffer pour accumuler les lignes JSON
     final buffer = <String>[];
     final bufferMaxLines = 100; // Flusher tous les 100 snapshots
+    final compressedBuffer = <int>[];
     
     DateTime? firstSnapshot;
     DateTime? lastSnapshot;
     int snapshotCount = 0;
 
-    // Écrire les snapshots compressés
-    final sink = GZipCodec().encoder.startChunkedConversion(
-      sessionFile.openWrite(),
-    );
+    // Créer un IOSink pour écrire les données compressées
+    final output = sessionFile.openWrite();
 
     try {
+      print('🔄 [TelemetryStorage] Attente de snapshots du stream...');
       await for (final snapshot in snapshots) {
+        print('📥 [TelemetryStorage] Snapshot reçu: ${snapshot.ts}');
         // Mémoriser les timestamps
         firstSnapshot ??= snapshot.ts;
         lastSnapshot = snapshot.ts;
@@ -97,23 +103,49 @@ class JsonTelemetryStorage implements TelemetryStorage {
         buffer.add(jsonLine);
         snapshotCount++;
 
+        if (snapshotCount % 50 == 0) {
+          print('💾 [TelemetryStorage] $snapshotCount snapshots enregistrés...');
+        }
+
         // Flusher le buffer periodiquement
         if (buffer.length >= bufferMaxLines) {
-          sink.add('${buffer.join('\n')}\n'.codeUnits);
+          print('💾 [TelemetryStorage] Flush: ${buffer.length} snapshots');
+          final line = '${buffer.join('\n')}\n';
+          final encoded = utf8.encode(line);
+          final compressed = GZipCodec().encode(encoded);
+          compressedBuffer.addAll(compressed);
           buffer.clear();
         }
       }
 
+      print('✅ [TelemetryStorage] Fin du stream de snapshots (fermeture détectée)');
+      
       // Flusher le reste
       if (buffer.isNotEmpty) {
-        sink.add('${buffer.join('\n')}\n'.codeUnits);
+        print('💾 [TelemetryStorage] Flush final: ${buffer.length} snapshots');
+        final line = '${buffer.join('\n')}\n';
+        final encoded = utf8.encode(line);
+        final compressed = GZipCodec().encode(encoded);
+        compressedBuffer.addAll(compressed);
       }
 
-      sink.close();
-    } catch (e) {
+      // Écrire toutes les données compressées d'un coup
+      print('🔒 [TelemetryStorage] Écriture des données compressées...');
+      output.add(compressedBuffer);
+      
+      print('🔒 [TelemetryStorage] Fermeture du sink...');
+      await output.close();
+      print('✅ [TelemetryStorage] Stream fermé avec succès');
+    } catch (e, st) {
       // Nettoyer en cas d'erreur
+      print('❌ [TelemetryStorage] Erreur écriture: $e');
+      print('   StackTrace: $st');
+      try {
+        await output.close();
+      } catch (_) {}
       if (await sessionFile.exists()) {
         await sessionFile.delete();
+        print('🗑️ [TelemetryStorage] Fichier supprimé (cleanup)');
       }
       rethrow;
     }
@@ -121,6 +153,10 @@ class JsonTelemetryStorage implements TelemetryStorage {
     // Sauvegarder les métadonnées
     if (firstSnapshot != null && lastSnapshot != null) {
       final fileSize = await sessionFile.length();
+      print('📊 [TelemetryStorage] Taille fichier: ${fileSize} bytes');
+      print('📊 [TelemetryStorage] Total snapshots: $snapshotCount');
+      print('📊 [TelemetryStorage] Durée: ${lastSnapshot.difference(firstSnapshot).inSeconds}s');
+      
       final metadata = SessionMetadata(
         sessionId: sessionId,
         startTime: firstSnapshot,
@@ -130,6 +166,9 @@ class JsonTelemetryStorage implements TelemetryStorage {
       );
 
       await _saveMetadata(sessionId, metadata);
+      print('✅ [TelemetryStorage] Session sauvegardée avec succès!');
+    } else {
+      print('⚠️ [TelemetryStorage] Pas de snapshots enregistrés');
     }
   }
 
@@ -457,26 +496,39 @@ class JsonTelemetryStorage implements TelemetryStorage {
   }
 
   TelemetrySnapshot _jsonLineToSnapshot(String line) {
-    final json = jsonDecode(line) as Map<String, dynamic>;
+    try {
+      final decoded = jsonDecode(line);
+      
+      // Convertir Map<dynamic, dynamic> en Map<String, dynamic>
+      final json = (decoded as Map).cast<String, dynamic>();
 
-    final ts = DateTime.parse(json['ts'] as String);
-    final metricsJson = (json['metrics'] ?? {}) as Map<String, dynamic>;
-    final tagsJson = (json['tags'] ?? {}) as Map<String, dynamic>;
+      final ts = DateTime.parse(json['ts'] as String);
+      final metricsRaw = json['metrics'] ?? {};
+      final tagsRaw = json['tags'] ?? {};
+      
+      // Convertir metrics en Map<String, dynamic>
+      final metricsJson = (metricsRaw as Map).cast<String, dynamic>();
+      final tagsJson = (tagsRaw as Map).cast<String, dynamic>();
 
-    final metrics = <String, Measurement>{};
-    for (final entry in metricsJson.entries) {
-      metrics[entry.key] = Measurement(
-        value: (entry.value as num).toDouble(),
-        unit: _guessUnit(entry.key),
+      final metrics = <String, Measurement>{};
+      for (final entry in metricsJson.entries) {
+        metrics[entry.key] = Measurement(
+          value: (entry.value as num).toDouble(),
+          unit: _guessUnit(entry.key),
+          ts: ts,
+        );
+      }
+
+      return TelemetrySnapshot(
         ts: ts,
+        metrics: metrics,
+        tags: tagsJson,
       );
+    } catch (e) {
+      print('❌ [_jsonLineToSnapshot] Erreur parsing: $e');
+      print('   Ligne: $line');
+      rethrow;
     }
-
-    return TelemetrySnapshot(
-      ts: ts,
-      metrics: metrics,
-      tags: tagsJson,
-    );
   }
 
   Unit _guessUnit(String key) {

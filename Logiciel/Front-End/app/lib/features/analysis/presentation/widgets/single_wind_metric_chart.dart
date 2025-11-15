@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../domain/services/wind_history_service.dart';
+import '../../providers/analysis_filters.dart';
+import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_providers.dart';
+import 'package:kornog/domain/entities/telemetry.dart';
 
 enum WindMetricType { twd, twa, tws }
 
@@ -19,7 +22,27 @@ class SingleWindMetricChart extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final historyAsync = _getHistoryProvider(metricType).call(ref);
+    // Vérifier si une session est sélectionnée
+    final selectedSessionId = ref.watch(selectedSessionProvider);
+    print('🔍 [SingleWindMetricChart.build] selectedSessionId=$selectedSessionId, metricType=$metricType');
+    
+    // Charger les données appropriées
+    final historyAsync = selectedSessionId != null
+        ? ref.watch(sessionHistoryDataProvider((
+            selectedSessionId,
+            _getMetricKey(metricType),
+          )))
+        : _getHistoryProvider(metricType).call(ref);
+    
+    print('📊 [SingleWindMetricChart.build] historyAsync type: ${historyAsync.runtimeType}');
+    if (historyAsync is AsyncData) {
+      final data = historyAsync.value;
+      print('📊 [SingleWindMetricChart.build] historyAsync.data length: ${data?.length ?? 0}');
+    } else if (historyAsync is AsyncLoading) {
+      print('⏳ [SingleWindMetricChart.build] historyAsync: LOADING');
+    } else if (historyAsync is AsyncError) {
+      print('❌ [SingleWindMetricChart.build] historyAsync: ERROR ${historyAsync.error}');
+    }
     
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -28,16 +51,26 @@ class SingleWindMetricChart extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(context, ref),
+            _buildHeader(context, ref, selectedSessionId),
             const SizedBox(height: 16),
             
             // Graphique principal  
             SizedBox(
               height: 250,
               child: historyAsync.when(
-                data: (data) => _buildChart(context, data),
-                loading: () => _buildLoadingChart(),
-                error: (error, stack) => _buildErrorChart('Erreur: $error'),
+                data: (data) {
+                  print('✅ [SingleWindMetricChart] Chart data disponible: ${data.length} points');
+                  return _buildChart(context, data);
+                },
+                loading: () {
+                  print('⏳ [SingleWindMetricChart] Chart en LOADING...');
+                  return _buildLoadingChart();
+                },
+                error: (error, stack) {
+                  print('❌ [SingleWindMetricChart] Chart ERROR: $error');
+                  print('   Stack: $stack');
+                  return _buildErrorChart('Erreur: $error');
+                },
               ),
             ),
             
@@ -49,8 +82,19 @@ class SingleWindMetricChart extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, WidgetRef ref) {
+  /// Récupère la clé de la métrique (wind.twd, wind.twa, wind.tws)
+  String _getMetricKey(WindMetricType type) {
+    return switch (type) {
+      WindMetricType.twd => 'wind.twd',
+      WindMetricType.twa => 'wind.twa',
+      WindMetricType.tws => 'wind.tws',
+    };
+  }
+
+  Widget _buildHeader(BuildContext context, WidgetRef ref, String? selectedSessionId) {
     final config = _getMetricConfig(metricType);
+    
+    print('📋 [_buildHeader] metricType=$metricType, selectedSessionId=$selectedSessionId');
     
     return Row(
       children: [
@@ -65,9 +109,11 @@ class SingleWindMetricChart extends ConsumerWidget {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               Text(
-                config.subtitle,
+                selectedSessionId != null
+                    ? '📊 Session: ${selectedSessionId.substring(0, 15)}...'
+                    : '📡 En temps réel',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey,
+                  color: selectedSessionId != null ? Colors.blue : Colors.grey,
                 ),
               ),
             ],
