@@ -681,8 +681,9 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
       return [];
     }
     
-    // ignore: avoid_print
     print('[TILES] DEBUG - _loadMultiLayerTilesForMap: ${map.id}, zoom=${map.zoomLevel}');
+    print('[TILES] 📐 Transform: scale=${view.scale}, offsetX=${view.offsetX}, offsetY=${view.offsetY}, minX=${view.minX}, minY=${view.minY}');
+    print('[TILES] 📏 Canvas: width=${size.width}, height=${size.height}');
   // Récupérer dynamiquement le chemin de stockage des cartes
   final container = ProviderScope.containerOf(context);
   final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
@@ -706,7 +707,12 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
       final y = ((size.height - pt.dy - view.offsetY) / view.scale) + view.minY;
       return LocalPosition(x: x, y: y);
     }).toList();
+    
+    print('[TILES] 🔍 localCorners: ${localCorners.map((lp) => 'x=${lp.x.toStringAsFixed(1)},y=${lp.y.toStringAsFixed(1)}').toList()}');
+    
     final geoCorners = localCorners.map((lp) => mercatorService.toGeographic(lp)).toList();
+    
+    print('[TILES] 🔍 geoCorners: ${geoCorners.map((g) => 'lat=${g.latitude.toStringAsFixed(2)},lon=${g.longitude.toStringAsFixed(2)}').toList()}');
     
     double minLat = geoCorners.first.latitude, maxLat = geoCorners.first.latitude;
     double minLon = geoCorners.first.longitude, maxLon = geoCorners.first.longitude;
@@ -775,34 +781,71 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     print('[TILES] Tiles widget (full): X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] z=$zoom, geo=[${minLon.toStringAsFixed(2)},${maxLon.toStringAsFixed(2)}] x [${minLat.toStringAsFixed(2)},${maxLat.toStringAsFixed(2)}]');
 
     final tiles = <LayeredTile>[];
-    final foundFiles = <String>[];
     
-    final expectedTileCount = (tileXmax - tileXmin + 1) * (tileYmax - tileYmin + 1);
-    print('[TILES] Cherchant $expectedTileCount tuiles...');
-
-    for (int x = tileXmin; x <= tileXmax; x++) {
-      for (int y = tileYmin; y <= tileYmax; y++) {
-        final filePath = '$mapPath/${x}_${y}_$zoom.png';
-        final file = File(filePath);
-        if (await file.exists()) {
-          foundFiles.add(filePath);
-          try {
-            final layeredTile = await MultiLayerTileService.loadLayeredTile(
-              x: x,
-              y: y,
-              zoom: zoom,
-              config: MapLayersConfig.defaultConfig,
-              localMapPath: mapPath,
-            );
-            tiles.add(layeredTile);
-          } catch (e) {
-            print('[TILES] ❌ Erreur chargement tuile $x/$y/$zoom: $e');
+    // Instead of searching in a predefined range, scan the actual tiles on disk
+    final mapDir = Directory(mapPath);
+    if (!await mapDir.exists()) {
+      print('[TILES] ⚠️ Répertoire de carte inexistant: $mapPath');
+      return [];
+    }
+    
+    print('[TILES] 📂 Balayage du répertoire: $mapPath');
+    
+    // List all tile files in the map directory
+    final tileFiles = <String>[];
+    try {
+      await for (final entity in mapDir.list()) {
+        if (entity is File && entity.path.endsWith('.png')) {
+          final filename = entity.path.split('/').last;
+          // Parse filename: x_y_z.png
+          final parts = filename.replaceAll('.png', '').split('_');
+          if (parts.length == 3) {
+            try {
+              final x = int.parse(parts[0]);
+              final y = int.parse(parts[1]);
+              final z = int.parse(parts[2]);
+              
+              // Only load tiles at the current zoom level that are visible
+              if (z == zoom && 
+                  x >= tileXmin && x <= tileXmax && 
+                  y >= tileYmin && y <= tileYmax) {
+                tileFiles.add(entity.path);
+              }
+            } catch (e) {
+              // Skip files that don't parse correctly
+            }
           }
         }
       }
+    } catch (e) {
+      print('[TILES] ❌ Erreur listage répertoire: $e');
+      return [];
+    }
+    
+    print('[TILES] 📊 ${tileFiles.length} tuiles trouvées au disque pour z=$zoom');
+    
+    // Load the found tiles
+    for (final filePath in tileFiles) {
+      try {
+        final filename = filePath.split('/').last.replaceAll('.png', '');
+        final parts = filename.split('_');
+        final x = int.parse(parts[0]);
+        final y = int.parse(parts[1]);
+        
+        final layeredTile = await MultiLayerTileService.loadLayeredTile(
+          x: x,
+          y: y,
+          zoom: zoom,
+          config: MapLayersConfig.defaultConfig,
+          localMapPath: mapPath,
+        );
+        tiles.add(layeredTile);
+      } catch (e) {
+        print('[TILES] ❌ Erreur chargement tuile: $e');
+      }
     }
 
-    print('[TILES] ✅ ${tiles.length} tuiles chargées sur $expectedTileCount');
+    print('[TILES] ✅ ${tiles.length} tuiles chargées');
 
     return tiles;
   }
