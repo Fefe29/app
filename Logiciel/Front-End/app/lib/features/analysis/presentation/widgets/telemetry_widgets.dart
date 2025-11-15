@@ -351,32 +351,20 @@ class SessionManagementWidget extends ConsumerWidget {
 
 class SessionStatsWidget extends ConsumerWidget {
   final String sessionId;
-  final bool isLive; // true si en cours d'enregistrement, false si session terminée
 
   const SessionStatsWidget({
     required this.sessionId,
-    this.isLive = false,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Utiliser le provider approprié selon le mode
-    final statsAsync = isLive
-        ? ref.watch(liveSessionStatsProvider(sessionId))
-        : ref.watch(sessionStatsProvider(sessionId));
+    final sessionStatsAsync = ref.watch(sessionStatsProvider(sessionId));
 
-    return statsAsync.when(
+    return sessionStatsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, st) => Center(child: Text('❌ $err')),
       data: (stats) {
-        // En mode live, stats peut être null temporairement
-        if (stats == null) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
-
         // Format durée en mm:ss
         String formatDuration(int? seconds) {
           if (seconds == null || seconds <= 0) return '--';
@@ -392,7 +380,7 @@ class SessionStatsWidget extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '📈 Statistiques ${isLive ? '(En cours d\'enregistrement 🔴)' : '(Session)'}',
+                  '📈 Statistiques de la session',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
@@ -420,7 +408,7 @@ class SessionStatsWidget extends ConsumerWidget {
                       color: Colors.orange,
                     ),
                     _StatCard(
-                      label: 'Durée',
+                      label: 'Enregistrement',
                       value: formatDuration(stats.durationSeconds),
                       unit: 'temps',
                       icon: Icons.timer,
@@ -482,37 +470,28 @@ class _StatCard extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.all(8),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Icône petite
-            Icon(icon, color: color, size: 16),
-            const SizedBox(height: 2),
-            // Valeur principale - grande, adaptée
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: color.withOpacity(0.9),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
               ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 2),
-            // Label petit et discret
             Text(
               label,
               style: TextStyle(
-                fontSize: 8,
+                fontSize: 9,
                 color: Colors.grey[600],
-                height: 1.0,
               ),
               textAlign: TextAlign.center,
               maxLines: 2,
