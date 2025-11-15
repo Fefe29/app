@@ -367,7 +367,7 @@ class SessionStatsWidget extends ConsumerWidget {
       data: (stats) {
         return Card(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -375,15 +375,15 @@ class SessionStatsWidget extends ConsumerWidget {
                   '📈 Statistiques de la session',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 // Grille 2x2 de stats clés
                 GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: 2.5,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
+                  childAspectRatio: 3.8,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
                   children: [
                     _StatCard(
                       label: 'Vitesse MAX',
@@ -442,11 +442,11 @@ class _StatCard extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(width: 12),
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -455,7 +455,7 @@ class _StatCard extends StatelessWidget {
                   Text(
                     label,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10,
                       color: color.withOpacity(0.7),
                       fontWeight: FontWeight.w500,
                     ),
@@ -463,7 +463,7 @@ class _StatCard extends StatelessWidget {
                   Text(
                     value,
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       fontWeight: FontWeight.bold,
                       color: color,
                     ),
