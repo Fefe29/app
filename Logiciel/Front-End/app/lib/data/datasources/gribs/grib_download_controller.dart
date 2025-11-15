@@ -154,7 +154,7 @@ class GribDownloadController extends Notifier<GribDownloadState> {
         // Charger automatiquement le premier fichier téléchargé
         print('[GRIB_DL] 📥 Chargement automatique du premier fichier téléchargé');
         try {
-          await loadGribFile(files.first, ref);
+          await loadGribFile(files.first, this.ref);
           print('[GRIB_DL] ✅ Fichier chargé avec succès');
         } catch (e) {
           print('[GRIB_DL] ❌ Erreur lors du chargement: $e');

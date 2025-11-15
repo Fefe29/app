@@ -1,24 +1,23 @@
-// Note: audioplayers est désactivé pour Linux (dépendances manquantes)
-// Ce fichier reste pour compatibilité Android/iOS
-// Importe conditionnellement selon la plateforme
-
+import 'package:audioplayers/audioplayers.dart';
 import 'sound_player.dart';
 
-// Stub pour Linux (pas d'audioplayers disponible)
 class AudioplayersSoundPlayer implements SoundPlayer {
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool _muted = false;
 
   AudioplayersSoundPlayer() {
-    // Stub - pas d'initialisation
+    _audioPlayer.setReleaseMode(ReleaseMode.stop);
   }
 
   void setMuted(bool muted) => _muted = muted;
 
   Future<void> _playAsset(String filename) async {
     if (_muted) return;
-    // Stub - pas de son sur cette plateforme
-    // ignore: avoid_print
-    print('🔇 Son désactivé (plateforme sans support): $filename');
+    try {
+      await _audioPlayer.play(AssetSource(filename));
+    } catch (e) {
+      print('❌ Erreur play: $e');
+    }
   }
 
   @override
@@ -46,7 +45,16 @@ class AudioplayersSoundPlayer implements SoundPlayer {
     if (_muted) return;
     for (final item in sequence) {
       await Future.delayed(Duration(milliseconds: item.delayMs));
-      // Stub - pas de sons
+      switch (item.type) {
+        case 'short':
+          await playShort();
+        case 'medium':
+          await playMedium();
+        case 'double':
+          await playDoubleShort();
+        case 'long':
+          await playLong();
+      }
     }
   }
 }
