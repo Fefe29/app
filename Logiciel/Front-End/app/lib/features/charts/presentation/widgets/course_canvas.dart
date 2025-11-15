@@ -333,6 +333,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                 children: [
                   if (displayMaps && activeMap != null)
                     FutureBuilder<List<LayeredTile>>(
+                      key: ValueKey('tiles_${activeMap.id}_${tileZoom}_${view.scale}'),
                       future: _loadMultiLayerTilesForMap(
                         activeMap.copyWith(zoomLevel: tileZoom),
                         course,
@@ -342,10 +343,16 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                       ),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
-                          return Center(child: Text('Erreur de chargement des tuiles'));
+                          print('[TILES] Erreur chargement: ${snapshot.error}');
+                          return Center(child: Text('Erreur: ${snapshot.error}'));
                         }
                         // Si aucune tuile n'est trouvée, on laisse simplement du blanc (pas de message)
                         if (snapshot.hasData) {
+                          if (snapshot.data!.isEmpty) {
+                            print('[TILES] Aucune tuile chargée pour zoom=$tileZoom');
+                          } else {
+                            print('[TILES] ${snapshot.data!.length} tuiles affichées');
+                          }
                           return CustomPaint(
                             size: Size(constraints.maxWidth, constraints.maxHeight),
                             painter: MultiLayerTilePainter(
@@ -356,7 +363,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                             ),
                           );
                         }
-                        return Center(child: Text('Chargement des tuiles...'));
+                        return Center(child: Text('Chargement des tuiles... (zoom=$tileZoom)'));
                       },
                     ),
                   
@@ -663,14 +670,25 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     required ViewTransform view,
     required Size size,
   }) async {
+    // Guard: vérifier que les paramètres sont valides
+    if (size.width <= 0 || size.height <= 0) {
+      print('[TILES] ❌ Taille invalide: $size');
+      return [];
+    }
+    
+    if (map.zoomLevel < 0 || map.zoomLevel > 28) {
+      print('[TILES] ❌ Zoom invalide: ${map.zoomLevel}');
+      return [];
+    }
+    
     // ignore: avoid_print
-    print('MULTI-LAYER DEBUG - _loadMultiLayerTilesForMap: ${map.id}');
+    print('[TILES] DEBUG - _loadMultiLayerTilesForMap: ${map.id}, zoom=${map.zoomLevel}');
   // Récupérer dynamiquement le chemin de stockage des cartes
   final container = ProviderScope.containerOf(context);
   final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
   final mapPath = '$mapBasePath/${map.id}';
     // ignore: avoid_print
-    print('MULTI-LAYER DEBUG - Chemin des tuiles: $mapPath');
+    print('[TILES] DEBUG - Chemin: $mapPath');
 
     // BBox géographique couvrant tout le widget (projetée depuis les 4 coins du widget en pixels)
     // On projette (0,0), (size.width,0), (0,size.height), (size.width,size.height) en coordonnées locales, puis en géographiques
@@ -689,6 +707,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
       return LocalPosition(x: x, y: y);
     }).toList();
     final geoCorners = localCorners.map((lp) => mercatorService.toGeographic(lp)).toList();
+    
     double minLat = geoCorners.first.latitude, maxLat = geoCorners.first.latitude;
     double minLon = geoCorners.first.longitude, maxLon = geoCorners.first.longitude;
     for (final g in geoCorners) {
@@ -699,20 +718,67 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     }
 
   final zoom = map.zoomLevel;
+  
+  // Clamp les coordonnées géographiques (monde fini en Web Mercator)
+  double clampLat(double lat) => lat.clamp(-85.051129, 85.051129);
+  double clampLon(double lon) {
+    while (lon < -180) lon += 360;
+    while (lon > 180) lon -= 360;
+    return lon;
+  }
+  
+  minLat = clampLat(minLat);
+  maxLat = clampLat(maxLat);
+  minLon = clampLon(minLon);
+  maxLon = clampLon(maxLon);
+  
+  // Guard: vérifier que les coordonnées ont du sens
+  if (minLat.isNaN || maxLat.isNaN || minLon.isNaN || maxLon.isNaN) {
+    print('[TILES] ❌ Coordonnées NaN après clamping');
+    return [];
+  }
+  
+  if (minLat > maxLat) { final t = minLat; minLat = maxLat; maxLat = t; }
+  if (minLon > maxLon) { final t = minLon; minLon = maxLon; maxLon = t; }
+  
+  // Guard: vérifier que la boîte n'est pas trop grande
+  final latSpan = (maxLat - minLat).abs();
+  final lonSpan = (maxLon - minLon).abs();
+  if (latSpan > 180 || lonSpan > 360) {
+    print('[TILES] ❌ Boîte géographique trop grande: latSpan=$latSpan, lonSpan=$lonSpan');
+    return [];
+  }
+  
   // On ajoute une tuile de marge de chaque côté pour garantir la couverture
-  int tileXmin = (_lon2tile(minLon, zoom) - 1).floor();
-  int tileXmax = (_lon2tile(maxLon, zoom) + 1).ceil();
-  int tileYmin = (_lat2tile(maxLat, zoom) - 1).floor(); // attention: Y inversé en tuiles
-  int tileYmax = (_lat2tile(minLat, zoom) + 1).ceil();
+  int tileXmin = (_lon2tile(minLon, zoom) - 1);
+  int tileXmax = (_lon2tile(maxLon, zoom) + 1);
+  int tileYmin = (_lat2tile(maxLat, zoom) - 1); // attention: Y inversé en tuiles
+  int tileYmax = (_lat2tile(minLat, zoom) + 1);
+
+  // Guard: vérifier que les indices sont sains
+  final maxTiles = 1 << zoom; // 2^zoom
+  if (tileXmin >= maxTiles || tileXmax < 0 || tileYmin >= maxTiles || tileYmax < 0) {
+    print('[TILES] ❌ Coordonnées de tuiles invalides: X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] (max=$maxTiles)');
+    return [];
+  }
+
+  // Clamp aux limites du monde
+  tileXmin = tileXmin.clamp(0, maxTiles - 1);
+  tileXmax = tileXmax.clamp(0, maxTiles - 1);
+  tileYmin = tileYmin.clamp(0, maxTiles - 1);
+  tileYmax = tileYmax.clamp(0, maxTiles - 1);
 
   if (tileXmin > tileXmax) { final t = tileXmin; tileXmin = tileXmax; tileXmax = t; }
   if (tileYmin > tileYmax) { final t = tileYmin; tileYmin = tileYmax; tileYmax = t; }
 
     // ignore: avoid_print
-    print('MULTI-LAYER DEBUG - Tiles widget (full): X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] z=$zoom');
+    print('[TILES] Tiles widget (full): X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] z=$zoom, geo=[${minLon.toStringAsFixed(2)},${maxLon.toStringAsFixed(2)}] x [${minLat.toStringAsFixed(2)},${maxLat.toStringAsFixed(2)}]');
 
     final tiles = <LayeredTile>[];
     final foundFiles = <String>[];
+    
+    final expectedTileCount = (tileXmax - tileXmin + 1) * (tileYmax - tileYmin + 1);
+    print('[TILES] Cherchant $expectedTileCount tuiles...');
 
     for (int x = tileXmin; x <= tileXmax; x++) {
       for (int y = tileYmin; y <= tileYmax; y++) {
@@ -720,30 +786,23 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
         final file = File(filePath);
         if (await file.exists()) {
           foundFiles.add(filePath);
-          final layeredTile = await MultiLayerTileService.loadLayeredTile(
-            x: x,
-            y: y,
-            zoom: zoom,
-            config: MapLayersConfig.defaultConfig,
-            localMapPath: mapPath,
-          );
-          tiles.add(layeredTile);
-        } else {
-          // Log tuile manquante pour debug
-          // ignore: avoid_print
-          print('MULTI-LAYER DEBUG - Tuile manquante: $filePath');
+          try {
+            final layeredTile = await MultiLayerTileService.loadLayeredTile(
+              x: x,
+              y: y,
+              zoom: zoom,
+              config: MapLayersConfig.defaultConfig,
+              localMapPath: mapPath,
+            );
+            tiles.add(layeredTile);
+          } catch (e) {
+            print('[TILES] ❌ Erreur chargement tuile $x/$y/$zoom: $e');
+          }
         }
       }
     }
 
-    // ignore: avoid_print
-    print('MULTI-LAYER DEBUG - Fichiers trouvés (${foundFiles.length})');
-    for (final f in foundFiles) {
-      // ignore: avoid_print
-      print('  $f');
-    }
-    // ignore: avoid_print
-    print('MULTI-LAYER DEBUG - ${tiles.length} layered tiles chargées');
+    print('[TILES] ✅ ${tiles.length} tuiles chargées sur $expectedTileCount');
 
     return tiles;
   }
