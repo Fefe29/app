@@ -47,7 +47,9 @@ class SessionStats {
     required this.minSpeed,
     required this.avgWindSpeed,
     required this.maxWindSpeed,
+    required this.minWindSpeed,
     required this.snapshotCount,
+    this.durationSeconds,
     this.customStats = const {},
   });
 
@@ -57,7 +59,9 @@ class SessionStats {
   final double minSpeed;
   final double avgWindSpeed;
   final double maxWindSpeed;
+  final double minWindSpeed;
   final int snapshotCount;
+  final int? durationSeconds; // Durée d'enregistrement en secondes
 
   /// Stats personnalisées selon l'implémentation de stockage
   final Map<String, dynamic> customStats;

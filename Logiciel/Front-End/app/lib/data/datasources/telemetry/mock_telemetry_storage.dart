@@ -167,6 +167,8 @@ class MockTelemetryStorage implements TelemetryStorage {
     double maxSpeed = 0;
     double minSpeed = double.infinity;
     double sumWindSpeed = 0;
+    double maxWindSpeed = 0;
+    double minWindSpeed = double.infinity;
     int windCount = 0;
 
     for (final snapshot in snapshots) {
@@ -180,8 +182,17 @@ class MockTelemetryStorage implements TelemetryStorage {
       final tws = snapshot.metrics['wind.tws']?.value;
       if (tws != null) {
         sumWindSpeed += tws;
+        maxWindSpeed = maxWindSpeed < tws ? tws : maxWindSpeed;
+        minWindSpeed = minWindSpeed > tws ? tws : minWindSpeed;
         windCount++;
       }
+    }
+
+    int? durationSeconds;
+    if (snapshots.length > 1) {
+      final firstTs = snapshots.first.ts;
+      final lastTs = snapshots.last.ts;
+      durationSeconds = lastTs.difference(firstTs).inSeconds;
     }
 
     return SessionStats(
@@ -190,8 +201,10 @@ class MockTelemetryStorage implements TelemetryStorage {
       maxSpeed: maxSpeed,
       minSpeed: minSpeed == double.infinity ? 0 : minSpeed,
       avgWindSpeed: windCount > 0 ? sumWindSpeed / windCount : 0,
-      maxWindSpeed: 0,
+      maxWindSpeed: maxWindSpeed == 0 ? 0 : maxWindSpeed,
+      minWindSpeed: minWindSpeed == double.infinity ? 0 : minWindSpeed,
       snapshotCount: snapshots.length,
+      durationSeconds: durationSeconds,
     );
   }
 

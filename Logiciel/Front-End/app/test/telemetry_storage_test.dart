@@ -342,6 +342,7 @@ void main() {
         minSpeed: 5.0,
         avgWindSpeed: 12.0,
         maxWindSpeed: 15.0,
+        minWindSpeed: 8.0,
         snapshotCount: 100,
       );
 

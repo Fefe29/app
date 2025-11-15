@@ -351,20 +351,40 @@ class SessionManagementWidget extends ConsumerWidget {
 
 class SessionStatsWidget extends ConsumerWidget {
   final String sessionId;
+  final bool isLive; // true si en cours d'enregistrement, false si session terminée
 
   const SessionStatsWidget({
     required this.sessionId,
+    this.isLive = false,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionStatsAsync = ref.watch(sessionStatsProvider(sessionId));
+    // Utiliser le provider approprié selon le mode
+    final statsAsync = isLive
+        ? ref.watch(liveSessionStatsProvider(sessionId))
+        : ref.watch(sessionStatsProvider(sessionId));
 
-    return sessionStatsAsync.when(
+    return statsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, st) => Center(child: Text('❌ $err')),
       data: (stats) {
+        // En mode live, stats peut être null temporairement
+        if (stats == null) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        // Format durée en mm:ss
+        String formatDuration(int? seconds) {
+          if (seconds == null || seconds <= 0) return '--';
+          final minutes = seconds ~/ 60;
+          final secs = seconds % 60;
+          return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+        }
+
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -372,42 +392,60 @@ class SessionStatsWidget extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '📈 Statistiques de la session',
+                  '📈 Statistiques ${isLive ? '(En cours d\'enregistrement 🔴)' : '(Session)'}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
-                // Grille 2x2 de stats clés
+                // Grille 3x2 de stats clés
                 GridView.count(
-                  crossAxisCount: 2,
+                  crossAxisCount: 3,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: 3.8,
+                  childAspectRatio: 1.6,
                   mainAxisSpacing: 8,
                   crossAxisSpacing: 8,
                   children: [
                     _StatCard(
                       label: 'Vitesse MAX',
-                      value: '${stats.maxSpeed.toStringAsFixed(1)} kn',
+                      value: '${stats.maxSpeed.toStringAsFixed(1)}',
+                      unit: 'kn',
                       icon: Icons.trending_up,
                       color: Colors.red,
                     ),
                     _StatCard(
                       label: 'Vitesse MOY',
-                      value: '${stats.avgSpeed.toStringAsFixed(1)} kn',
+                      value: '${stats.avgSpeed.toStringAsFixed(1)}',
+                      unit: 'kn',
                       icon: Icons.speed,
                       color: Colors.orange,
                     ),
                     _StatCard(
-                      label: 'Vent MOY',
-                      value: '${stats.avgWindSpeed.toStringAsFixed(1)} kn',
-                      icon: Icons.cloud,
+                      label: 'Durée',
+                      value: formatDuration(stats.durationSeconds),
+                      unit: 'temps',
+                      icon: Icons.timer,
+                      color: Colors.purple,
+                    ),
+                    _StatCard(
+                      label: 'Vent MAX',
+                      value: '${stats.maxWindSpeed.toStringAsFixed(1)}',
+                      unit: 'kn',
+                      icon: Icons.cloud_upload,
                       color: Colors.blue,
                     ),
                     _StatCard(
-                      label: 'Durée / Points',
-                      value: '${stats.snapshotCount} pts',
-                      icon: Icons.data_usage,
-                      color: Colors.green,
+                      label: 'Vent MIN',
+                      value: '${stats.minWindSpeed.toStringAsFixed(1)}',
+                      unit: 'kn',
+                      icon: Icons.cloud_download,
+                      color: Colors.cyan,
+                    ),
+                    _StatCard(
+                      label: 'Vent MOY',
+                      value: '${stats.avgWindSpeed.toStringAsFixed(1)}',
+                      unit: 'kn',
+                      icon: Icons.cloud,
+                      color: Colors.lightBlue,
                     ),
                   ],
                 ),
@@ -423,12 +461,14 @@ class SessionStatsWidget extends ConsumerWidget {
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
+  final String unit;
   final IconData icon;
   final Color color;
 
   const _StatCard({
     required this.label,
     required this.value,
+    required this.unit,
     required this.icon,
     required this.color,
   });
@@ -442,34 +482,41 @@ class _StatCard extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Row(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 8),
+            // Icône petite
+            Icon(icon, color: color, size: 16),
+            const SizedBox(height: 2),
+            // Valeur principale - grande, adaptée
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: color.withOpacity(0.7),
-                      fontWeight: FontWeight.w500,
-                    ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: color.withOpacity(0.9),
                   ),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
-                ],
+                  textAlign: TextAlign.center,
+                ),
               ),
+            ),
+            const SizedBox(height: 2),
+            // Label petit et discret
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 8,
+                color: Colors.grey[600],
+                height: 1.0,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -477,6 +524,10 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
+
+// ============================================================================
+// TELEMETRY PAGE - Full details
+// ============================================================================
 
 // ============================================================================
 // HELPER WIDGETS

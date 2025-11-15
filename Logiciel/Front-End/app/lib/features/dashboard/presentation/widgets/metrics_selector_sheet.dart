@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
+import 'package:kornog/features/dashboard/providers/metric_categories.dart';
 
 class MetricsSelectorSheet extends ConsumerWidget {
   const MetricsSelectorSheet({super.key});
@@ -38,15 +39,36 @@ class MetricsSelectorSheet extends ConsumerWidget {
                 data: (selected) => ListView(
                   controller: scroll,
                   children: [
-                    for (final key in allMetricKeys)
-                      CheckboxListTile(
-                        value: selected.contains(key),
-                        onChanged: (v) => ref
-                            .read(selectedMetricsProvider.notifier)
-                            .toggle(key, v ?? false),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        title: Text(key),
+                    // Afficher les catégories avec leurs métriques
+                    for (final category in metricCategories) ...[
+                      // En-tête de catégorie
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Text(
+                          category.name,
+                          style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
+                      // Métriques de la catégorie
+                      for (final metric in category.metrics)
+                        CheckboxListTile(
+                          value: selected.contains(metric.key),
+                          onChanged: (v) => ref
+                              .read(selectedMetricsProvider.notifier)
+                              .toggle(metric.key, v ?? false),
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(metric.label),
+                          subtitle: metric.description != null
+                              ? Text(
+                                  metric.description!,
+                                  style: const TextStyle(fontSize: 11),
+                                )
+                              : null,
+                        ),
+                      const Divider(height: 16, indent: 16, endIndent: 16),
+                    ],
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -81,3 +103,4 @@ class MetricsSelectorSheet extends ConsumerWidget {
     );
   }
 }
+

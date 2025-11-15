@@ -205,6 +205,35 @@ final sessionStatsProvider =
   return storage.getSessionStats(sessionId);
 });
 
+/// Provider pour les stats d'une session EN DIRECT
+/// Relit les stats toutes les 500ms pour une session en cours d'enregistrement
+final liveSessionStatsProvider =
+    StreamProvider.family<SessionStats?, String>((ref, sessionId) async* {
+  print('🎬 [liveSessionStatsProvider] Start pour session: $sessionId');
+  
+  final storage = await ref.watch(telemetryStorageProvider.future);
+  
+  int emitCount = 0;
+  // Boucle infinie - emit les stats toutes les 500ms
+  while (true) {
+    try {
+      final stats = await storage.getSessionStats(sessionId);
+      emitCount++;
+      if (emitCount % 4 == 0) { // Log tous les 2s (4 × 500ms)
+        print('📈 [liveSessionStatsProvider] Émission #$emitCount: ${stats.snapshotCount} snapshots, durée: ${stats.durationSeconds}s');
+      }
+      yield stats;
+    } catch (e, st) {
+      print('⚠️ [liveSessionStatsProvider] Erreur lecture stats pour $sessionId: $e');
+      // Continuer malgré l'erreur
+      yield null;
+    }
+    
+    // Attendre 500ms avant la prochaine lecture
+    await Future.delayed(const Duration(milliseconds: 500));
+  }
+});
+
 /// Provider pour charger une session complète
 final sessionDataProvider =
     FutureProvider.family<List<TelemetrySnapshot>, String>((ref, sessionId) async {

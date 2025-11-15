@@ -91,6 +91,13 @@ class _AnalysisTabState extends ConsumerState<_AnalysisTab> {
     final polarsAsync = ref.watch(polarsJ80Provider);
     final filters = ref.watch(analysisFiltersProvider);
     final sessionsAsync = ref.watch(sessionsListProvider);
+    final selectedSessionId = ref.watch(selectedSessionProvider);
+    final recordingState = ref.watch(recordingStateProvider);
+    final recorder = ref.watch(telemetryRecorderProvider);
+
+    // Déterminer s'il y a un enregistrement en cours
+    final isRecording = recordingState == RecorderState.recording;
+    final currentSessionId = isRecording ? recorder.currentSessionId : null;
 
     return Stack(
       children: [
@@ -104,24 +111,64 @@ class _AnalysisTabState extends ConsumerState<_AnalysisTab> {
             
             const SizedBox(height: 24),
             
-            // Statistiques de la session (avant les graphiques)
-            sessionsAsync.when(
-              loading: () => const SizedBox(
-                height: 200,
-                child: Center(child: CircularProgressIndicator()),
+            // Statistiques - 3 cas possibles:
+            // 1. En cours d'enregistrement → Stats live de la session en cours
+            // 2. Session sélectionnée → Stats finales de la session
+            // 3. Sinon → Message "Sélectionnez une session"
+            
+            if (currentSessionId != null)
+              // CAS 1: Enregistrement en cours
+              SessionStatsWidget(
+                sessionId: currentSessionId,
+                isLive: true,
+              )
+            else if (selectedSessionId != null)
+              // CAS 2: Session sélectionnée
+              sessionsAsync.when(
+                loading: () => const SizedBox(
+                  height: 200,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (err, st) => SizedBox(
+                  height: 200,
+                  child: Center(child: Text('Erreur chargement stats')),
+                ),
+                data: (sessions) {
+                  // Chercher la session sélectionnée
+                  final selectedSession = sessions.firstWhere(
+                    (s) => s.sessionId == selectedSessionId,
+                    orElse: () => sessions.first,
+                  );
+                  return SessionStatsWidget(
+                    sessionId: selectedSession.sessionId,
+                    isLive: false,
+                  );
+                },
+              )
+            else
+              // CAS 3: Temps réel sans session - afficher message
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '📊 Statistiques',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Sélectionnez une session pour voir ses statistiques détaillées.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
-              error: (err, st) => SizedBox(
-                height: 200,
-                child: Center(child: Text('Aucune session')),
-              ),
-              data: (sessions) {
-                if (sessions.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                final latestSession = sessions.first;
-                return SessionStatsWidget(sessionId: latestSession.sessionId);
-              },
-            ),
             
             const SizedBox(height: 24),
             const Divider(),
