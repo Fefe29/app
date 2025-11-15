@@ -78,64 +78,74 @@ class JsonTelemetryStorage implements TelemetryStorage {
 
     print('📂 [TelemetryStorage] Chemin fichier: ${sessionFile.path}');
 
-    // Buffer pour accumuler les lignes JSON
-    final buffer = <String>[];
-    final bufferMaxLines = 100; // Flusher tous les 100 snapshots
-    final compressedBuffer = <int>[];
-    
+    // CHANGEMENT: Écriture immédiate ligne par ligne plutôt que buffering
+    // Cela permet à getCurrentStats() de voir les données pendant l'enregistrement
     DateTime? firstSnapshot;
     DateTime? lastSnapshot;
     int snapshotCount = 0;
-
-    // Créer un IOSink pour écrire les données compressées
+    final linesBuffer = <String>[]; // Buffer temporaire avant compression
+    int lastFlushTime = DateTime.now().millisecondsSinceEpoch;
+    
+    // Créer un IOSink pour écrire directement
     final output = sessionFile.openWrite();
 
     try {
       print('🔄 [TelemetryStorage] Attente de snapshots du stream...');
       await for (final snapshot in snapshots) {
-        print('📥 [TelemetryStorage] Snapshot reçu: ${snapshot.ts}');
+        print('📥 [TelemetryStorage] Snapshot #${snapshotCount + 1} reçu: ${snapshot.ts}');
+        
         // Mémoriser les timestamps
         firstSnapshot ??= snapshot.ts;
         lastSnapshot = snapshot.ts;
 
         // Convertir en JSON
         final jsonLine = _snapshotToJsonLine(snapshot);
-        buffer.add(jsonLine);
+        linesBuffer.add(jsonLine);
         snapshotCount++;
 
-        if (snapshotCount % 50 == 0) {
-          print('💾 [TelemetryStorage] $snapshotCount snapshots enregistrés...');
-        }
-
-        // Flusher le buffer periodiquement
-        if (buffer.length >= bufferMaxLines) {
-          print('💾 [TelemetryStorage] Flush: ${buffer.length} snapshots');
-          final line = '${buffer.join('\n')}\n';
+        // CHANGEMENT: Flush immédiat tous les 10 snapshots (au lieu de 100)
+        // Cela permet aux lectures concurrentes de voir les données plus rapidement
+        if (snapshotCount % 10 == 0) {
+          print('💾 [TelemetryStorage] Flush immédiat #$snapshotCount: ${linesBuffer.length} lignes');
+          final line = '${linesBuffer.join('\n')}\n';
           final encoded = utf8.encode(line);
           final compressed = GZipCodec().encode(encoded);
-          compressedBuffer.addAll(compressed);
-          buffer.clear();
+          print('   → ${encoded.length} bytes → ${compressed.length} bytes compressés');
+          output.add(compressed);
+          
+          // Flush le sink pour forcer l'écriture disque
+          print('   → Flush du IOSink...');
+          await output.flush();
+          print('   ✅ Données écrites sur le disque');
+          
+          linesBuffer.clear();
+          lastFlushTime = DateTime.now().millisecondsSinceEpoch;
+        }
+
+        if (snapshotCount % 50 == 0) {
+          print('📊 [TelemetryStorage] Total: $snapshotCount snapshots enregistrés');
         }
       }
 
-      print('✅ [TelemetryStorage] Fin du stream de snapshots (fermeture détectée)');
+      print('✅ [TelemetryStorage] Fin du stream (fermeture détectée après $snapshotCount snapshots)');
       
       // Flusher le reste
-      if (buffer.isNotEmpty) {
-        print('💾 [TelemetryStorage] Flush final: ${buffer.length} snapshots');
-        final line = '${buffer.join('\n')}\n';
+      if (linesBuffer.isNotEmpty) {
+        print('💾 [TelemetryStorage] Flush FINAL: ${linesBuffer.length} snapshots restants');
+        final line = '${linesBuffer.join('\n')}\n';
         final encoded = utf8.encode(line);
         final compressed = GZipCodec().encode(encoded);
-        compressedBuffer.addAll(compressed);
+        print('   → ${encoded.length} bytes → ${compressed.length} bytes compressés');
+        output.add(compressed);
+        
+        print('   → Flush final du IOSink...');
+        await output.flush();
+        print('   ✅ Données finales écrites sur le disque');
       }
 
-      // Écrire toutes les données compressées d'un coup
-      print('🔒 [TelemetryStorage] Écriture des données compressées...');
-      output.add(compressedBuffer);
-      
       print('🔒 [TelemetryStorage] Fermeture du sink...');
       await output.close();
-      print('✅ [TelemetryStorage] Stream fermé avec succès');
+      print('✅ [TelemetryStorage] IOSink fermé avec succès');
     } catch (e, st) {
       // Nettoyer en cas d'erreur
       print('❌ [TelemetryStorage] Erreur écriture: $e');
@@ -153,7 +163,7 @@ class JsonTelemetryStorage implements TelemetryStorage {
     // Sauvegarder les métadonnées
     if (firstSnapshot != null && lastSnapshot != null) {
       final fileSize = await sessionFile.length();
-      print('📊 [TelemetryStorage] Taille fichier: ${fileSize} bytes');
+      print('📊 [TelemetryStorage] Taille fichier final: ${fileSize} bytes');
       print('📊 [TelemetryStorage] Total snapshots: $snapshotCount');
       print('📊 [TelemetryStorage] Durée: ${lastSnapshot.difference(firstSnapshot).inSeconds}s');
       
@@ -174,27 +184,57 @@ class JsonTelemetryStorage implements TelemetryStorage {
 
   @override
   Future<List<TelemetrySnapshot>> loadSession(String sessionId) async {
+    print('📂 [loadSession] Chargement session: $sessionId');
+    
     final sessionFile = File(_sessionFilePath(sessionId));
     if (!await sessionFile.exists()) {
+      print('❌ [loadSession] Fichier n\'existe pas: ${sessionFile.path}');
       throw Exception('Session $sessionId not found');
     }
 
-    final snapshots = <TelemetrySnapshot>[];
-    final input = sessionFile.openRead();
-    final decompressed = input.transform(GZipCodec().decoder);
-    final lines = decompressed
-        .transform(const Utf8Decoder())
-        .transform(const LineSplitter());
+    final fileSize = await sessionFile.length();
+    print('📂 [loadSession] Fichier trouvé, taille: $fileSize bytes');
 
-    await for (final line in lines) {
-      if (line.trim().isEmpty) continue;
-      try {
-        final snapshot = _jsonLineToSnapshot(line);
-        snapshots.add(snapshot);
-      } catch (e) {
-        print('⚠️ Erreur parsing ligne JSON: $e');
-        // Continuer avec les autres snapshots
+    final snapshots = <TelemetrySnapshot>[];
+    int lineCount = 0;
+    int errorCount = 0;
+    
+    print('🔄 [loadSession] Démarrage décompression et parsing...');
+    
+    try {
+      final input = sessionFile.openRead();
+      final decompressed = input.transform(GZipCodec().decoder);
+      final lines = decompressed
+          .transform(const Utf8Decoder())
+          .transform(const LineSplitter());
+
+      await for (final line in lines) {
+        lineCount++;
+        if (line.trim().isEmpty) continue;
+        try {
+          final snapshot = _jsonLineToSnapshot(line);
+          snapshots.add(snapshot);
+        } catch (e) {
+          errorCount++;
+          print('⚠️ [loadSession] Erreur parsing ligne $lineCount: $e');
+          // Continuer avec les autres snapshots
+        }
       }
+      print('✅ [loadSession] Décompression terminée');
+    } catch (e, st) {
+      print('❌ [loadSession] Erreur décompression: $e');
+      print('   StackTrace: $st');
+      rethrow;
+    }
+
+    print('✅ [loadSession] Chargement complet:');
+    print('   - Lignes lues: $lineCount');
+    print('   - Snapshots parsés: ${snapshots.length}');
+    print('   - Erreurs: $errorCount');
+    if (snapshots.isNotEmpty) {
+      print('   - Premier: ${snapshots.first.ts}');
+      print('   - Dernier: ${snapshots.last.ts}');
+      print('   - Durée: ${snapshots.last.ts.difference(snapshots.first.ts).inSeconds}s');
     }
 
     return snapshots;
@@ -354,9 +394,22 @@ class JsonTelemetryStorage implements TelemetryStorage {
 
   @override
   Future<SessionStats> getSessionStats(String sessionId) async {
+    print('📊 [TelemetryStorage.getSessionStats] Lecture stats pour session: $sessionId');
+    
+    final sessionFile = File(_sessionFilePath(sessionId));
+    print('📂 [TelemetryStorage.getSessionStats] Fichier: ${sessionFile.path}');
+    print('   Existe? ${await sessionFile.exists()}');
+    
+    if (await sessionFile.exists()) {
+      final fileSize = await sessionFile.length();
+      print('   Taille: $fileSize bytes');
+    }
+    
     final snapshots = await loadSession(sessionId);
+    print('✅ [TelemetryStorage.getSessionStats] Chargé ${snapshots.length} snapshots');
 
     if (snapshots.isEmpty) {
+      print('⚠️ [TelemetryStorage.getSessionStats] Aucun snapshot trouvé');
       throw Exception('Session $sessionId est vide');
     }
 
@@ -368,6 +421,8 @@ class JsonTelemetryStorage implements TelemetryStorage {
     double minWindSpeed = double.infinity;
     int windCount = 0;
 
+    print('📈 [TelemetryStorage.getSessionStats] Calcul stats sur ${snapshots.length} snapshots...');
+    
     for (final snapshot in snapshots) {
       // Vitesse (nav.sog)
       final sog = snapshot.metrics['nav.sog']?.value;
@@ -395,7 +450,7 @@ class JsonTelemetryStorage implements TelemetryStorage {
       durationSeconds = lastTs.difference(firstTs).inSeconds;
     }
 
-    return SessionStats(
+    final stats = SessionStats(
       sessionId: sessionId,
       avgSpeed: sumSpeed / snapshots.length,
       maxSpeed: maxSpeed,
@@ -406,6 +461,13 @@ class JsonTelemetryStorage implements TelemetryStorage {
       snapshotCount: snapshots.length,
       durationSeconds: durationSeconds,
     );
+    
+    print('✅ [TelemetryStorage.getSessionStats] Stats calculées:');
+    print('   Speed: AVG=${stats.avgSpeed.toStringAsFixed(1)}, MAX=${stats.maxSpeed.toStringAsFixed(1)}');
+    print('   Wind: AVG=${stats.avgWindSpeed.toStringAsFixed(1)}, MAX=${stats.maxWindSpeed.toStringAsFixed(1)}, MIN=${stats.minWindSpeed.toStringAsFixed(1)}');
+    print('   Duration: ${stats.durationSeconds}s');
+    
+    return stats;
   }
 
   @override

@@ -350,98 +350,127 @@ class SessionManagementWidget extends ConsumerWidget {
 // ============================================================================
 
 class SessionStatsWidget extends ConsumerWidget {
-  final String sessionId;
+  final String? sessionId;
 
   const SessionStatsWidget({
-    required this.sessionId,
+    this.sessionId,
     Key? key,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionStatsAsync = ref.watch(sessionStatsProvider(sessionId));
+    print('🎨 [SessionStatsWidget.build] sessionId=$sessionId');
+    
+    // Chercher si une session est en cours d'enregistrement
+    final currentRecordingSessionId = ref.watch(currentRecordingSessionIdProvider);
+    
+    // Si on est en enregistrement, afficher les stats en temps réel
+    if (currentRecordingSessionId != null) {
+      print('✅ [SessionStatsWidget] Enregistrement en cours: $currentRecordingSessionId');
+      final statsAsync = ref.watch(currentSessionStatsProvider);
+      return statsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, st) => Center(child: Text('❌ $err')),
+        data: (stats) {
+          if (stats == null) {
+            return const Center(child: Text('📊 En attente de données...'));
+          }
+          return _buildStatsCard(context, stats);
+        },
+      );
+    }
+    
+    // Sinon afficher les stats de la session sélectionnée (si existe)
+    if (sessionId != null) {
+      print('📊 [SessionStatsWidget] Session sélectionnée: $sessionId');
+      final sessionStatsAsync = ref.watch(sessionStatsProvider(sessionId!));
+      return sessionStatsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, st) => Center(child: Text('❌ $err')),
+        data: (stats) => _buildStatsCard(context, stats),
+      );
+    }
+    
+    // Aucune session
+    return const Center(child: Text('Démarrer une session dans le menu pour voir les stats'));
+  }
 
-    return sessionStatsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, st) => Center(child: Text('❌ $err')),
-      data: (stats) {
-        // Format durée en mm:ss
-        String formatDuration(int? seconds) {
-          if (seconds == null || seconds <= 0) return '--';
-          final minutes = seconds ~/ 60;
-          final secs = seconds % 60;
-          return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-        }
+  Widget _buildStatsCard(BuildContext context, SessionStats stats) {
+    // Format durée en mm:ss
+    String formatDuration(int? seconds) {
+      if (seconds == null || seconds <= 0) return '--';
+      final minutes = seconds ~/ 60;
+      final secs = seconds % 60;
+      return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+    }
 
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '📈 Statistiques de la session',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            // Grille 3x2 de stats clés
+            GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 1.6,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
               children: [
-                Text(
-                  '📈 Statistiques de la session',
-                  style: Theme.of(context).textTheme.titleMedium,
+                _StatCard(
+                  label: 'Vitesse MAX',
+                  value: '${stats.maxSpeed.toStringAsFixed(1)}',
+                  unit: 'kn',
+                  icon: Icons.trending_up,
+                  color: Colors.red,
                 ),
-                const SizedBox(height: 12),
-                // Grille 3x2 de stats clés
-                GridView.count(
-                  crossAxisCount: 3,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  childAspectRatio: 1.6,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  children: [
-                    _StatCard(
-                      label: 'Vitesse MAX',
-                      value: '${stats.maxSpeed.toStringAsFixed(1)}',
-                      unit: 'kn',
-                      icon: Icons.trending_up,
-                      color: Colors.red,
-                    ),
-                    _StatCard(
-                      label: 'Vitesse MOY',
-                      value: '${stats.avgSpeed.toStringAsFixed(1)}',
-                      unit: 'kn',
-                      icon: Icons.speed,
-                      color: Colors.orange,
-                    ),
-                    _StatCard(
-                      label: 'Enregistrement',
-                      value: formatDuration(stats.durationSeconds),
-                      unit: 'temps',
-                      icon: Icons.timer,
-                      color: Colors.purple,
-                    ),
-                    _StatCard(
-                      label: 'Vent MAX',
-                      value: '${stats.maxWindSpeed.toStringAsFixed(1)}',
-                      unit: 'kn',
-                      icon: Icons.cloud_upload,
-                      color: Colors.blue,
-                    ),
-                    _StatCard(
-                      label: 'Vent MIN',
-                      value: '${stats.minWindSpeed.toStringAsFixed(1)}',
-                      unit: 'kn',
-                      icon: Icons.cloud_download,
-                      color: Colors.cyan,
-                    ),
-                    _StatCard(
-                      label: 'Vent MOY',
-                      value: '${stats.avgWindSpeed.toStringAsFixed(1)}',
-                      unit: 'kn',
-                      icon: Icons.cloud,
-                      color: Colors.lightBlue,
-                    ),
-                  ],
+                _StatCard(
+                  label: 'Vitesse MOY',
+                  value: '${stats.avgSpeed.toStringAsFixed(1)}',
+                  unit: 'kn',
+                  icon: Icons.speed,
+                  color: Colors.orange,
+                ),
+                _StatCard(
+                  label: 'Enregistrement',
+                  value: formatDuration(stats.durationSeconds),
+                  unit: 'temps',
+                  icon: Icons.timer,
+                  color: Colors.purple,
+                ),
+                _StatCard(
+                  label: 'Vent MAX',
+                  value: '${stats.maxWindSpeed.toStringAsFixed(1)}',
+                  unit: 'kn',
+                  icon: Icons.cloud_upload,
+                  color: Colors.blue,
+                ),
+                _StatCard(
+                  label: 'Vent MIN',
+                  value: '${stats.minWindSpeed.toStringAsFixed(1)}',
+                  unit: 'kn',
+                  icon: Icons.cloud_download,
+                  color: Colors.cyan,
+                ),
+                _StatCard(
+                  label: 'Vent MOY',
+                  value: '${stats.avgWindSpeed.toStringAsFixed(1)}',
+                  unit: 'kn',
+                  icon: Icons.cloud,
+                  color: Colors.lightBlue,
                 ),
               ],
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }

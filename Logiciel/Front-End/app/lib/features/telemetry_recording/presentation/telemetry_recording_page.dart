@@ -67,7 +67,7 @@ class _RecordingControls extends ConsumerWidget {
           const SizedBox(height: 16),
 
           // Durée écoulée (si en cours)
-          if (recordingState == RecorderState.recording)
+          if (recordingState == RecorderState.recording && recorder != null)
             Text(
               'Durée: ${recorder.elapsedTime.inSeconds}s',
               style: const TextStyle(fontSize: 14, color: Colors.grey),

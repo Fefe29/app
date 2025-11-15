@@ -75,21 +75,45 @@ final telemetryStorageProvider = FutureProvider<TelemetryStorage>((ref) async {
 // Providers pour l'enregistrement
 // ============================================================================
 
-/// Provider pour l'instance TelemetryRecorder
-final telemetryRecorderProvider =
-    Provider<TelemetryRecorder>((ref) {
-  final storage = ref.watch(telemetryStorageProvider).value;
-  final bus = ref.watch(telemetryBusProvider);
-
-  if (storage == null) {
-    throw Exception('Storage non disponible');
+/// Notifier pour conserver une instance unique de TelemetryRecorder
+class TelemetryRecorderNotifier extends Notifier<TelemetryRecorder?> {
+  @override
+  TelemetryRecorder? build() {
+    print('🔧 [TelemetryRecorderNotifier] build() appelé - lancement init async');
+    _initializeAsync();
+    return null; // Sera remplacé par _initializeAsync
   }
 
-  return TelemetryRecorder(
-    storage: storage,
-    telemetryBus: bus,
-  );
-});
+  Future<void> _initializeAsync() async {
+    try {
+      print('🔧 [TelemetryRecorderNotifier] Attente storage...');
+      final storage = await ref.watch(telemetryStorageProvider.future);
+      final bus = ref.watch(telemetryBusProvider);
+
+      if (storage == null) {
+        throw Exception('Storage non disponible');
+      }
+
+      final recorder = TelemetryRecorder(
+        storage: storage,
+        telemetryBus: bus,
+      );
+      state = recorder;
+      print('✅ [TelemetryRecorderNotifier] Recorder initialisé: ${recorder.hashCode}');
+    } catch (e, st) {
+      print('❌ [TelemetryRecorderNotifier] Erreur: $e');
+      print('   StackTrace: $st');
+    }
+  }
+}
+
+/// Provider pour l'instance TelemetryRecorder - PERSISTE pendant toute l'app
+/// Important: Retourne la MÊME instance à chaque accès pour que currentSessionId
+/// soit cohérent entre les appels
+final telemetryRecorderProvider =
+    NotifierProvider<TelemetryRecorderNotifier, TelemetryRecorder?>(
+  () => TelemetryRecorderNotifier(),
+);
 
 // ============================================================================
 // Recordingnotifier pour l'enregistrement
@@ -108,14 +132,36 @@ class RecordingStateNotifier extends Notifier<RecorderState> {
   /// Démarrer un nouvel enregistrement
   Future<void> startRecording(String sessionId) async {
     print('📱 [RecordingStateNotifier] startRecording($sessionId)');
-    final recorder = ref.read(telemetryRecorderProvider);
+    var recorder = ref.read(telemetryRecorderProvider);
+    
+    print('📝 [RecordingStateNotifier] Recorder obtenu: ${recorder != null ? "OK (${recorder.hashCode})" : "NULL"}');
+
+    // Si recorder est null, attendre son initialisation
+    if (recorder == null) {
+      print('⏳ [RecordingStateNotifier] Recorder non initialisé, attente...');
+      // Déclencher l'initialisation en lisant la storage
+      await ref.read(telemetryStorageProvider.future);
+      // Attendre un peu que la NotifierProvider finisse son init
+      await Future.delayed(const Duration(milliseconds: 500));
+      // Relire le recorder
+      recorder = ref.read(telemetryRecorderProvider);
+      print('📝 [RecordingStateNotifier] Recorder re-obtenu: ${recorder != null ? "OK (${recorder.hashCode})" : "STILL NULL"}');
+    }
+
+    if (recorder == null) {
+      throw Exception('Recorder non disponible après init');
+    }
 
     try {
+      print('� [RecordingStateNotifier] Appel recorder.startRecording()...');
+      await recorder.startRecording(sessionId);
+      print('✅ [RecordingStateNotifier] recorder.startRecording() terminé');
+      
+      // PUIS on change l'état APRÈS que le recorder soit vraiment en enregistrement
       print('🔴 [RecordingStateNotifier] État → RECORDING');
       state = RecorderState.recording;
-      print('📡 [RecordingStateNotifier] Appel recorder.startRecording()...');
-      await recorder.startRecording(sessionId);
-      print('✅ [RecordingStateNotifier] startRecording terminé');
+      
+      print('✅ [RecordingStateNotifier] startRecording terminé (état changé)');
     } catch (e, st) {
       print('❌ [RecordingStateNotifier] Erreur startRecording: $e');
       print('   StackTrace: $st');
@@ -128,6 +174,10 @@ class RecordingStateNotifier extends Notifier<RecorderState> {
   Future<SessionMetadata> stopRecording() async {
     print('📱 [RecordingStateNotifier] stopRecording()');
     final recorder = ref.read(telemetryRecorderProvider);
+
+    if (recorder == null) {
+      throw Exception('Recorder non disponible');
+    }
 
     try {
       print('⏹️ [RecordingStateNotifier] Appel recorder.stopRecording()...');
@@ -149,30 +199,14 @@ class RecordingStateNotifier extends Notifier<RecorderState> {
 
   /// Mettre en pause
   void pauseRecording() {
-    print('📱 [RecordingStateNotifier] pauseRecording()');
-    final recorder = ref.read(telemetryRecorderProvider);
-    try {
-      recorder.pauseRecording();
-      state = RecorderState.paused;
-      print('✅ [RecordingStateNotifier] État → PAUSED');
-    } catch (e, st) {
-      print('❌ [RecordingStateNotifier] Erreur pauseRecording: $e');
-      print('   StackTrace: $st');
-    }
+    print('📱 [RecordingStateNotifier] pauseRecording() - TODO: fix async');
+    // TODO: Faire async pour accéder au FutureProvider
   }
 
   /// Reprendre
   void resumeRecording() {
-    print('📱 [RecordingStateNotifier] resumeRecording()');
-    final recorder = ref.read(telemetryRecorderProvider);
-    try {
-      recorder.resumeRecording();
-      state = RecorderState.recording;
-      print('✅ [RecordingStateNotifier] État → RECORDING');
-    } catch (e, st) {
-      print('❌ [RecordingStateNotifier] Erreur resumeRecording: $e');
-      print('   StackTrace: $st');
-    }
+    print('📱 [RecordingStateNotifier] resumeRecording() - TODO: fix async');
+    // TODO: Faire async pour accéder au FutureProvider
   }
 }
 
@@ -180,6 +214,32 @@ class RecordingStateNotifier extends Notifier<RecorderState> {
 final recordingStateProvider = NotifierProvider<
     RecordingStateNotifier,
     RecorderState>(() => RecordingStateNotifier());
+
+// ============================================================================
+// Provider pour l'ID de la session en cours d'enregistrement
+// ============================================================================
+
+/// Provider pour obtenir l'ID de la session en cours d'enregistrement
+final currentRecordingSessionIdProvider = Provider<String?>((ref) {
+  final recorder = ref.watch(telemetryRecorderProvider);
+  final state = ref.watch(recordingStateProvider);
+  
+  print('🔍 [currentRecordingSessionIdProvider] État: $state, recorder: ${recorder != null ? 'ready' : 'null'}');
+  
+  // Retourner l'ID de session uniquement si en enregistrement ET recorder existe
+  if (recorder != null && state == RecorderState.recording) {
+    final sessionId = recorder.currentSessionId;
+    print('🔍 [DEBUG] recorder.currentSessionId = $sessionId');
+    print('🔍 [DEBUG] recorder = $recorder');
+    print('🔍 [DEBUG] recorder.hashCode = ${recorder.hashCode}');
+    print('🔍 [DEBUG] recorder.state = ${recorder.state}');
+    print('✅ [currentRecordingSessionIdProvider] En enregistrement, retour: $sessionId');
+    return sessionId;
+  }
+  
+  print('⚪ [currentRecordingSessionIdProvider] Pas en enregistrement, retour null');
+  return null;
+});
 
 // ============================================================================
 // Providers pour la lecture des sessions
@@ -205,32 +265,61 @@ final sessionStatsProvider =
   return storage.getSessionStats(sessionId);
 });
 
-/// Provider pour les stats d'une session EN DIRECT
-/// Relit les stats toutes les 500ms pour une session en cours d'enregistrement
-final liveSessionStatsProvider =
-    StreamProvider.family<SessionStats?, String>((ref, sessionId) async* {
-  print('🎬 [liveSessionStatsProvider] Start pour session: $sessionId');
+/// Provider pour les stats en temps réel pendant l'enregistrement
+/// S'auto-invalide toutes les secondes pour forcer le rafraîchissement
+final currentSessionStatsProvider = FutureProvider<SessionStats?>((ref) async {
+  final recordingState = ref.watch(recordingStateProvider);
+  final recorder = ref.watch(telemetryRecorderProvider);
+  final currentRecordingSessionId = ref.watch(currentRecordingSessionIdProvider);
   
-  final storage = await ref.watch(telemetryStorageProvider.future);
+  print('📊 [currentSessionStatsProvider] ======== BUILD ========');
+  print('📊 [currentSessionStatsProvider] État enregistrement: $recordingState');
+  print('📊 [currentSessionStatsProvider] Session ID: $currentRecordingSessionId');
+  print('📊 [currentSessionStatsProvider] Recorder disponible: ${recorder != null}');
   
-  int emitCount = 0;
-  // Boucle infinie - emit les stats toutes les 500ms
-  while (true) {
-    try {
-      final stats = await storage.getSessionStats(sessionId);
-      emitCount++;
-      if (emitCount % 4 == 0) { // Log tous les 2s (4 × 500ms)
-        print('📈 [liveSessionStatsProvider] Émission #$emitCount: ${stats.snapshotCount} snapshots, durée: ${stats.durationSeconds}s');
-      }
-      yield stats;
-    } catch (e, st) {
-      print('⚠️ [liveSessionStatsProvider] Erreur lecture stats pour $sessionId: $e');
-      // Continuer malgré l'erreur
-      yield null;
-    }
+  // Si pas en enregistrement, retourner null
+  if (recordingState != RecorderState.recording || currentRecordingSessionId == null || recorder == null) {
+    print('⏸️ [currentSessionStatsProvider] Pas en enregistrement → retour NULL');
+    return null;
+  }
+  
+  print('✅ [currentSessionStatsProvider] En enregistrement → récupération stats');
+  
+  try {
+    print('📈 [currentSessionStatsProvider] Appel recorder.getCurrentStats()...');
+    final stats = await recorder.getCurrentStats();
     
-    // Attendre 500ms avant la prochaine lecture
-    await Future.delayed(const Duration(milliseconds: 500));
+    print('✅ [currentSessionStatsProvider] Stats REÇUES:');
+    print('   - avgSpeed: ${stats.avgSpeed.toStringAsFixed(2)} kn');
+    print('   - maxSpeed: ${stats.maxSpeed.toStringAsFixed(2)} kn');
+    print('   - avgWindSpeed: ${stats.avgWindSpeed.toStringAsFixed(2)} kn');
+    print('   - maxWindSpeed: ${stats.maxWindSpeed.toStringAsFixed(2)} kn');
+    print('   - minWindSpeed: ${stats.minWindSpeed.toStringAsFixed(2)} kn');
+    print('   - snapshotCount: ${stats.snapshotCount}');
+    print('   - durationSeconds: ${stats.durationSeconds}');
+    
+    // Invalider ce provider après 1 seconde pour forcer le rafraîchissement
+    print('⏳ [currentSessionStatsProvider] Programmation auto-invalidation 1s...');
+    Future.delayed(const Duration(seconds: 1), () {
+      print('🔄 [currentSessionStatsProvider] AUTO-INVALIDATION EXÉCUTÉE');
+      ref.invalidateSelf();
+    });
+    
+    print('📊 [currentSessionStatsProvider] RETOUR des stats à l\'UI');
+    return stats;
+  } catch (e, st) {
+    print('❌ [currentSessionStatsProvider] ERREUR: $e');
+    print('   StackTrace: $st');
+    
+    // Invalider quand même pour réessayer
+    print('⏳ [currentSessionStatsProvider] Programmation auto-invalidation 1s (erreur)...');
+    Future.delayed(const Duration(seconds: 1), () {
+      print('🔄 [currentSessionStatsProvider] AUTO-INVALIDATION EXÉCUTÉE (erreur)');
+      ref.invalidateSelf();
+    });
+    
+    print('📊 [currentSessionStatsProvider] RETOUR NULL (erreur)');
+    return null;
   }
 });
 
