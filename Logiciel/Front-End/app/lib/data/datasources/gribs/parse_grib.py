@@ -89,6 +89,10 @@ def parse_grib_eccodes(grib_file, component=None, field_name=None):
                         lon = lons[i] if hasattr(lons, '__len__') else lons
                         val = float(values[i]) if not np.isnan(values[i]) else float('nan')
                         
+                        # Convertir longitude de 0-360 à -180 à 180
+                        if lon > 180:
+                            lon = lon - 360
+                        
                         # Output CSV: record,id,grid,sub_grid,lat,lon,value
                         print(f"{record_count},{msg_count},0,0,{lat},{lon},{val}")
                         record_count += 1
@@ -150,6 +154,10 @@ def parse_grib_cfgrib(grib_file, component=None, field_name=None):
                     lat = float(lat_row)
                     lon = float(lon_row)
                     val = float(data[i, j]) if not np.isnan(data[i, j]) else float('nan')
+                    
+                    # Convertir longitude de 0-360 à -180 à 180
+                    if lon > 180:
+                        lon = lon - 360
                     
                     print(f"{record_count},1,0,0,{lat},{lon},{val}")
                     record_count += 1
