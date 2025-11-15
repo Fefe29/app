@@ -171,27 +171,72 @@ class _MetricTileState extends ConsumerState<MetricTile>
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // Catégorie "NAV" + nom "POSITION" regroupés (style cohérent)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'NAV',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.1,
+                                color: cs.onSurface.withOpacity(.80),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
                       Text(
                         'POSITION',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.1,
-                          color: cs.onSurface.withOpacity(.80),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: .4,
+                          color: cs.onSurface.withOpacity(.85),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Center(
-                        child: Text(
-                          posText,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontFamily: 'monospace',
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface.withOpacity(posText == '--' ? 0.5 : 1),
+                      // Valeur centrée (style cohérent avec autres tuiles)
+                      Expanded(
+                        child: Center(
+                          child: Opacity(
+                            opacity: posText == '--' ? 0.55 : 1,
+                            child: LayoutBuilder(
+                              builder: (ctx, c) {
+                                return ConstrainedBox(
+                                  constraints: const BoxConstraints(minWidth: 140),
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      posText,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 100,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -1.4,
+                                        fontFamily: 'monospace',
+                                        color: isDark ? const Color(0xFFFF005C) : null,
+                                        shadows: isDark
+                                            ? [
+                                                Shadow(
+                                                  color: const Color(0xFFFF005C).withOpacity(0.7),
+                                                  blurRadius: 12,
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
