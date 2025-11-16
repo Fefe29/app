@@ -380,9 +380,23 @@ class SessionStatsWidget extends ConsumerWidget {
       );
     }
     
-    // Sinon afficher les stats de la session sélectionnée (si existe)
+    // Sinon, observer la session sélectionnée depuis selectedSessionProvider
+    final selectedSessionId = ref.watch(selectedSessionProvider);
+    
+    // Si une session est sélectionnée (pas d'enregistrement en cours), afficher ses stats
+    if (selectedSessionId != null) {
+      print('📊 [SessionStatsWidget] Session sélectionnée: $selectedSessionId');
+      final sessionStatsAsync = ref.watch(sessionStatsProvider(selectedSessionId));
+      return sessionStatsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, st) => Center(child: Text('❌ $err')),
+        data: (stats) => _buildStatsCard(context, stats),
+      );
+    }
+    
+    // Sinon si sessionId a été passé en paramètre, l'utiliser
     if (sessionId != null) {
-      print('📊 [SessionStatsWidget] Session sélectionnée: $sessionId');
+      print('📊 [SessionStatsWidget] Session passée en paramètre: $sessionId');
       final sessionStatsAsync = ref.watch(sessionStatsProvider(sessionId!));
       return sessionStatsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

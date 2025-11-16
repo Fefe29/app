@@ -55,7 +55,33 @@ class AnalysisPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: const AnalysisFilterDrawer(),
-      body: const _AnalysisTab(),
+      body: Stack(
+        children: [
+          const _AnalysisTab(),
+          // Floating session management button (bottom left)
+          Positioned(
+            bottom: 16,
+            left: 16,
+            child: FloatingActionButton.extended(
+              onPressed: () => _showSessionManagement(context),
+              icon: const Icon(Icons.history),
+              label: const Text('Sessions'),
+              tooltip: 'Consulter les sessions passées',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSessionManagement(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.75,
+        child: const SessionManagementWidget(),
+      ),
     );
   }
 }
