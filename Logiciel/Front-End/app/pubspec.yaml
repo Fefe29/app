@@ -49,6 +49,7 @@ dependencies:
 
   permission_handler: ^11.0.0
   flutter_launcher_icons: ^0.14.4
+  geolocator: ^12.0.0
   
   # Audio playback for sounds (Android/iOS/Windows only, not Linux/Web)
   # audioplayers: ^6.0.0  # Disabled for Linux build - use stub instead

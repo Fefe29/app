@@ -10,6 +10,7 @@ import 'package:kornog/common/providers/telemetry_providers.dart';
 import 'package:kornog/common/services/miniplexe_discovery.dart';
 import 'package:kornog/config/telemetry_config.dart';
 import 'package:kornog/features/settings/presentation/widgets/nmea_sniffer_widget.dart';
+import 'package:kornog/features/settings/presentation/widgets/position_source_widget.dart';
 import 'package:kornog/theme/theme_provider.dart';
 
 
@@ -260,6 +261,10 @@ class _NetworkConfigTabContentState
             ],
           ),
           const SizedBox(height: 24),
+
+          // Source de position (GPS appareil ou NMEA réseau)
+          const PositionSourceWidget(),
+          const SizedBox(height: 24),
           
           // Découverte automatique
           if (sourceMode == TelemetrySourceMode.network)
@@ -342,23 +347,6 @@ class _NetworkConfigTabContentState
                 const SizedBox(height: 24),
               ],
             ),
-
-          // Activation / Désactivation
-          if (sourceMode == TelemetrySourceMode.network)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Connexion Réseau',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                Switch(
-                  value: networkConfig.enabled,
-                  onChanged: (value) {
-                    ref.read(telemetryNetworkConfigProvider.notifier).setEnabled(value);
-                  },
-                ),
-              ],
-            ),
-          const SizedBox(height: 24),
 
           // Configuration manuelle
           if (sourceMode == TelemetrySourceMode.network)
