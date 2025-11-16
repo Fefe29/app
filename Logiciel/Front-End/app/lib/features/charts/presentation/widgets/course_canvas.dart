@@ -230,7 +230,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
             maxY = math.max(maxY, o.dy);
           }
         }
-        print('[COURSE_CANVAS_BOUNDS] AVANT ajustements: minX=$minX, maxX=$maxX, minY=$minY, maxY=$maxY, localPoints=${localPoints.length}');
         // Pas de limites artificielles sur spanX/spanY - laisse le zoom totalement libre
         var spanX = (maxX - minX).abs() < 1e-6 ? 1.0 : (maxX - minX).abs();
         var spanY = (maxY - minY).abs() < 1e-6 ? 1.0 : (maxY - minY).abs();
@@ -243,7 +242,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
           minX -= delta / 2; maxX += delta / 2;
           spanX = spanY;
         }
-        print('[COURSE_CANVAS_BOUNDS] APRES ajustements: minX=$minX, maxX=$maxX, minY=$minY, maxY=$maxY, spanX=$spanX, spanY=$spanY');
         final availW = constraints.maxWidth - 2 * CourseCanvas._margin;
         final availH = constraints.maxHeight - 2 * CourseCanvas._margin;
         final baseScale = math.min(availW / spanX, availH / spanY);
@@ -264,10 +262,8 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
         _currentView = view;
         _currentCanvasSize = Size(constraints.maxWidth, constraints.maxHeight);
         
-        print('[COURSE_CANVAS_BOUNDS] View: scale=$scale, offsetX=$offsetX, offsetY=$offsetY, zoomFactor=$_zoomFactor');
   int baseTileZoom = activeMap?.zoomLevel ?? 10;
   int tileZoom = (baseTileZoom + _tileZoomOffset).clamp(1, 20);
-  print('[TILE] baseTileZoom=$baseTileZoom, _tileZoomOffset=$_tileZoomOffset, tileZoom=$tileZoom, _zoomFactor=$_zoomFactor');
 
 
         return Listener(
@@ -343,16 +339,10 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                       ),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
-                          print('[TILES] Erreur chargement: ${snapshot.error}');
                           return Center(child: Text('Erreur: ${snapshot.error}'));
                         }
                         // Si aucune tuile n'est trouvée, on laisse simplement du blanc (pas de message)
                         if (snapshot.hasData) {
-                          if (snapshot.data!.isEmpty) {
-                            print('[TILES] Aucune tuile chargée pour zoom=$tileZoom');
-                          } else {
-                            print('[TILES] ${snapshot.data!.length} tuiles affichées');
-                          }
                           return CustomPaint(
                             size: Size(constraints.maxWidth, constraints.maxHeight),
                             painter: MultiLayerTilePainter(
@@ -679,19 +669,13 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     }
     
     if (map.zoomLevel < 0 || map.zoomLevel > 28) {
-      print('[TILES] ❌ Zoom invalide: ${map.zoomLevel}');
       return [];
     }
     
-    print('[TILES] DEBUG - _loadMultiLayerTilesForMap: ${map.id}, zoom=${map.zoomLevel}');
-    print('[TILES] 📐 Transform: scale=${view.scale}, offsetX=${view.offsetX}, offsetY=${view.offsetY}, minX=${view.minX}, minY=${view.minY}');
-    print('[TILES] 📏 Canvas: width=${size.width}, height=${size.height}');
-  // Récupérer dynamiquement le chemin de stockage des cartes
+    // Récupérer dynamiquement le chemin de stockage des cartes
   final container = ProviderScope.containerOf(context);
   final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
   final mapPath = '$mapBasePath/${map.id}';
-    // ignore: avoid_print
-    print('[TILES] DEBUG - Chemin: $mapPath');
 
     // BBox géographique couvrant tout le widget (projetée depuis les 4 coins du widget en pixels)
     // On projette (0,0), (size.width,0), (0,size.height), (size.width,size.height) en coordonnées locales, puis en géographiques
@@ -710,11 +694,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
       return LocalPosition(x: x, y: y);
     }).toList();
     
-    print('[TILES] 🔍 localCorners: ${localCorners.map((lp) => 'x=${lp.x.toStringAsFixed(1)},y=${lp.y.toStringAsFixed(1)}').toList()}');
-    
     final geoCorners = localCorners.map((lp) => mercatorService.toGeographic(lp)).toList();
-    
-    print('[TILES] 🔍 geoCorners: ${geoCorners.map((g) => 'lat=${g.latitude.toStringAsFixed(2)},lon=${g.longitude.toStringAsFixed(2)}').toList()}');
     
     double minLat = geoCorners.first.latitude, maxLat = geoCorners.first.latitude;
     double minLon = geoCorners.first.longitude, maxLon = geoCorners.first.longitude;
@@ -742,7 +722,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   
   // Guard: vérifier que les coordonnées ont du sens
   if (minLat.isNaN || maxLat.isNaN || minLon.isNaN || maxLon.isNaN) {
-    print('[TILES] ❌ Coordonnées NaN après clamping');
     return [];
   }
   
@@ -753,7 +732,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   final latSpan = (maxLat - minLat).abs();
   final lonSpan = (maxLon - minLon).abs();
   if (latSpan > 180 || lonSpan > 360) {
-    print('[TILES] ❌ Boîte géographique trop grande: latSpan=$latSpan, lonSpan=$lonSpan');
     return [];
   }
   
@@ -766,7 +744,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   // Guard: vérifier que les indices sont sains
   final maxTiles = 1 << zoom; // 2^zoom
   if (tileXmin >= maxTiles || tileXmax < 0 || tileYmin >= maxTiles || tileYmax < 0) {
-    print('[TILES] ❌ Coordonnées de tuiles invalides: X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] (max=$maxTiles)');
     return [];
   }
 
@@ -779,9 +756,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   if (tileXmin > tileXmax) { final t = tileXmin; tileXmin = tileXmax; tileXmax = t; }
   if (tileYmin > tileYmax) { final t = tileYmin; tileYmin = tileYmax; tileYmax = t; }
 
-    // ignore: avoid_print
-    print('[TILES] Tiles widget (full): X[$tileXmin;$tileXmax] Y[$tileYmin;$tileYmax] z=$zoom, geo=[${minLon.toStringAsFixed(2)},${maxLon.toStringAsFixed(2)}] x [${minLat.toStringAsFixed(2)},${maxLat.toStringAsFixed(2)}]');
-
     final tiles = <LayeredTile>[];
     
     // Instead of searching in a predefined range, scan the actual tiles on disk
@@ -790,8 +764,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
       print('[TILES] ⚠️ Répertoire de carte inexistant: $mapPath');
       return [];
     }
-    
-    print('[TILES] 📂 Balayage du répertoire: $mapPath');
     
     // List all tile files in the map directory
     final tileFiles = <String>[];
@@ -824,8 +796,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
       return [];
     }
     
-    print('[TILES] 📊 ${tileFiles.length} tuiles trouvées au disque pour z=$zoom');
-    
     // Load the found tiles
     for (final filePath in tileFiles) {
       try {
@@ -846,8 +816,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
         print('[TILES] ❌ Erreur chargement tuile: $e');
       }
     }
-
-    print('[TILES] ✅ ${tiles.length} tuiles chargées');
 
     return tiles;
   }

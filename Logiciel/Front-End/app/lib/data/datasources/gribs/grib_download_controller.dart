@@ -93,7 +93,7 @@ class GribDownloadController extends Notifier<GribDownloadState> {
     required GribModel model,
     required Set<GribVariable> variables,
     required int days,
-    required int stepHours,
+    int? stepHours, // ⚠️ IGNORÉ - utilise résolution adaptive GFS
     required double leftLon,
     required double rightLon,
     required double bottomLat,
@@ -125,7 +125,7 @@ class GribDownloadController extends Notifier<GribDownloadState> {
           model: model,
           cycleUtc: cycle,
           days: days,
-          stepHours: stepHours,
+          stepHours: 1, // ⚠️ IGNORÉ - utilise résolution adaptive dans _forecastHours()
           leftLon: leftLon,
           rightLon: rightLon,
           bottomLat: bottomLat,
