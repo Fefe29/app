@@ -60,35 +60,10 @@ class CourseMenuButton extends ConsumerWidget {
   }
 
   Future<void> _openNewBuoyMenu(BuildContext context, WidgetRef ref) async {
-    final action = await showDialog<_BuoyType>(
+    await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nouvelle marque'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.radio_button_unchecked),
-              title: const Text('Marque de parcours'),
-              onTap: () => Navigator.of(ctx).pop(_BuoyType.regular),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Annuler'),
-          ),
-        ],
-      ),
+      builder: (context) => const GeographicBuoyDialog(role: BuoyRole.regular),
     );
-    
-    if (action != null) {
-      await showDialog(
-        context: context,
-        builder: (context) => const GeographicBuoyDialog(role: BuoyRole.regular),
-      );
-    }
   }
 
   Future<void> _openStartLineDialog(BuildContext context, WidgetRef ref) async {
@@ -286,10 +261,6 @@ class CourseMenuButton extends ConsumerWidget {
       ref.read(courseProvider.notifier).clear();
     }
   }
-}
-
-enum _BuoyType {
-  regular,
 }
 
 enum _ModificationItemType {

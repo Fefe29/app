@@ -581,7 +581,9 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                 return const SizedBox.shrink();
               }
               
-              return const WindSpeedLegendBar();
+              // TODO: Réactiver la légende des couleurs si nécessaire
+              // return const WindSpeedLegendBar();
+              return const SizedBox.shrink();
             },
           ),
         ),

@@ -200,27 +200,39 @@ final mapDisplayProvider = NotifierProvider<MapDisplayNotifier, bool>(
 
 /// Provider pour la carte active à afficher
 final activeMapProvider = Provider<MapTileSet?>((ref) {
-  final selectedMapId = ref.watch(selectedMapProvider);
-  final maps = ref.watch(mapManagerProvider);
   final displayMaps = ref.watch(mapDisplayProvider);
-  
-  if (!displayMaps || selectedMapId == null) return null;
-  
-  try {
-    return maps.firstWhere(
-      (map) => map.id == selectedMapId && map.status == MapDownloadStatus.completed,
-    );
-  } catch (e) {
-    // Si la carte sélectionnée n'est pas trouvée, sélectionner automatiquement la première disponible
-    final availableMaps = maps.where((map) => map.status == MapDownloadStatus.completed);
+  final maps = ref.watch(mapManagerProvider);
+  final selectedMapId = ref.watch(selectedMapProvider);
+
+  // If map display is disabled, there's no active map
+  if (!displayMaps) return null;
+
+  // If no map is explicitly selected, automatically pick the first available
+  final availableMaps = maps.where((map) => map.status == MapDownloadStatus.completed).toList();
+  if (selectedMapId == null) {
     if (availableMaps.isNotEmpty) {
-      // Mise à jour asynchrone de la sélection
+      // Update selection asynchronously to avoid modifying state during read
       Future.microtask(() {
         ref.read(selectedMapProvider.notifier).select(availableMaps.first.id);
       });
       return availableMaps.first;
     }
+    return null;
   }
-  
-  return null;
+
+  // If a selection exists, return it when available
+  try {
+    return maps.firstWhere(
+      (map) => map.id == selectedMapId && map.status == MapDownloadStatus.completed,
+    );
+  } catch (e) {
+    // Selected map not found among completed maps: fall back to first available if any
+    if (availableMaps.isNotEmpty) {
+      Future.microtask(() {
+        ref.read(selectedMapProvider.notifier).select(availableMaps.first.id);
+      });
+      return availableMaps.first;
+    }
+    return null;
+  }
 });

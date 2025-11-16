@@ -42,11 +42,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage>
       appBar: AppBar(
         title: const Text('Paramètres'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
           tooltip: 'Retour',
         ),
-        backgroundColor: Colors.white,
         elevation: 1,
         bottom: TabBar(
           controller: _tabController,

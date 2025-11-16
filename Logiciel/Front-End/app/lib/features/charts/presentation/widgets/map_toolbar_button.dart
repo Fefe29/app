@@ -55,19 +55,7 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
             ),
             const PopupMenuDivider(),
             
-            // Option télécharger nouvelle carte
-            PopupMenuItem(
-              value: 'download',
-              child: const Row(
-                children: [
-                  Icon(Icons.download, size: 16, color: Colors.green),
-                  SizedBox(width: 12),
-                  Text('Télécharger une carte'),
-                ],
-              ),
-            ),
-            
-            const PopupMenuDivider(),
+            // Note: 'Télécharger une carte' moved down to sit just before 'Gérer les cartes'
             
             // Option affichage des cartes
             PopupMenuItem(
@@ -94,7 +82,7 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
               PopupMenuItem(
                 enabled: false,
                 child: Text(
-                  'Carte active',
+                  'Cartes disponibles',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -102,12 +90,13 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
                   ),
                 ),
               ),
-              
-              // Liste des cartes disponibles
+
+              // Liste des cartes disponibles (no explicit checkbox anymore;
+              // selecting a map will make it the active map and will also ensure
+              // the map display is enabled)
               ...maps.where((map) => map.status == MapDownloadStatus.completed).map((map) {
-                return CheckedPopupMenuItem<String>(
+                return PopupMenuItem<String>(
                   value: map.id,
-                  checked: selectedMapId == map.id,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -128,10 +117,24 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
                   ),
                 );
               }).toList(),
-              
+
               if (maps.where((map) => map.status == MapDownloadStatus.completed).isNotEmpty) ...[
                 const PopupMenuDivider(),
-                
+
+                // Option télécharger nouvelle carte (moved here so it appears just before Manage)
+                PopupMenuItem(
+                  value: 'download',
+                  child: const Row(
+                    children: [
+                      Icon(Icons.download, size: 16, color: Colors.green),
+                      SizedBox(width: 12),
+                      Text('Télécharger une carte'),
+                    ],
+                  ),
+                ),
+
+                const PopupMenuDivider(),
+
                 // Option gérer les cartes
                 PopupMenuItem(
                   value: 'manage',
@@ -322,7 +325,9 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
           orElse: () => maps.first,
         );
         if (selectedMap.status == MapDownloadStatus.completed) {
+          // Select the map and ensure map display is enabled (no redundant checkbox needed)
           ref.read(selectedMapProvider.notifier).select(value);
+          ref.read(mapDisplayProvider.notifier).toggle(true);
         }
         break;
     }
