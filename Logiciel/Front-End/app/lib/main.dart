@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/router.dart';
 import 'theme/app_theme.dart';
+import 'theme/theme_provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -45,11 +46,13 @@ class App extends ConsumerWidget {
     
     final router = ref.watch(appRouterProvider);
     final theme = ref.watch(appThemeProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    
     return MaterialApp.router(
       title: 'App',
       theme: theme.light,
       darkTheme: theme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       routerConfig: router,
     );
   }

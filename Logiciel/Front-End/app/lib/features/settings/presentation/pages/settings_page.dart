@@ -10,16 +10,17 @@ import 'package:kornog/common/providers/telemetry_providers.dart';
 import 'package:kornog/common/services/miniplexe_discovery.dart';
 import 'package:kornog/config/telemetry_config.dart';
 import 'package:kornog/features/settings/presentation/widgets/nmea_sniffer_widget.dart';
+import 'package:kornog/theme/theme_provider.dart';
 
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage>
+class _SettingsPageState extends ConsumerState<SettingsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -68,15 +69,48 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _buildGeneralTab() {
+    final themeMode = ref.watch(themeModeProvider);
+    
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('App', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-        SwitchListTile(
-          title: const Text('Thème sombre (système)'),
-          value: Theme.of(context).brightness == Brightness.dark,
-          onChanged: (_) {},
+        const Text('Apparence', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        ListTile(
+          title: const Text('Mode thème'),
+          subtitle: Text(
+            themeMode == ThemeMode.system 
+              ? 'Système (suit les paramètres du téléphone)'
+              : themeMode == ThemeMode.dark
+                ? 'Thème sombre (forcé)'
+                : 'Thème clair (forcé)',
+          ),
+          trailing: DropdownButton<ThemeMode>(
+            value: themeMode,
+            onChanged: (ThemeMode? newMode) {
+              if (newMode != null) {
+                ref.read(themeModeProvider.notifier).setThemeMode(newMode);
+              }
+            },
+            items: const [
+              DropdownMenuItem(
+                value: ThemeMode.system,
+                child: Text('Système'),
+              ),
+              DropdownMenuItem(
+                value: ThemeMode.light,
+                child: Text('Clair'),
+              ),
+              DropdownMenuItem(
+                value: ThemeMode.dark,
+                child: Text('Sombre'),
+              ),
+            ],
+          ),
         ),
+        const Divider(),
+        const SizedBox(height: 16),
+        const Text('App', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
         ListTile(
           leading: const Icon(Icons.info_outline),
           title: const Text('À propos'),
