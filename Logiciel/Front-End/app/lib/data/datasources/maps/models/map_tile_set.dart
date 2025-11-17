@@ -1,13 +1,20 @@
 /// Modèles pour les tuiles de carte et métadonnées de téléchargement.
 import 'map_bounds.dart';
 
+/// Source des données de carte
+enum MapSource {
+  local,    // Cartes téléchargées et stockées localement
+  oceam,    // OSeaM Standard (streaming via API)
+}
+
 /// États de téléchargement d'une carte
 enum MapDownloadStatus {
   notStarted,   // Pas encore commencé
   downloading,  // En cours de téléchargement
   completed,    // Téléchargement terminé avec succès
   failed,       // Échec du téléchargement
-  cancelled     // Annulé par l'utilisateur
+  cancelled,    // Annulé par l'utilisateur
+  streaming     // Flux continu (OSeaM)
 }
 
 /// Informations sur une carte téléchargée ou à télécharger
@@ -24,6 +31,7 @@ class MapTileSet {
     this.tileCount,
     this.downloadProgress = 0.0,
     this.errorMessage,
+    this.source = MapSource.local,
   });
 
   final String id;                    // Identifiant unique
@@ -37,6 +45,7 @@ class MapTileSet {
   final int? tileCount;              // Nombre de tuiles
   final double downloadProgress;      // Progrès 0.0 à 1.0
   final String? errorMessage;        // Message d'erreur si échec
+  final MapSource source;             // Source de la carte (local ou OSeaM)
 
   /// Taille formatée pour l'affichage
   String get formattedSize {
@@ -86,6 +95,7 @@ class MapTileSet {
     int? tileCount,
     double? downloadProgress,
     String? errorMessage,
+    MapSource? source,
   }) => MapTileSet(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -98,6 +108,7 @@ class MapTileSet {
         tileCount: tileCount ?? this.tileCount,
         downloadProgress: downloadProgress ?? this.downloadProgress,
         errorMessage: errorMessage ?? this.errorMessage,
+        source: source ?? this.source,
       );
 
   @override

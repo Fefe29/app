@@ -1,6 +1,7 @@
-// FLUTTER & DART
 import 'dart:math' as math;
 import 'dart:io';
+import 'dart:ui' as ui;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +36,8 @@ import '../../../../data/datasources/gribs/viewport_wind_grid_provider.dart';
 import '../../../../data/datasources/gribs/grib_time_slider_widget.dart';
 import '../../../../data/datasources/gribs/wind_speed_legend_bar.dart';
 import '../../providers/grib_layers_provider.dart';
+import '../../../mapview/layers/oceam_tile_layer.dart';
+import '../../../mapview/layers/flutter_map_oceam_simple.dart';
 // -------------------------
 import '../../presentation/models/view_transform.dart';
 
@@ -119,7 +122,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   void _incrementZoom() {
     setState(() {
       _zoomFactor *= 1.25;
-      print('[ZOOM] _incrementZoom: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
+      print('[ZOOM] _incrementZoom: NEW _zoomFactor=$_zoomFactor');
       _adjustTileZoomIfNeeded();
     });
   }
@@ -127,7 +130,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   void _decrementZoom() {
     setState(() {
       _zoomFactor /= 1.25;
-      print('[ZOOM] _decrementZoom: _zoomFactor=$_zoomFactor, _tileZoomOffset=$_tileZoomOffset');
+      print('[ZOOM] _decrementZoom: NEW _zoomFactor=$_zoomFactor');
       _adjustTileZoomIfNeeded();
     });
   }
@@ -248,6 +251,7 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
         final scale = baseScale * _zoomFactor;
         final offsetX = (constraints.maxWidth - spanX * scale) / 2 + _panOffset.dx;
         final offsetY = (constraints.maxHeight - spanY * scale) / 2 + _panOffset.dy;
+        print('[LayoutBuilder] Recalculated view: scale=$scale (baseScale=$baseScale, _zoomFactor=$_zoomFactor)');
         final view = ViewTransform(
           minX: minX,
           maxX: maxX,
@@ -327,35 +331,63 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (displayMaps && activeMap != null)
-                    FutureBuilder<List<LayeredTile>>(
-                      key: ValueKey('tiles_${activeMap.id}_${tileZoom}_${view.scale}'),
-                      future: _loadMultiLayerTilesForMap(
-                        activeMap.copyWith(zoomLevel: tileZoom),
-                        course,
-                        mercatorService: mercatorService,
-                        view: view,
-                        size: Size(constraints.maxWidth, constraints.maxHeight),
-                      ),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasError) {
-                          return Center(child: Text('Erreur: ${snapshot.error}'));
-                        }
-                        // Si aucune tuile n'est trouvée, on laisse simplement du blanc (pas de message)
-                        if (snapshot.hasData) {
-                          return CustomPaint(
+                  // Affichage des cartes (OSeaM ou locales)
+                  Consumer(
+                    builder: (context, consumerRef, child) {
+                      final oceamActive = consumerRef.watch(oceamActiveProvider);
+                      final activeMap = consumerRef.watch(activeMapProvider);
+                      final displayMaps = consumerRef.watch(mapDisplayProvider);
+
+                      // OSeaM en streaming avec flutter_map
+                      if (oceamActive) {
+                        final valueKey = 'oceam_${view.scale}_${view.offsetX}_${view.offsetY}';
+                        print('[Canvas.OSeaM] Rendering with flutter_map, ValueKey=$valueKey, _zoomFactor=$_zoomFactor');
+                        
+                        return FlutterMapOSeaMSimple(
+                          key: ValueKey(valueKey),
+                          initialLatitude: 48.37,
+                          initialLongitude: -4.49,
+                          initialZoom: 11,
+                          canvasSize: Size(constraints.maxWidth, constraints.maxHeight),
+                          mercatorService: mercatorService,
+                          view: view,
+                        );
+                      }
+
+                      // Cartes téléchargées
+                      if (displayMaps && activeMap != null)
+                        return FutureBuilder<List<LayeredTile>>(
+                          key: ValueKey('tiles_${activeMap.id}_${tileZoom}_${view.scale}'),
+                          future: _loadMultiLayerTilesForMap(
+                            activeMap.copyWith(zoomLevel: tileZoom),
+                            course,
+                            mercatorService: mercatorService,
+                            view: view,
                             size: Size(constraints.maxWidth, constraints.maxHeight),
-                            painter: MultiLayerTilePainter(
-                              snapshot.data!,
-                              mercatorService,
-                              view,
-                              MapLayersConfig.defaultConfig,
-                            ),
-                          );
-                        }
-                        return Center(child: Text('Chargement des tuiles... (zoom=$tileZoom)'));
-                      },
-                    ),
+                          ),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return Center(child: Text('Erreur: ${snapshot.error}'));
+                            }
+                            // Si aucune tuile n'est trouvée, on laisse simplement du blanc (pas de message)
+                            if (snapshot.hasData) {
+                              return CustomPaint(
+                                size: Size(constraints.maxWidth, constraints.maxHeight),
+                                painter: MultiLayerTilePainter(
+                                  snapshot.data!,
+                                  mercatorService,
+                                  view,
+                                  MapLayersConfig.defaultConfig,
+                                ),
+                              );
+                            }
+                            return Center(child: Text('Chargement des tuiles... (zoom=$tileZoom)'));
+                          },
+                        );
+
+                      return const SizedBox.shrink();
+                    },
+                  ),
                   
                   // ✅ ANCIEN GRIB HEATMAP SUPPRIMÉ - Remplacé par le nouveau système 50 points
                   
@@ -818,6 +850,135 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     }
 
     return tiles;
+  }
+
+  /// Charge les tuiles OSeaM visibles pour la vue actuelle
+  Future<List<OSeaMLayeredTile>> _loadOSeaMTilesForView(
+    WidgetRef ref,
+    MercatorCoordinateSystemService mercatorService,
+    CourseState course,
+    ViewTransform view,
+  ) async {
+    print('[Canvas._loadOSeaMTilesForView] Starting');
+    final oceamService = ref.read(oceamTileServiceProvider);
+    
+    // Zoom fixe pour OSeaM (détail suffisant pour la navigation)
+    const zoom = 15;
+    
+    // Calculer les tuiles visibles basées sur le parcours
+    final visibleTiles = _calculateOSeaMTiles(course, zoom);
+    print('[Canvas._loadOSeaMTilesForView] visibleTiles: ${visibleTiles.length}');
+    
+    if (visibleTiles.isEmpty) {
+      print('[Canvas._loadOSeaMTilesForView] No visible tiles, returning empty');
+      return [];
+    }
+
+    final loadedTiles = <OSeaMLayeredTile>[];
+
+    // Charger les tuiles en parallèle (max 4 concurrent)
+    const maxConcurrent = 4;
+    for (var i = 0; i < visibleTiles.length; i += maxConcurrent) {
+      final chunk = visibleTiles.sublist(
+        i,
+        i + maxConcurrent > visibleTiles.length
+            ? visibleTiles.length
+            : i + maxConcurrent,
+      );
+      print('[Canvas._loadOSeaMTilesForView] Loading chunk at offset $i: ${chunk.length} tiles');
+
+      final futures = chunk.map((coord) async {
+        try {
+          final (x, y, z) = coord;
+          print('[Canvas] Fetching tile z=$z x=$x y=$y');
+          final data = await oceamService.getTile(x, y, z);
+          if (data != null) {
+            final completer = Completer<ui.Image?>();
+            ui.decodeImageFromList(data, (image) {
+              print('[Canvas] Tile decoded z=$z x=$x y=$y');
+              completer.complete(image);
+            });
+            final image = await completer.future;
+            if (image != null) {
+              return OSeaMLayeredTile(x: x, y: y, z: z, image: image);
+            }
+          } else {
+            print('[Canvas] Tile data null for z=$z x=$x y=$y');
+          }
+        } catch (e) {
+          print('[Canvas] Error loading tile: $e');
+        }
+        return null;
+      });
+
+      final chunkResults = await Future.wait(futures);
+      loadedTiles.addAll(chunkResults.whereType<OSeaMLayeredTile>());
+      print('[Canvas._loadOSeaMTilesForView] After chunk, loadedTiles: ${loadedTiles.length}');
+    }
+
+    print('[Canvas._loadOSeaMTilesForView] Done, loaded ${loadedTiles.length} tiles');
+    return loadedTiles;
+  }
+
+  /// Calcule les tuiles OSeaM visibles
+  List<(int, int, int)> _calculateOSeaMTiles(
+    CourseState course,
+    int zoom,
+  ) {
+    final tiles = <(int, int, int)>[];
+
+    if (course.buoys.isEmpty) {
+      // Par défaut: grille 3x3 autour de l'origine
+      final centerTile = _latLonToOSeaMTile(0, 0, zoom);
+      for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+          tiles.add((centerTile.$1 + dx, centerTile.$2 + dy, zoom));
+        }
+      }
+      return tiles;
+    }
+
+    // Calculer les tuiles couvrant le parcours
+    int minX = 0x7FFFFFFF, maxX = 0, minY = 0x7FFFFFFF, maxY = 0;
+
+    for (final buoy in course.buoys) {
+      final (x, y) = _latLonToOSeaMTile(
+        buoy.position.latitude,
+        buoy.position.longitude,
+        zoom,
+      );
+      minX = minX > x ? x : minX;
+      maxX = maxX < x ? x : maxX;
+      minY = minY > y ? y : minY;
+      maxY = maxY < y ? y : maxY;
+    }
+
+    // Ajouter une marge
+    final n = 1 << zoom;
+    minX = (minX - 1).clamp(0, n - 1);
+    maxX = (maxX + 1).clamp(0, n - 1);
+    minY = (minY - 1).clamp(0, n - 1);
+    maxY = (maxY + 1).clamp(0, n - 1);
+
+    // Générer la grille
+    for (int x = minX; x <= maxX; x++) {
+      for (int y = minY; y <= maxY; y++) {
+        tiles.add((x, y, zoom));
+      }
+    }
+
+    return tiles;
+  }
+
+  /// Convertit lat/lon en coordonnées de tuile OSeaM
+  (int, int) _latLonToOSeaMTile(double lat, double lon, int zoom) {
+    final n = 1 << zoom;
+    final x = ((lon + 180.0) / 360.0 * n).floor();
+    
+    final latRad = lat * math.pi / 180.0;
+    final y = ((1.0 - (math.atan(math.tan(latRad) + 1.0 / math.cos(latRad)) / math.pi)) / 2.0 * n).floor();
+    
+    return (x.clamp(0, n - 1), y.clamp(0, n - 1));
   }
 
   // Conversion latitude/longitude vers numéro de tuile OSM (slippy)

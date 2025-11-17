@@ -27,6 +27,7 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
     final maps = ref.watch(mapManagerProvider);
     final selectedMapId = ref.watch(selectedMapProvider);
     final showMaps = ref.watch(mapDisplayProvider);
+    final oceamActive = ref.watch(oceamActiveProvider);
     
     return Row(
       children: [
@@ -55,14 +56,53 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
             ),
             const PopupMenuDivider(),
             
-            // Note: 'Télécharger une carte' moved down to sit just before 'Gérer les cartes'
+            // Option OSeaM Standard (Streaming)
+            PopupMenuItem(
+              enabled: false,
+              child: SizedBox(
+                width: 280,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_download_outlined,
+                      size: 16,
+                      color: oceamActive ? Colors.green : Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'OSeaM Standard',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final isActive = ref.watch(oceamActiveProvider);
+                        print('[OSeaM] Menu Switch - isActive: $isActive');
+                        return Switch(
+                          value: isActive,
+                          onChanged: (value) {
+                            print('[OSeaM] Toggle clicked: $value');
+                            ref.read(oceamActiveProvider.notifier).setActive(value);
+                            print('[OSeaM] Provider updated, closing menu');
+                            Navigator.of(context).pop();
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
             
-            // Option affichage des cartes
+            const PopupMenuDivider(),
+            
+            // Option affichage des cartes téléchargées
             PopupMenuItem(
               enabled: false,
               child: Row(
                 children: [
-                  const Text('Afficher les cartes'),
+                  const Text('Afficher cartes téléchargées'),
                   const Spacer(),
                   Switch(
                     value: showMaps,
@@ -75,7 +115,7 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
               ),
             ),
             
-            if (maps.isNotEmpty) ...[
+            if (maps.isNotEmpty && !oceamActive) ...[
               const PopupMenuDivider(),
               
               // Titre section sélection carte
@@ -91,9 +131,7 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
                 ),
               ),
 
-              // Liste des cartes disponibles (no explicit checkbox anymore;
-              // selecting a map will make it the active map and will also ensure
-              // the map display is enabled)
+              // Liste des cartes disponibles
               ...maps.where((map) => map.status == MapDownloadStatus.completed).map((map) {
                 return PopupMenuItem<String>(
                   value: map.id,

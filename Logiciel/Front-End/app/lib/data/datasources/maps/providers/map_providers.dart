@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../common/kornog_data_directory.dart';
 
 import '../services/map_download_service.dart';
+import '../services/oceam_tile_service.dart';
 import '../models/map_tile_set.dart';
 import '../models/map_bounds.dart';
 import '../repositories/map_repository.dart';
@@ -32,6 +33,13 @@ final mapDownloadServiceProvider = FutureProvider<MapDownloadService>((ref) asyn
 final mapRepositoryProvider = FutureProvider<MapRepository>((ref) async {
   final storageDir = await ref.watch(mapStorageDirectoryProvider.future);
   return MapRepository(storageDirectory: storageDir);
+});
+
+/// Provider pour le service OSeaM
+final oceamTileServiceProvider = Provider<OSeaMTileService>((ref) {
+  final service = OSeaMTileService();
+  ref.onDispose(() => service.dispose());
+  return service;
 });
 
 /// Notifier pour la gestion de l'état des cartes
@@ -178,6 +186,20 @@ class SelectedMapNotifier extends Notifier<String?> {
   }
 }
 
+/// Notifier pour activer/désactiver OSeaM
+class OSeaMActiveNotifier extends Notifier<bool> {
+  @override
+  bool build() => false; // OSeaM désactivé par défaut
+
+  void setActive(bool active) {
+    state = active;
+    // Quand on active OSeaM, désactiver les cartes téléchargées
+    if (active) {
+      ref.read(mapDisplayProvider.notifier).toggle(false);
+    }
+  }
+}
+
 /// Notifier pour l'affichage des cartes
 class MapDisplayNotifier extends Notifier<bool> {
   @override
@@ -185,12 +207,21 @@ class MapDisplayNotifier extends Notifier<bool> {
 
   void toggle(bool show) {
     state = show;
+    // Quand on active les cartes, désactiver OSeaM
+    if (show) {
+      ref.read(oceamActiveProvider.notifier).setActive(false);
+    }
   }
 }
 
 /// Provider pour la carte actuellement sélectionnée
 final selectedMapProvider = NotifierProvider<SelectedMapNotifier, String?>(
   SelectedMapNotifier.new,
+);
+
+/// Provider pour OSeaM actif/inactif
+final oceamActiveProvider = NotifierProvider<OSeaMActiveNotifier, bool>(
+  OSeaMActiveNotifier.new,
 );
 
 /// Provider pour l'affichage des cartes (activé/désactivé)
@@ -200,18 +231,37 @@ final mapDisplayProvider = NotifierProvider<MapDisplayNotifier, bool>(
 
 /// Provider pour la carte active à afficher
 final activeMapProvider = Provider<MapTileSet?>((ref) {
+  final oceamActive = ref.watch(oceamActiveProvider);
   final displayMaps = ref.watch(mapDisplayProvider);
   final maps = ref.watch(mapManagerProvider);
   final selectedMapId = ref.watch(selectedMapProvider);
 
-  // If map display is disabled, there's no active map
+  // Si OSeaM est actif, créer une carte virtuelle OSeaM
+  if (oceamActive) {
+    return MapTileSet(
+      id: 'oceam_streaming',
+      name: 'OSeaM Standard (Streaming)',
+      bounds: MapBounds(
+        minLatitude: -85.051129,
+        maxLatitude: 85.051129,
+        minLongitude: -180,
+        maxLongitude: 180,
+      ),
+      zoomLevel: 15,
+      status: MapDownloadStatus.streaming,
+      description: 'Cartes marines OSeaM en temps réel',
+      source: MapSource.oceam,
+    );
+  }
+
+  // Si map display est désactivé, aucune carte active
   if (!displayMaps) return null;
 
-  // If no map is explicitly selected, automatically pick the first available
+  // Si aucune carte n'est sélectionnée, prendre la première disponible
   final availableMaps = maps.where((map) => map.status == MapDownloadStatus.completed).toList();
   if (selectedMapId == null) {
     if (availableMaps.isNotEmpty) {
-      // Update selection asynchronously to avoid modifying state during read
+      // Mise à jour asynchrone pour éviter de modifier l'état pendant la lecture
       Future.microtask(() {
         ref.read(selectedMapProvider.notifier).select(availableMaps.first.id);
       });
@@ -220,13 +270,13 @@ final activeMapProvider = Provider<MapTileSet?>((ref) {
     return null;
   }
 
-  // If a selection exists, return it when available
+  // Si une sélection existe, la retourner si disponible
   try {
     return maps.firstWhere(
       (map) => map.id == selectedMapId && map.status == MapDownloadStatus.completed,
     );
   } catch (e) {
-    // Selected map not found among completed maps: fall back to first available if any
+    // Carte sélectionnée non trouvée : revenir à la première disponible si possible
     if (availableMaps.isNotEmpty) {
       Future.microtask(() {
         ref.read(selectedMapProvider.notifier).select(availableMaps.first.id);
