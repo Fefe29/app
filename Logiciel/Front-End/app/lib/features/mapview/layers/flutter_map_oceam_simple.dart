@@ -54,33 +54,31 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
         return;
       }
 
-      // ✅ STRATÉGIE: Au démarrage, se caler sur les bounds du parcours (simple)
-      // Ensuite, suivre le viewport visible avec scale
-      
-      // 1. Calculer le centre du parcours (bounds totaux)
-      final parcoursMinX = widget.view.minX;
-      final parcoursMaxX = widget.view.maxX;
-      final parcoursMinY = widget.view.minY;
-      final parcoursMaxY = widget.view.maxY;
-      
-      final parcoursCenterX = (parcoursMinX + parcoursMaxX) / 2;
-      final parcoursCenterY = (parcoursMinY + parcoursMaxY) / 2;
-      
-      // 2. Convertir en géographique
+      // Calculer le centre depuis les bounds du viewport
+      final centerLocalX = (widget.view.minX + widget.view.maxX) / 2;
+      final centerLocalY = (widget.view.minY + widget.view.maxY) / 2;
+
+      // Convertir du système Mercator local au géographique
       final centerGeo = widget.mercatorService.toGeographic(
-        LocalPosition(x: parcoursCenterX, y: parcoursCenterY),
+        LocalPosition(x: centerLocalX, y: centerLocalY),
       );
 
-      // 3. Calculer l'empan visible basé sur scale
-      // L'empan visible = empan du parcours / scale
-      final parcourSpanX = parcoursMaxX - parcoursMinX;
-      final parcourSpanY = parcoursMaxY - parcoursMinY;
+      // ✅ CLEF: Calculer l'empan VISIBLE du viewport, pas l'empan du parcours
+      // L'empan visible dépend de: view.scale et canvas size
+      // Plus view.scale est grand, plus l'empan visible est petit (on est zoom in)
       
+      // Empan du parcours (bounds totaux)
+      final parcourSpanX = widget.view.maxX - widget.view.minX;
+      final parcourSpanY = widget.view.maxY - widget.view.minY;
+      
+      // Empan VISIBLE du viewport (après application de scale)
+      // Au zoom initial (_zoomFactor=1.0), on voit tout le parcours
+      // Au zoom higher (_zoomFactor>1.0), on voit un plus petit empan
       final visibleSpanX = parcourSpanX / widget.view.scale;
       final visibleSpanY = parcourSpanY / widget.view.scale;
       final visibleSpan = math.max(visibleSpanX, visibleSpanY);
       
-      // 4. Estimer le zoom basé sur l'empan visible
+      // Estimer le zoom basé sur cet empan visible
       double zoom = 15.0;
       if (visibleSpan < 500) zoom = 19.0;
       else if (visibleSpan < 1000) zoom = 18.0;
@@ -97,7 +95,7 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
       // Debug: log la synchronisation
       print('[OSM] _syncMapWithView:');
       print('[OSM]   center=(${centerGeo.latitude.toStringAsFixed(4)}, ${centerGeo.longitude.toStringAsFixed(4)})');
-      print('[OSM]   zoom=$zoom (scale=${widget.view.scale.toStringAsFixed(4)}, visibleSpan=${visibleSpan.toStringAsFixed(0)})');
+      print('[OSM]   zoom=$zoom (scale=${widget.view.scale.toStringAsFixed(4)}, visibleSpan=$visibleSpan)');
       print('[OSM]   mapController moving to: (${centerGeo.latitude}, ${centerGeo.longitude}) @ zoom $zoom');
 
       // Synchroniser la carte avec la position du parcours
