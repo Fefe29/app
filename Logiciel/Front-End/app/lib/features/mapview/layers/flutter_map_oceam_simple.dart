@@ -113,11 +113,23 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Calculer le centre et le zoom du viewport AVANT de construire la carte
+    final centerPixelX = widget.canvasSize.width / 2;
+    final centerPixelY = widget.canvasSize.height / 2;
+    final centerMercator = widget.view.unproject(centerPixelX, centerPixelY, widget.canvasSize);
+    final centerGeo = widget.mercatorService.toGeographic(
+      LocalPosition(x: centerMercator.dx, y: centerMercator.dy),
+    );
+    
+    final baseZoom = 15.0;
+    final zoomAdjustment = math.log(widget.view.scale / 0.19277) / math.ln2;
+    final initialZoom = (baseZoom + zoomAdjustment).clamp(1.0, 20.0);
+
     return FlutterMap(
       mapController: mapController,
       options: MapOptions(
-        initialCenter: LatLng(widget.initialLatitude, widget.initialLongitude),
-        initialZoom: widget.initialZoom,
+        initialCenter: LatLng(centerGeo.latitude, centerGeo.longitude),
+        initialZoom: initialZoom,
         // IMPORTANT: Désactiver TOUTES les interactions utilisateur
         // La carte est entièrement contrôlée par le ViewTransform
         interactionOptions: const InteractionOptions(
@@ -125,17 +137,17 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
         ),
       ),
       children: [
-        // Couche OSM (OpenStreetMap)
+        // Couche OSM (OpenStreetMap) - base
         TileLayer(
           urlTemplate: 'https://a.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png',
           userAgentPackageName: 'kornog.app',
           maxZoom: 19.0,
         ),
-        // Couche OpenSeaMap (marine features)
+        // Couche OpenSeaMap - données marines (bouées, phares, etc.)
         TileLayer(
-          urlTemplate: 'https://tiles.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+          urlTemplate: 'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
           userAgentPackageName: 'kornog.app',
-          maxZoom: 20.0,
+          maxZoom: 18.0,
         ),
       ],
     );
