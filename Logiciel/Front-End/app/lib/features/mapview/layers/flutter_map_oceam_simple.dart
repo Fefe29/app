@@ -35,78 +35,50 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
   void initState() {
     super.initState();
     mapController = MapController();
+    // Sync initial après la première frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncMapWithView();
+    });
   }
 
   @override
   void didUpdateWidget(FlutterMapOSeaMSimple oldWidget) {
     super.didUpdateWidget(oldWidget);
-    print('[OSM] didUpdateWidget called');
-    print('[OSM]   oldView: scale=${oldWidget.view?.scale}, offset=(${oldWidget.view?.offsetX}, ${oldWidget.view?.offsetY})');
-    print('[OSM]   newView: scale=${widget.view?.scale}, offset=(${widget.view?.offsetX}, ${widget.view?.offsetY})');
-    // Synchroniser la position et le zoom avec le ViewTransform
+    // Synchroniser à chaque fois que le widget parent reçoit des props différentes
     _syncMapWithView();
   }
 
   void _syncMapWithView() {
     try {
       if (widget.mercatorService == null || widget.view == null) {
-        print('[OSM] _syncMapWithView: mercatorService ou view null');
         return;
       }
 
-      // Calculer le centre depuis les bounds du viewport
-      final centerLocalX = (widget.view.minX + widget.view.maxX) / 2;
-      final centerLocalY = (widget.view.minY + widget.view.maxY) / 2;
-
-      // Convertir du système Mercator local au géographique
+      // ✅ Calculer le centre RÉEL du viewport visible
+      // Le centre du viewport en pixels est toujours au centre du canvas
+      final centerPixelX = widget.canvasSize.width / 2;
+      final centerPixelY = widget.canvasSize.height / 2;
+      
+      // Inverser en coordonnées Mercator locales
+      final centerMercator = widget.view.unproject(centerPixelX, centerPixelY, widget.canvasSize);
+      
+      // Convertir en géographique
       final centerGeo = widget.mercatorService.toGeographic(
-        LocalPosition(x: centerLocalX, y: centerLocalY),
+        LocalPosition(x: centerMercator.dx, y: centerMercator.dy),
       );
 
-      // ✅ CLEF: Calculer l'empan VISIBLE du viewport, pas l'empan du parcours
-      // L'empan visible dépend de: view.scale et canvas size
-      // Plus view.scale est grand, plus l'empan visible est petit (on est zoom in)
-      
-      // Empan du parcours (bounds totaux)
-      final parcourSpanX = widget.view.maxX - widget.view.minX;
-      final parcourSpanY = widget.view.maxY - widget.view.minY;
-      
-      // Empan VISIBLE du viewport (après application de scale)
-      // Au zoom initial (_zoomFactor=1.0), on voit tout le parcours
-      // Au zoom higher (_zoomFactor>1.0), on voit un plus petit empan
-      final visibleSpanX = parcourSpanX / widget.view.scale;
-      final visibleSpanY = parcourSpanY / widget.view.scale;
-      final visibleSpan = math.max(visibleSpanX, visibleSpanY);
-      
-      // Estimer le zoom basé sur cet empan visible
-      double zoom = 15.0;
-      if (visibleSpan < 500) zoom = 19.0;
-      else if (visibleSpan < 1000) zoom = 18.0;
-      else if (visibleSpan < 2000) zoom = 17.0;
-      else if (visibleSpan < 5000) zoom = 16.0;
-      else if (visibleSpan < 10000) zoom = 15.0;
-      else if (visibleSpan < 25000) zoom = 14.0;
-      else if (visibleSpan < 50000) zoom = 13.0;
-      else if (visibleSpan < 100000) zoom = 12.0;
-      else if (visibleSpan < 250000) zoom = 11.0;
-      else if (visibleSpan < 500000) zoom = 10.0;
-      else zoom = 9.0;
+      // ✅ Calculer le zoom OSM directement depuis view.scale
+      final baseZoom = 15.0; // Zoom quand _zoomFactor = 1.0
+      final zoomAdjustment = math.log(widget.view.scale / 0.19277) / math.ln2;
+      final zoom = (baseZoom + zoomAdjustment).clamp(1.0, 20.0);
 
-      // Debug: log la synchronisation
-      print('[OSM] _syncMapWithView:');
-      print('[OSM]   center=(${centerGeo.latitude.toStringAsFixed(4)}, ${centerGeo.longitude.toStringAsFixed(4)})');
-      print('[OSM]   zoom=$zoom (scale=${widget.view.scale.toStringAsFixed(4)}, visibleSpan=$visibleSpan)');
-      print('[OSM]   mapController moving to: (${centerGeo.latitude}, ${centerGeo.longitude}) @ zoom $zoom');
-
-      // Synchroniser la carte avec la position du parcours
+      // Synchroniser la carte
       mapController.move(
         LatLng(centerGeo.latitude, centerGeo.longitude),
         zoom,
       );
-      
-      print('[OSM]   move() called');
     } catch (e) {
-      print('[OSM] Erreur _syncMapWithView: $e');
+      // Silencieusement ignorer les erreurs
     }
   }
 
@@ -141,9 +113,6 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
 
   @override
   Widget build(BuildContext context) {
-    print('[OSM] build() called, view.scale=${widget.view?.scale}');
-    _syncMapWithView();
-
     return FlutterMap(
       mapController: mapController,
       options: MapOptions(

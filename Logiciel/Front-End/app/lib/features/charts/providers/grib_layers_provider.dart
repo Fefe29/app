@@ -4,7 +4,7 @@ import '../../../data/datasources/gribs/grib_downloader.dart';
 /// Notifier pour afficher/masquer les GRIBs sur la carte
 class GribVisibilityNotifier extends Notifier<bool> {
   @override
-  bool build() => true;
+  bool build() => false; // GRIB désactivé par défaut
   void setVisible(bool v) => state = v;
 }
 

@@ -189,7 +189,7 @@ class SelectedMapNotifier extends Notifier<String?> {
 /// Notifier pour activer/désactiver OSeaM
 class OSeaMActiveNotifier extends Notifier<bool> {
   @override
-  bool build() => false; // OSeaM désactivé par défaut
+  bool build() => true; // OSeaM activé par défaut
 
   void setActive(bool active) {
     state = active;
@@ -203,7 +203,7 @@ class OSeaMActiveNotifier extends Notifier<bool> {
 /// Notifier pour l'affichage des cartes
 class MapDisplayNotifier extends Notifier<bool> {
   @override
-  bool build() => true;
+  bool build() => false; // Cartes téléchargées désactivées par défaut
 
   void toggle(bool show) {
     state = show;

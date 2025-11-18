@@ -122,7 +122,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   void _incrementZoom() {
     setState(() {
       _zoomFactor *= 1.25;
-      print('[ZOOM] _incrementZoom: NEW _zoomFactor=$_zoomFactor');
       _adjustTileZoomIfNeeded();
     });
   }
@@ -130,7 +129,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   void _decrementZoom() {
     setState(() {
       _zoomFactor /= 1.25;
-      print('[ZOOM] _decrementZoom: NEW _zoomFactor=$_zoomFactor');
       _adjustTileZoomIfNeeded();
     });
   }
@@ -251,7 +249,6 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
         final scale = baseScale * _zoomFactor;
         final offsetX = (constraints.maxWidth - spanX * scale) / 2 + _panOffset.dx;
         final offsetY = (constraints.maxHeight - spanY * scale) / 2 + _panOffset.dy;
-        print('[LayoutBuilder] Recalculated view: scale=$scale (baseScale=$baseScale, _zoomFactor=$_zoomFactor)');
         final view = ViewTransform(
           minX: minX,
           maxX: maxX,
@@ -340,11 +337,8 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
 
                       // OSeaM en streaming avec flutter_map
                       if (oceamActive) {
-                        final valueKey = 'oceam_${view.scale}_${view.offsetX}_${view.offsetY}';
-                        print('[Canvas.OSeaM] Rendering with flutter_map, ValueKey=$valueKey, _zoomFactor=$_zoomFactor');
-                        
                         return FlutterMapOSeaMSimple(
-                          key: ValueKey(valueKey),
+                          key: ValueKey('oceam_map'),
                           initialLatitude: 48.37,
                           initialLongitude: -4.49,
                           initialZoom: 11,
@@ -510,19 +504,18 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                   ),
 
                   // Parcours et debug
-                  RepaintBoundary(
-                    child: CustomPaint(
-                      size: Size(constraints.maxWidth, constraints.maxHeight),
-                      painter: _CoursePainter(
-                        state: course,
-                        route: route,
-                        windDirDeg: wind.directionDeg,
-                        windSpeed: wind.speed,
-                        upwindOptimalAngle: vmcUp?.angleDeg,
-                        windTrend: windTrend,
-                        mercatorService: mercatorService,
-                        view: view,
-                      ),
+                  CustomPaint(
+                    key: ValueKey('course_${view.minX}_${view.maxX}_${view.minY}_${view.maxY}_${view.scale}'),
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: _CoursePainter(
+                      state: course,
+                      route: route,
+                      windDirDeg: wind.directionDeg,
+                      windSpeed: wind.speed,
+                      upwindOptimalAngle: vmcUp?.angleDeg,
+                      windTrend: windTrend,
+                      mercatorService: mercatorService,
+                      view: view,
                     ),
                   ),
 
@@ -709,9 +702,8 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   final mapBasePath = await container.read(mapStorageDirectoryProvider.future);
   final mapPath = '$mapBasePath/${map.id}';
 
-    // BBox géographique couvrant tout le widget (projetée depuis les 4 coins du widget en pixels)
-    // On projette (0,0), (size.width,0), (0,size.height), (size.width,size.height) en coordonnées locales, puis en géographiques
-    // On élargit la bbox de 1.0 tuile de chaque côté pour éviter les bords vides
+    // BBox géographique couvrant le viewport visible
+    // Utiliser view.unproject() pour convertir les 4 coins du viewport en coordonnées locales Mercator
     const double tileMargin = 1.0;
     List<Offset> widgetCornersPx = [
       Offset(-size.width * tileMargin, -size.height * tileMargin),
@@ -719,11 +711,11 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
       Offset(-size.width * tileMargin, size.height * (1 + tileMargin)),
       Offset(size.width * (1 + tileMargin), size.height * (1 + tileMargin)),
     ];
-    // Inverse de view.project : (px, py) -> (x, y)
+    
+    // ✅ Utiliser view.unproject() pour obtenir les coordonnées Mercator correctes
     List<LocalPosition> localCorners = widgetCornersPx.map((pt) {
-      final x = ((pt.dx - view.offsetX) / view.scale) + view.minX;
-      final y = ((size.height - pt.dy - view.offsetY) / view.scale) + view.minY;
-      return LocalPosition(x: x, y: y);
+      final unprojected = view.unproject(pt.dx, pt.dy, size);
+      return LocalPosition(x: unprojected.dx, y: unprojected.dy);
     }).toList();
     
     final geoCorners = localCorners.map((lp) => mercatorService.toGeographic(lp)).toList();
@@ -1419,13 +1411,31 @@ class _CoursePainter extends CustomPainter {
   }
 
   void _drawBoundsInfo(Canvas canvas, Size size) {
-  final southWest = mercatorService.toGeographic(LocalPosition(x: view.minX, y: view.minY));
-  final northEast = mercatorService.toGeographic(LocalPosition(x: view.maxX, y: view.maxY));
+    // ✅ Calculer les bounds VISIBLES du viewport, pas les bounds du parcours
+    // Le viewport visible dépend de scale et offset, pas de minX/maxX/minY/maxY
+    
+    // Inverse de la projection: pixel corners → mercator coordinates
+    // Top-left corner (0, 0) en pixels
+    final topLeftMercator = view.unproject(0, 0, size);
+    // Bottom-right corner (width, height) en pixels
+    final bottomRightMercator = view.unproject(size.width, size.height, size);
+    
+    // Convertir en géographique
+    final topLeft = mercatorService.toGeographic(LocalPosition(x: topLeftMercator.dx, y: topLeftMercator.dy));
+    final bottomRight = mercatorService.toGeographic(LocalPosition(x: bottomRightMercator.dx, y: bottomRightMercator.dy));
+    
+    // topLeft est en haut à gauche, bottomRight en bas à droite
+    // Donc: topLeft.latitude > bottomRight.latitude (latitude décroît vers le bas)
+    //       topLeft.longitude < bottomRight.longitude (longitude croît vers la droite)
+    final minLat = bottomRight.latitude;
+    final maxLat = topLeft.latitude;
+    final minLon = topLeft.longitude;
+    final maxLon = bottomRight.longitude;
 
-  final geoTxt = 'Géo: Lat:[${southWest.latitude.toStringAsFixed(4)}° ; ${northEast.latitude.toStringAsFixed(4)}°]  '
-    'Lon:[${southWest.longitude.toStringAsFixed(4)}° ; ${northEast.longitude.toStringAsFixed(4)}°]';
+    final geoTxt = 'Géo: Lat:[${minLat.toStringAsFixed(4)}° ; ${maxLat.toStringAsFixed(4)}°]  '
+      'Lon:[${minLon.toStringAsFixed(4)}° ; ${maxLon.toStringAsFixed(4)}°]';
 
-  _drawText(canvas, geoTxt, Offset(8, size.height - 18), fontSize: 10, color: Colors.green.shade600);
+    _drawText(canvas, geoTxt, Offset(8, size.height - 18), fontSize: 10, color: Colors.green.shade600);
   }
 
   void _drawText(Canvas canvas, String text, Offset position, {double fontSize = 14, Color color = Colors.black}) {
