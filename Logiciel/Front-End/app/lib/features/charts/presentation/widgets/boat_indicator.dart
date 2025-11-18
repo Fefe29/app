@@ -2,9 +2,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../common/providers/app_providers.dart';
-import '../../../../domain/entities/telemetry.dart';
 import '../../providers/mercator_coordinate_system_provider.dart';
+import '../../providers/boat_position_provider.dart';
 import '../../domain/models/geographic_position.dart';
 import '../models/view_transform.dart';
 
@@ -253,47 +252,51 @@ class BoatIndicator extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Observe la source de télémétrie
-    final telemetryBus = ref.watch(telemetryBusProvider);
+    // Observe la source de position du bateau (NMEA ou GPS de l'appareil)
+    final boatPositionAsync = ref.watch(boatPositionProvider);
+    final boatHeadingAsync = ref.watch(boatHeadingProvider);
 
-    // Écouter le stream de snapshots pour obtenir les positions et heading en temps réel
-    return StreamBuilder<TelemetrySnapshot>(
-      stream: telemetryBus.snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
+    return boatPositionAsync.when(
+      data: (position) {
+        if (position == null) {
+          // Pas de position disponible
           return const SizedBox.shrink();
         }
 
-        final snapshotData = snapshot.data!;
-        
-        // Extraire les coordonnées et le cap du snapshot
-        final latMeasure = snapshotData.metrics['nav.lat'];
-        final lonMeasure = snapshotData.metrics['nav.lon'];
-        final hdgMeasure = snapshotData.metrics['nav.hdg'];
+        return boatHeadingAsync.when(
+          data: (heading) {
+            final geoPosition = GeographicPosition(
+              latitude: position.latitude,
+              longitude: position.longitude,
+            );
 
-        if (latMeasure == null || lonMeasure == null) {
-          return const SizedBox.shrink();
-        }
-
-        final position = GeographicPosition(
-          latitude: latMeasure.value,
-          longitude: lonMeasure.value,
+            return RepaintBoundary(
+              child: CustomPaint(
+                size: canvasSize,
+                painter: _BoatPainter(
+                  boatPosition: geoPosition,
+                  heading: heading ?? 0.0,
+                  mercatorService: mercatorService,
+                  view: view,
+                  boatSize: boatSize,
+                  boatColor: boatColor,
+                ),
+              ),
+            );
+          },
+          loading: () => const SizedBox.shrink(),
+          error: (err, stack) {
+            // ignore: avoid_print
+            print('Erreur heading: $err');
+            return const SizedBox.shrink();
+          },
         );
-        final heading = (hdgMeasure?.value) ?? 0.0;
-
-        return RepaintBoundary(
-          child: CustomPaint(
-            size: canvasSize,
-            painter: _BoatPainter(
-              boatPosition: position,
-              heading: heading,
-              mercatorService: mercatorService,
-              view: view,
-              boatSize: boatSize,
-              boatColor: boatColor,
-            ),
-          ),
-        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (err, stack) {
+        // ignore: avoid_print
+        print('Erreur position: $err');
+        return const SizedBox.shrink();
       },
     );
   }

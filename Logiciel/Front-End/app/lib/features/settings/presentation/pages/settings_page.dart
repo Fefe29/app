@@ -262,9 +262,11 @@ class _NetworkConfigTabContentState
           ),
           const SizedBox(height: 24),
 
-          // Source de position (GPS appareil ou NMEA réseau)
-          const PositionSourceWidget(),
-          const SizedBox(height: 24),
+          // Source de position (GPS appareil ou NMEA réseau) - uniquement en mode Réseau
+          if (sourceMode == TelemetrySourceMode.network) ...[
+            const PositionSourceWidget(),
+            const SizedBox(height: 24),
+          ],
           
           // Découverte automatique
           if (sourceMode == TelemetrySourceMode.network)

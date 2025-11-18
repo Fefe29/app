@@ -74,13 +74,15 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 # Configuration flutter_launcher_icons
 flutter_launcher_icons:
+  image_path: "assets/ic_launcher.png"
   android: true
   ios: true
   windows:
     generate: true
-  web:
+  macos:
     generate: true
-  image_path: "Kornog.png"
+  linux:
+    generate: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
