@@ -249,15 +249,27 @@ class _SleepTabState extends ConsumerState<_SleepTab> {
 								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
 							),
 						),
-						OutlinedButton.icon(
-							onPressed: st.running ? () => notifier.cancel() : null,
-							icon: const Icon(Icons.close),
-							label: const Text('Annuler', style: TextStyle(fontSize: 18)),
-							style: OutlinedButton.styleFrom(
-								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+						if (st.alarmActive)
+							ElevatedButton.icon(
+								onPressed: () => notifier.stopAlarm(),
+								icon: const Icon(Icons.stop_circle),
+								label: const Text('ARRÊTER ALARME', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+								style: ElevatedButton.styleFrom(
+									backgroundColor: Colors.red,
+									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+								),
 							),
-						),
+						if (!st.alarmActive)
+							OutlinedButton.icon(
+								onPressed: st.running ? () => notifier.cancel() : null,
+								icon: const Icon(Icons.close),
+								label: const Text('Annuler', style: TextStyle(fontSize: 18)),
+								style: OutlinedButton.styleFrom(
+									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+								),
+							),
 					]),
 				],
 			),

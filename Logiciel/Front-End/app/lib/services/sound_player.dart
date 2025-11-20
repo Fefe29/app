@@ -4,6 +4,8 @@ abstract class SoundPlayer {
   Future<void> playShort();
   Future<void> playDoubleShort();
   Future<void> playLong();
+  Future<void> playStart();   // Extra long beep for sequence start
+  Future<void> playFinish();  // Very long beep for finish/go
   
   /// Play a sequence of sounds with delays between them
   Future<void> playSequence(List<({String type, int delayMs})> sequence) async {
@@ -18,6 +20,10 @@ abstract class SoundPlayer {
           await playDoubleShort();
         case 'long':
           await playLong();
+        case 'start':
+          await playStart();
+        case 'finish':
+          await playFinish();
       }
     }
   }

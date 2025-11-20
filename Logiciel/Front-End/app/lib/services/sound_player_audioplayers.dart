@@ -11,12 +11,21 @@ class AudioplayersSoundPlayer implements SoundPlayer {
 
   void setMuted(bool muted) => _muted = muted;
 
-  Future<void> _playAsset(String filename) async {
+  Future<void> _playAsset(String assetPath) async {
     if (_muted) return;
     try {
-      await _audioPlayer.play(AssetSource(filename));
+      print('🔊 [AudioplayersSoundPlayer] Tentative play: $assetPath');
+      
+      // Sur Android, les assets sont préfixés avec "assets/"
+      // AssetSource les charge automatiquement depuis le bundle
+      final source = AssetSource(assetPath);
+      print('🔊 [AudioplayersSoundPlayer] Source créée: $source');
+      
+      await _audioPlayer.play(source);
+      print('✅ [AudioplayersSoundPlayer] Play appelé avec succès');
     } catch (e) {
-      print('❌ Erreur play: $e');
+      print('❌ [AudioplayersSoundPlayer] Erreur play $assetPath: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
     }
   }
 
@@ -38,6 +47,16 @@ class AudioplayersSoundPlayer implements SoundPlayer {
   @override
   Future<void> playLong() async {
     await _playAsset('sounds/beep_long.wav');
+  }
+
+  @override
+  Future<void> playStart() async {
+    await _playAsset('sounds/beep_start.wav');
+  }
+
+  @override
+  Future<void> playFinish() async {
+    await _playAsset('sounds/beep_finish.wav');
   }
 
   @override

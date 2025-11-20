@@ -51,8 +51,8 @@ class RegattaTimerNotifier extends Notifier<RegattaTimerState> {
     _lastTick = DateTime.now();
     state = state.copyWith(running: true);
     _soundPlayedAt.clear();
-    // 🔔 Démarrage: bip long
-    _sound.playLong();
+    // 🔔 Démarrage: bip extra long
+    _sound.playStart();
   }
 
   void stop() => state = state.copyWith(running: false);
@@ -78,18 +78,21 @@ class RegattaTimerNotifier extends Notifier<RegattaTimerState> {
   }
 
   void _handleSoundsForTransition({required int oldRemaining, required int newRemaining}) {
-    // ✅ Départ! (0 secondes)
+    // ✅ Départ! (0 secondes) - très long bip de finish
     if (oldRemaining > 0 && newRemaining <= 0 && !_soundPlayedAt.contains(0)) {
       _soundPlayedAt.add(0);
-      _sound.playLong();
+      _sound.playFinish();
       return;
     }
 
-    // ✅ À 1 minute exactement: bip moyen
-    if (oldRemaining > 60 && newRemaining <= 60 && !_soundPlayedAt.contains(60)) {
-      _soundPlayedAt.add(60);
-      _sound.playMedium();
-      return;
+    // ✅ Détection des repères dans la séquence
+    // Parcourir les repères et jouer le son approprié à chacun
+    for (final mark in state.sequence.marks) {
+      if (oldRemaining > mark && newRemaining <= mark && !_soundPlayedAt.contains(mark)) {
+        _soundPlayedAt.add(mark);
+        _handleMarkSound(mark);
+        return;
+      }
     }
 
     // ✅ Compte à rebours dans les 10 dernières secondes
@@ -107,6 +110,18 @@ class RegattaTimerNotifier extends Notifier<RegattaTimerState> {
         _playRepeatedShort(frequency);
       }
       return;
+    }
+  }
+
+  /// Déterminer le son approprié pour chaque repère
+  void _handleMarkSound(int secondsRemaining) {
+    // Premier repère (le plus grand) : bip long
+    final firstMark = state.sequence.marks.isNotEmpty ? state.sequence.marks.first : 0;
+    if (secondsRemaining == firstMark) {
+      _sound.playLong();
+    } else {
+      // Autres repères : bip moyen
+      _sound.playMedium();
     }
   }
 

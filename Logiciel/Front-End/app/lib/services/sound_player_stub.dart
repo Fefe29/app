@@ -15,5 +15,11 @@ class SoundPlayerStub implements iface.SoundPlayer {
   Future<void> playLong() async {}
 
   @override
+  Future<void> playStart() async {}
+
+  @override
+  Future<void> playFinish() async {}
+
+  @override
   Future<void> playSequence(List<({String type, int delayMs})> sequence) async {}
 }

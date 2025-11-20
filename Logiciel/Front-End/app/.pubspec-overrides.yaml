@@ -1,0 +1,14 @@
+# Pubspec overrides for platform-specific dependencies
+# This file allows us to exclude audioplayers on Linux while keeping it for Android/iOS/Windows
+
+# Mark audioplayers as unavailable on unsupported platforms
+dependency_overrides:
+  audioplayers:
+    sdk: flutter
+    platforms:
+      android: true
+      ios: true
+      windows: true
+      macos: false
+      linux: false
+      web: false
