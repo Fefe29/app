@@ -40,9 +40,20 @@ class AnchorAlarmNotifier extends Notifier<AnchorAlarmState> {
   @override
   AnchorAlarmState build() => const AnchorAlarmState(enabled: false, radiusMeters: 30, triggered: false);
 
-  void toggle(bool v) => state = state.copyWith(enabled: v, triggered: v ? state.triggered : false);
-  void setRadius(double r) => state = state.copyWith(radiusMeters: r);
-  void setAnchorPosition(double lat, double lon) => state = state.copyWith(anchorLat: lat, anchorLon: lon);
+  void toggle(bool v) {
+    print('🔘 Anchor alarm toggle: $v');
+    state = state.copyWith(enabled: v, triggered: v ? state.triggered : false);
+  }
+  
+  void setRadius(double r) {
+    print('📏 Anchor alarm setRadius: $r m');
+    state = state.copyWith(radiusMeters: r);
+  }
+  
+  void setAnchorPosition(double lat, double lon) {
+    print('⚓ Anchor alarm setAnchorPosition: lat=$lat, lon=$lon');
+    state = state.copyWith(anchorLat: lat, anchorLon: lon);
+  }
 
   void updateCurrentPosition(double lat, double lon) {
     if (!state.enabled || state.anchorLat == null || state.anchorLon == null) return;

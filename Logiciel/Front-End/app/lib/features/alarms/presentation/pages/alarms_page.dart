@@ -8,6 +8,8 @@ import '../../providers/sleep_timer_provider.dart';
 import '../../providers/anchor_alarm_provider.dart';
 import '../../providers/other_alarms_provider.dart';
 import 'package:kornog/common/providers/app_providers.dart';
+import 'package:kornog/features/charts/providers/boat_position_provider.dart';
+import 'package:kornog/common/services/position_formatter.dart';
 
 class AlarmsPage extends ConsumerStatefulWidget {
 	const AlarmsPage({super.key});
@@ -284,6 +286,8 @@ class _AnchorTab extends ConsumerWidget {
 	Widget build(BuildContext context, WidgetRef ref) {
 		final st = ref.watch(anchorAlarmProvider);
 		final n = ref.read(anchorAlarmProvider.notifier);
+		final boatPositionAsync = ref.watch(boatPositionProvider);
+
 		return Padding(
 			padding: const EdgeInsets.all(16),
 			child: ListView(
@@ -304,22 +308,54 @@ class _AnchorTab extends ConsumerWidget {
 						onChanged: (v) => n.setRadius(v),
 					),
 					const SizedBox(height: 12),
-					ElevatedButton.icon(
-						onPressed: () {
-						// Placeholder: récupérer GPS réel ici
-						n.setAnchorPosition(48.0, -4.5);
-					},
-						icon: const Icon(Icons.my_location),
-						label: const Text('Définir position actuelle', style: TextStyle(fontSize: 18)),
-						style: ElevatedButton.styleFrom(
-							shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-							padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-						),
+					boatPositionAsync.when(
+						data: (boatPos) {
+							if (boatPos == null) {
+								return Column(
+									mainAxisSize: MainAxisSize.min,
+									children: [
+										ElevatedButton.icon(
+											onPressed: null, // Désactivé
+											icon: const Icon(Icons.my_location),
+											label: const Text('Position GPS indisponible', style: TextStyle(fontSize: 18)),
+											style: ElevatedButton.styleFrom(
+												shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+												padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+											),
+										),
+									],
+								);
+							}
+							return ElevatedButton.icon(
+								onPressed: () {
+									print('📍 Définir position du mouillage: lat=${boatPos.latitude}, lon=${boatPos.longitude}');
+									n.setAnchorPosition(boatPos.latitude, boatPos.longitude);
+								},
+								icon: const Icon(Icons.my_location),
+								label: const Text('Définir position actuelle', style: TextStyle(fontSize: 18)),
+								style: ElevatedButton.styleFrom(
+									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+								),
+							);
+						},
+						loading: () => const Center(child: CircularProgressIndicator()),
+						error: (err, st) => Text('Erreur GPS: $err', style: const TextStyle(color: Colors.red)),
 					),
 					if (st.anchorLat != null)
 						Padding(
 							padding: const EdgeInsets.only(top: 12),
-							child: Text('Ancre: lat=${st.anchorLat}, lon=${st.anchorLon}', style: const TextStyle(fontSize: 16)),
+							child: Column(
+								crossAxisAlignment: CrossAxisAlignment.start,
+								children: [
+									const Text('⚓ Position du mouillage:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+									const SizedBox(height: 8),
+									Text(
+										formatPosition(st.anchorLat!, st.anchorLon!),
+										style: const TextStyle(fontSize: 14, fontFamily: 'monospace'),
+									),
+								],
+							),
 						),
 				],
 			),

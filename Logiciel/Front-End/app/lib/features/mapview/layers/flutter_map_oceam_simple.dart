@@ -1,12 +1,14 @@
 /// Simple intégration OpenSeaMap avec flutter_map
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'dart:math' as math;
 import '../../charts/domain/models/geographic_position.dart';
+import '../../alarms/presentation/providers/anchor_visualization_provider.dart';
 
 /// Widget OpenSeaMap simple avec flutter_map - INTÉGRÉ AU SYSTÈME DE VUE EXISTANT
-class FlutterMapOSeaMSimple extends StatefulWidget {
+class FlutterMapOSeaMSimple extends ConsumerStatefulWidget {
   final double initialLatitude;
   final double initialLongitude;
   final double initialZoom;
@@ -25,10 +27,10 @@ class FlutterMapOSeaMSimple extends StatefulWidget {
   });
 
   @override
-  State<FlutterMapOSeaMSimple> createState() => _FlutterMapOSeaMSimpleState();
+  ConsumerState<FlutterMapOSeaMSimple> createState() => _FlutterMapOSeaMSimpleState();
 }
 
-class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
+class _FlutterMapOSeaMSimpleState extends ConsumerState<FlutterMapOSeaMSimple> {
   late MapController mapController;
 
   @override
@@ -82,6 +84,106 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
     }
   }
 
+  List<Widget> _buildAnchorLayers(AnchorVisualization anchorViz) {
+    if (!anchorViz.visible) {
+      return [];
+    }
+    
+    if (anchorViz.latitude == 0.0 && anchorViz.longitude == 0.0) {
+      return [];
+    }
+
+    final anchorPoint = LatLng(anchorViz.latitude, anchorViz.longitude);
+
+    return [
+      // Cercle de la zone de mouillage
+      CircleLayer(
+        circles: [
+          CircleMarker(
+            point: anchorPoint,
+            radius: anchorViz.radiusMeters, // Rayon en mètres
+            useRadiusInMeter: true,
+            color: anchorViz.triggered
+                ? Colors.red.withOpacity(0.4)   // Rouge si déclenché (plus opaque)
+                : Colors.blue.withOpacity(0.35),  // Bleu sinon (plus opaque)
+            borderColor: anchorViz.triggered
+                ? Colors.red.withOpacity(0.9)
+                : Colors.blue.withOpacity(0.8),
+            borderStrokeWidth: 3.0,  // Plus épais
+          ),
+        ],
+      ),
+      
+      // Marqueur de l'ancre au centre
+      MarkerLayer(
+        markers: [
+          Marker(
+            point: anchorPoint,
+            width: 50,
+            height: 50,
+            alignment: Alignment.center,
+            child: GestureDetector(
+              onTap: () {
+                print('⚓ Ancre tapée à: $anchorPoint');
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Cercle de fond blanc
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(
+                        color: anchorViz.triggered ? Colors.red : Colors.blue,
+                        width: 3,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.anchor,
+                      color: anchorViz.triggered ? Colors.red : Colors.blue,
+                      size: 28,
+                    ),
+                  ),
+                  // Badge d'alerte si dérive
+                  if (anchorViz.triggered)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.red,
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        padding: const EdgeInsets.all(2),
+                        child: const Text(
+                          '!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
   double _estimateZoomFromSpan(double spanX, double spanY, Size canvasSize) {
     // Utiliser le scale du ViewTransform pour estimer le zoom
     // Plus le scale est grand, plus le zoom est élevé
@@ -125,6 +227,9 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
     final zoomAdjustment = math.log(widget.view.scale / 0.19277) / math.ln2;
     final initialZoom = (baseZoom + zoomAdjustment).clamp(1.0, 20.0);
 
+    // Récupérer les données de l'ancre
+    final anchorViz = ref.watch(anchorVisualizationProvider);
+
     return FlutterMap(
       mapController: mapController,
       options: MapOptions(
@@ -149,6 +254,9 @@ class _FlutterMapOSeaMSimpleState extends State<FlutterMapOSeaMSimple> {
           userAgentPackageName: 'kornog.app',
           maxZoom: 18.0,
         ),
+        
+        // 🔵 Layer de visualisation de l'ancre et zone de mouillage
+        ..._buildAnchorLayers(anchorViz),
       ],
     );
   }

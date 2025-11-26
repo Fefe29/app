@@ -11,6 +11,7 @@ import '../../../charts/providers/course_providers.dart';
 import '../../../charts/providers/route_plan_provider.dart';
 import '../../../charts/providers/polar_providers.dart';
 import '../../../charts/providers/wind_trend_provider.dart';
+import '../../../charts/providers/boat_position_provider.dart';
 import '../../../charts/domain/services/routing_calculator.dart';
 import '../../../charts/domain/services/wind_trend_analyzer.dart';
 import '../../domain/models/course.dart';
@@ -59,6 +60,9 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   Offset? _lastPanPosition;
   double _zoomFactor = 1.0; // 1.0 = normal, >1 = zoom in, <1 = zoom out
   int _tileZoomOffset = 0; // Décalage de zoom OSM
+  
+  // Mode suivi du bateau
+  bool _followingBoat = false; // true = suivre le bateau, false = navigation libre
   
   // Mouse tracking pour le vent sous le curseur
   Offset? _mousePosition;
@@ -181,6 +185,26 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
     final mercatorService = ref.watch(mercatorCoordinateSystemProvider);
     final activeMap = ref.watch(activeMapProvider);
     final displayMaps = ref.watch(mapDisplayProvider);
+    final boatPositionAsync = ref.watch(boatPositionProvider);
+    
+    // Logique de suivi du bateau : si le mode suivi est actif et qu'on a une position de bateau,
+    // centrer la vue sur le bateau à chaque changement de position
+    if (_followingBoat) {
+      boatPositionAsync.whenData((boatPos) {
+        if (boatPos != null) {
+          // Convertir position géo → local Mercator
+          final boatLocal = mercatorService.toLocal(
+            GeographicPosition(
+              latitude: boatPos.latitude,
+              longitude: boatPos.longitude,
+            ),
+          );
+          print('🎯 [FollowBoat] Position du bateau: local=(${boatLocal.x.toStringAsFixed(2)}, ${boatLocal.y.toStringAsFixed(2)})');
+          // La logique d'ajustement du pan sera faite dans le LayoutBuilder
+          // où on aura accès à la vue et aux dimensions du canvas
+        }
+      });
+    }
     
     // Auto-load GRIB grids on startup ONLY
     // (autoLoadGribFromActiveDirectoryProvider removed - was causing continuous re-triggers)
@@ -263,6 +287,44 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
         _currentView = view;
         _currentCanvasSize = Size(constraints.maxWidth, constraints.maxHeight);
         
+        // Logique de suivi du bateau : si le mode suivi est actif, centrer sur le bateau
+        if (_followingBoat) {
+          boatPositionAsync.whenData((boatPos) {
+            if (boatPos != null) {
+              // Convertir position du bateau en coordonnées locales Mercator
+              final boatLocal = mercatorService.toLocal(
+                GeographicPosition(
+                  latitude: boatPos.latitude,
+                  longitude: boatPos.longitude,
+                ),
+              );
+              
+              // Position du bateau en pixels à l'écran selon la vue actuelle
+              final boatPixelX = (boatLocal.x - view.minX) * view.scale + view.offsetX;
+              final boatPixelY = constraints.maxHeight - ((boatLocal.y - view.minY) * view.scale + view.offsetY);
+              
+              // Centre de l'écran
+              final centerX = constraints.maxWidth / 2;
+              final centerY = constraints.maxHeight / 2;
+              
+              // Delta nécessaire pour centrer le bateau
+              final deltaX = centerX - boatPixelX;
+              final deltaY = centerY - boatPixelY;
+              
+              // Ajuster le pan pour centrer le bateau
+              // Seuil de 5 pixels pour éviter les micro-ajustements constants
+              if (deltaX.abs() > 5 || deltaY.abs() > 5) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  setState(() {
+                    _panOffset += Offset(deltaX, -deltaY);
+                    print('🎯 [FollowBoat] Centrage du bateau: deltaX=$deltaX, deltaY=$deltaY');
+                  });
+                });
+              }
+            }
+          });
+        }
+        
   int baseTileZoom = activeMap?.zoomLevel ?? 10;
   int tileZoom = (baseTileZoom + _tileZoomOffset).clamp(1, 20);
 
@@ -294,6 +356,12 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                   // Inverser le déplacement vertical (Y)
                   _panOffset += Offset(delta.dx, -delta.dy);
                   _lastPanPosition = details.focalPoint;
+                  
+                  // Si l'utilisateur navigue manuellement, désactiver le suivi du bateau
+                  if (_followingBoat && delta.distance > 0.5) {
+                    _followingBoat = false;
+                    print('🎯 [FollowBoat] Mode suivi désactivé (navigation manuelle détectée)');
+                  }
                 }
                 // Zoom (pinch) adouci : on réduit la sensibilité du facteur de scale
                 if (details.scale != 1.0) {
@@ -531,20 +599,81 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                   Positioned(
                     right: 16,
                     bottom: 32,
-                    child: Column(
-                      children: [
-                        ZoomButton(
-                          icon: Icons.add,
-                          onTap: _incrementZoom,
-                          tooltip: 'Zoomer',
-                        ),
-                        SizedBox(height: 8),
-                        ZoomButton(
-                          icon: Icons.remove,
-                          onTap: _decrementZoom,
-                          tooltip: 'Dézoomer',
-                        ),
-                      ],
+                    child: Consumer(
+                      builder: (context, consumerRef, child) {
+                        // Créer la fonction callback pour centrer sur le bateau ou désactiver le suivi
+                        final onCenterBoat = () {
+                          if (_followingBoat) {
+                            // Désactiver le suivi
+                            setState(() {
+                              _followingBoat = false;
+                              print('🎯 [FollowBoat] Mode suivi désactivé');
+                            });
+                          } else {
+                            // Activer le suivi
+                            print('🎯 [CenterBoat] Bouton cliqué');
+                            final boatPositionAsync = consumerRef.read(boatPositionProvider);
+                            print('🎯 [CenterBoat] boatPositionAsync = $boatPositionAsync');
+                            
+                            boatPositionAsync.when(
+                              data: (boatPos) {
+                                print('🎯 [CenterBoat] Data: boatPos = $boatPos');
+                                if (boatPos != null) {
+                                  print('🎯 [CenterBoat] Centrage en cours: lat=${boatPos.latitude}, lon=${boatPos.longitude}');
+                                  setState(() {
+                                    _panOffset = Offset.zero;
+                                    _followingBoat = true;
+                                    print('🎯 [CenterBoat] ✅ Mode suivi activé (followingBoat=true)');
+                                  });
+                                } else {
+                                  print('🎯 [CenterBoat] ⚠️ Position du bateau est null');
+                                }
+                              },
+                              loading: () {
+                                print('🎯 [CenterBoat] ⏳ Chargement de la position...');
+                              },
+                              error: (err, st) {
+                                print('🎯 [CenterBoat] ❌ Erreur: $err\n$st');
+                              },
+                            );
+                          }
+                        };
+
+                        // Couleur du bouton selon l'état du suivi
+                        final buttonColor = _followingBoat ? Colors.blue : Colors.white;
+                        final iconColor = _followingBoat ? Colors.white : Colors.black;
+
+                        return Column(
+                          children: [
+                            // Bouton de suivi du bateau avec état visuel
+                            Material(
+                              color: buttonColor,
+                              shape: const CircleBorder(),
+                              elevation: 2,
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: onCenterBoat,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(10),
+                                  child: Icon(Icons.my_location, color: iconColor, size: 28),
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            ZoomButton(
+                              icon: Icons.add,
+                              onTap: _incrementZoom,
+                              tooltip: 'Zoomer',
+                            ),
+                            SizedBox(height: 8),
+                            ZoomButton(
+                              icon: Icons.remove,
+                              onTap: _decrementZoom,
+                              tooltip: 'Dézoomer',
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
