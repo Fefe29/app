@@ -30,6 +30,7 @@ import 'package:kornog/data/datasources/telemetry/json_telemetry_storage.dart';
 import 'package:kornog/data/datasources/telemetry/telemetry_recorder.dart';
 import 'package:kornog/data/datasources/telemetry/telemetry_bus.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
+import 'package:kornog/features/telemetry_recording/models/recording_options.dart';
 import 'package:kornog/common/providers/app_providers.dart'
     show telemetryBusProvider;
 import 'package:kornog/common/kornog_data_directory.dart'
@@ -130,7 +131,7 @@ class RecordingStateNotifier extends Notifier<RecorderState> {
   RecorderState get current => state;
 
   /// Démarrer un nouvel enregistrement
-  Future<void> startRecording(String sessionId) async {
+  Future<void> startRecording(String sessionId, [RecordingOptions? options]) async {
     print('📱 [RecordingStateNotifier] startRecording($sessionId)');
     var recorder = ref.read(telemetryRecorderProvider);
     
@@ -154,7 +155,7 @@ class RecordingStateNotifier extends Notifier<RecorderState> {
 
     try {
       print('� [RecordingStateNotifier] Appel recorder.startRecording()...');
-      await recorder.startRecording(sessionId);
+      await recorder.startRecording(sessionId, options);
       print('✅ [RecordingStateNotifier] recorder.startRecording() terminé');
       
       // PUIS on change l'état APRÈS que le recorder soit vraiment en enregistrement

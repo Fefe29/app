@@ -12,6 +12,7 @@ import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_
 import 'package:kornog/features/analysis/providers/analysis_filters.dart';
 import 'package:kornog/data/datasources/telemetry/telemetry_recorder.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
+import 'package:kornog/features/telemetry_recording/presentation/dialogs/recording_session_dialog.dart';
 
 // ============================================================================
 // RECORDING CONTROLS WIDGET
@@ -38,46 +39,17 @@ class RecordingControlsWidget extends ConsumerWidget {
             // Status indicator
             _StatusIndicator(state: recordingState),
             const SizedBox(height: 16),
-            // Control buttons
+            // Bouton unique pour afficher le dialog
             Row(
               children: [
-                if (recordingState == RecorderState.idle)
-                  ElevatedButton.icon(
-                    onPressed: () => _startRecording(context, ref),
-                    icon: const Icon(Icons.fiber_manual_record),
-                    label: const Text('Démarrer'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                    ),
-                  )
-                else if (recordingState == RecorderState.recording)
-                  ElevatedButton.icon(
-                    onPressed: () => _stopRecording(context, ref),
-                    icon: const Icon(Icons.stop),
-                    label: const Text('Arrêter'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                    ),
+                ElevatedButton.icon(
+                  onPressed: () => _showRecordingDialog(context),
+                  icon: const Icon(Icons.settings),
+                  label: const Text('Gérer l\'enregistrement'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
                   ),
-                if (recordingState == RecorderState.recording) ...[
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => _pauseRecording(ref),
-                    icon: const Icon(Icons.pause),
-                    label: const Text('Pause'),
-                  ),
-                ]
-                else if (recordingState == RecorderState.paused) ...[
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => _resumeRecording(ref),
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Reprendre'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                    ),
-                  ),
-                ],
+                ),
               ],
             ),
           ],
@@ -86,84 +58,11 @@ class RecordingControlsWidget extends ConsumerWidget {
     );
   }
 
-  Future<void> _startRecording(BuildContext context, WidgetRef ref) async {
-    final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
-    final recorder = ref.read(recordingStateProvider.notifier);
-    
-    print('🎬 [RecordingControlsWidget] Démarrage enregistrement: $sessionId');
-    
-    try {
-      print('📱 [RecordingControlsWidget] Appel recorder.startRecording()...');
-      await recorder.startRecording(sessionId);
-      print('✅ [RecordingControlsWidget] Enregistrement démarré avec succès');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Enregistrement démarré: $sessionId')),
-        );
-      }
-    } catch (e, st) {
-      print('❌ [RecordingControlsWidget] Erreur démarrage: $e');
-      print('   StackTrace: $st');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Erreur: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _stopRecording(BuildContext context, WidgetRef ref) async {
-    final recorder = ref.read(recordingStateProvider.notifier);
-    
-    print('🛑 [RecordingControlsWidget] Arrêt enregistrement demandé');
-    
-    try {
-      print('📱 [RecordingControlsWidget] Appel recorder.stopRecording()...');
-      final metadata = await recorder.stopRecording();
-      print('✅ [RecordingControlsWidget] Enregistrement arrêté:');
-      print('   - Snapshots: ${metadata.snapshotCount}');
-      print('   - Taille: ${metadata.sizeBytes} bytes');
-      print('   - SessionId: ${metadata.sessionId}');
-      
-      // Invalider le cache des sessions pour afficher la nouvelle
-      print('🔄 [RecordingControlsWidget] Invalidation du cache sessions...');
-      ref.invalidate(sessionsListProvider);
-      ref.invalidate(totalStorageSizeProvider);
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ Enregistrement arrêté: ${metadata.snapshotCount} points')),
-        );
-      }
-    } catch (e, st) {
-      print('❌ [RecordingControlsWidget] Erreur arrêt: $e');
-      print('   StackTrace: $st');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Erreur: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  void _pauseRecording(WidgetRef ref) {
-    print('⏸️ [RecordingControlsWidget] Pause demandée');
-    try {
-      ref.read(recordingStateProvider.notifier).pauseRecording();
-      print('✅ [RecordingControlsWidget] Pause activée');
-    } catch (e) {
-      print('❌ [RecordingControlsWidget] Erreur pause: $e');
-    }
-  }
-
-  void _resumeRecording(WidgetRef ref) {
-    print('▶️ [RecordingControlsWidget] Reprise demandée');
-    try {
-      ref.read(recordingStateProvider.notifier).resumeRecording();
-      print('✅ [RecordingControlsWidget] Reprise activée');
-    } catch (e) {
-      print('❌ [RecordingControlsWidget] Erreur reprise: $e');
-    }
+  void _showRecordingDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const RecordingSessionDialog(),
+    );
   }
 }
 

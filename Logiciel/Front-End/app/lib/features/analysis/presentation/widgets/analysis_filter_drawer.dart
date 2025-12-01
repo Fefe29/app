@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/analysis_filters.dart';
 import '../widgets/telemetry_widgets.dart';
 import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_providers.dart';
+import 'package:kornog/features/telemetry_recording/presentation/dialogs/recording_session_dialog.dart';
+import 'package:kornog/data/datasources/telemetry/telemetry_recorder.dart';
 
 class AnalysisFilterDrawer extends ConsumerWidget {
   const AnalysisFilterDrawer({super.key});
@@ -283,17 +285,42 @@ class AnalysisFilterDrawer extends ConsumerWidget {
             
             const SizedBox(height: 8),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _showRecordingDialog(context);
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  showDialog(
+                    context: context,
+                    builder: (context) => const RecordingSessionDialog(),
+                  );
+                },
+                icon: Consumer(
+                  builder: (context, ref, _) {
+                    final recordingState = ref.watch(recordingStateProvider);
+                    final Color indicatorColor = switch (recordingState) {
+                      RecorderState.idle => Colors.red,
+                      RecorderState.recording => Colors.green,
+                      RecorderState.paused => Colors.orange,
+                      RecorderState.error => Colors.red,
+                    };
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: indicatorColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.timer),
+                      ],
+                    );
                   },
-                  icon: const Icon(Icons.fiber_manual_record),
-                  label: const Text('⏱️ Enregistrement'),
                 ),
+                label: const Text('Enregistrement'),
               ),
             ),
             
@@ -361,43 +388,6 @@ class AnalysisFilterDrawer extends ConsumerWidget {
     }
     
     return '${selected.length} métriques: ${selected.take(2).join(', ')}${selected.length > 2 ? '...' : ''}';
-  }
-
-  void _showRecordingDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('⏱️ Enregistrement'),
-        content: const SizedBox(
-          height: 300,
-          width: 400,
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                RecordingControlsWidget(),
-                SizedBox(height: 24),
-                Text(
-                  '''• Cliquez sur "Démarrer" pour commencer un nouvel enregistrement
-• Le système sauvegarde automatiquement les données du bateau
-• Utilisez "Pause" pour interrompre temporairement
-• Cliquez sur "Arrêter" quand vous avez terminé
-• Les sessions sont stockées en format compressé dans ~/.kornog/telemetry/
-
-Une fois arrêtée, la session est disponible dans la gestion pour export ou analyse.''',
-                  style: TextStyle(color: Colors.grey, height: 1.6, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showSessionManagementDialog(BuildContext context) {

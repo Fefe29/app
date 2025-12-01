@@ -22,6 +22,7 @@
 import 'dart:async';
 import 'package:kornog/data/datasources/telemetry/telemetry_bus.dart';
 import 'package:kornog/domain/entities/telemetry.dart';
+import 'package:kornog/features/telemetry_recording/models/recording_options.dart';
 import 'telemetry_storage.dart';
 
 /// Callback pour notifier du progrès
@@ -73,6 +74,7 @@ class TelemetryRecorder {
   final List<RecorderError> _errors = [];
   Future<void>? _saveFuture; // 🆕 Track la Future de saveSession
   StreamController<TelemetrySnapshot>? _controller; // 🆕 Pour fermer le stream
+  RecordingOptions _recordingOptions = const RecordingOptions(); // Options d'enregistrement
 
   /// État actuel
   RecorderState get state => _state;
@@ -96,8 +98,11 @@ class TelemetryRecorder {
   ///
   /// Lance une exception si une session est déjà en cours d'enregistrement.
   /// Crée une nouvelle session et commence à sauvegarder les snapshots du bus.
-  Future<void> startRecording(String sessionId) async {
+  /// 
+  /// [options] définit quels types de données enregistrer (par défaut tout)
+  Future<void> startRecording(String sessionId, [RecordingOptions? options]) async {
     print('🔴 [TelemetryRecorder] Démarrage enregistrement: $sessionId');
+    print('   Options: ${options ?? const RecordingOptions()}');
     
     if (_state != RecorderState.idle) {
       print('❌ [TelemetryRecorder] État invalide: $_state');
@@ -111,6 +116,7 @@ class TelemetryRecorder {
       throw Exception('Session $sessionId existe déjà');
     }
 
+    _recordingOptions = options ?? const RecordingOptions();
     _state = RecorderState.recording;
     _currentSessionId = sessionId;
     _recordingStartTime = DateTime.now();
@@ -127,7 +133,27 @@ class TelemetryRecorder {
     // S'abonner au bus et ajouter les snapshots au contrôleur
     _subscription = telemetryBus.snapshots().listen(
       (snapshot) {
-        controller.add(snapshot);
+        // Filtrer les métriques selon les options d'enregistrement
+        final filteredMetrics = <String, Measurement>{};
+        for (final entry in snapshot.metrics.entries) {
+          if (_recordingOptions.shouldRecord(entry.key)) {
+            filteredMetrics[entry.key] = entry.value;
+          }
+        }
+
+        // Si aucune métrique à enregistrer après filtrage, ignorer ce snapshot
+        if (filteredMetrics.isEmpty) {
+          print('🚫 [TelemetryRecorder] Snapshot ignoré (aucune métrique sélectionnée)');
+          return;
+        }
+
+        // Créer un snapshot filtré et l'ajouter au controller
+        final filteredSnapshot = TelemetrySnapshot(
+          ts: snapshot.ts,
+          metrics: filteredMetrics,
+          tags: snapshot.tags,
+        );
+        controller.add(filteredSnapshot);
         _snapshotCount++;
 
         if (_snapshotCount % 50 == 0) {

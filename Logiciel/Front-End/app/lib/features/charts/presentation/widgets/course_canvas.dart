@@ -32,6 +32,7 @@ import '../../../../data/datasources/gribs/viewport_wind_grid.dart';
 import '../../../../data/datasources/gribs/viewport_wind_arrows_painter.dart';
 import '../../../../data/datasources/gribs/viewport_wind_heatmap_painter.dart';
 import 'boat_indicator.dart';
+import 'boat_trace_indicator.dart';
 import '../../../../data/datasources/gribs/grib_interpolation_service.dart';
 import '../../../../data/datasources/gribs/viewport_wind_grid_provider.dart';
 import '../../../../data/datasources/gribs/grib_time_slider_widget.dart';
@@ -585,6 +586,15 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                       mercatorService: mercatorService,
                       view: view,
                     ),
+                  ),
+
+                  // Trace du bateau (historique de la trajectoire)
+                  BoatTraceIndicator(
+                    view: view,
+                    canvasSize: Size(constraints.maxWidth, constraints.maxHeight),
+                    mercatorService: mercatorService,
+                    traceColor: Colors.red.withOpacity(0.7),
+                    traceWidth: 2.0,
                   ),
 
                   // Position du bateau avec indicateur visuel
