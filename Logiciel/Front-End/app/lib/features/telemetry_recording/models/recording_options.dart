@@ -17,12 +17,16 @@ class RecordingOptions {
   /// Autres données (météo, marées, etc)
   final bool recordOther;
 
+  /// Trace GPS (affichage graphique de la route)
+  final bool recordTrace;
+
   const RecordingOptions({
     this.recordPosition = true,
     this.recordWind = true,
     this.recordPerformance = true,
     this.recordSystem = false,
     this.recordOther = false,
+    this.recordTrace = true,
   });
 
   /// Tout enregistrer
@@ -32,6 +36,7 @@ class RecordingOptions {
     recordPerformance: true,
     recordSystem: true,
     recordOther: true,
+    recordTrace: true,
   );
 
   /// Rien enregistrer
@@ -41,6 +46,7 @@ class RecordingOptions {
     recordPerformance: false,
     recordSystem: false,
     recordOther: false,
+    recordTrace: false,
   );
 
   /// Profil minimal (position + vent + performance)
@@ -50,6 +56,7 @@ class RecordingOptions {
     recordPerformance: true,
     recordSystem: false,
     recordOther: false,
+    recordTrace: true,
   );
 
   /// Copier avec modifications
@@ -59,12 +66,14 @@ class RecordingOptions {
     bool? recordPerformance,
     bool? recordSystem,
     bool? recordOther,
+    bool? recordTrace,
   }) => RecordingOptions(
     recordPosition: recordPosition ?? this.recordPosition,
     recordWind: recordWind ?? this.recordWind,
     recordPerformance: recordPerformance ?? this.recordPerformance,
     recordSystem: recordSystem ?? this.recordSystem,
     recordOther: recordOther ?? this.recordOther,
+    recordTrace: recordTrace ?? this.recordTrace,
   );
 
   /// Déterminer si une métrique doit être enregistrée

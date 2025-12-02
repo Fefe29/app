@@ -82,6 +82,9 @@ class TelemetryRecorder {
   /// Session actuelle (null si pas en enregistrement)
   String? get currentSessionId => _currentSessionId;
 
+  /// Options d'enregistrement actuelles
+  RecordingOptions get recordingOptions => _recordingOptions;
+
   /// Nombre de snapshots enregistrés
   int get snapshotCount => _snapshotCount;
 

@@ -156,6 +156,9 @@ class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
     if (shallow && !state.depth.triggered) {
       _sound.playMedium(); // Alarme profondeur
       state = state.copyWith(depth: state.depth.copyWith(triggered: true, lastDepth: m.value));
+    } else if (!shallow && state.depth.triggered) {
+      // Reset alarm when depth goes back above threshold
+      state = state.copyWith(depth: state.depth.copyWith(triggered: false, lastDepth: m.value));
     } else {
       state = state.copyWith(depth: state.depth.copyWith(lastDepth: m.value));
     }
@@ -167,16 +170,33 @@ class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
     final baseline = ws.baselineDir ?? m.value;
     final diff = _angleDiffAbs(baseline, m.value);
     final triggered = diff >= ws.thresholdDeg;
+    
     if (triggered && !ws.triggered) {
       _sound.playMedium(); // Alarme shift vent
+      state = state.copyWith(
+        windShift: ws.copyWith(
+          baselineDir: baseline,
+          currentDiffAbs: diff,
+          triggered: true,
+        ),
+      );
+    } else if (!triggered && ws.triggered) {
+      // Reset alarm when shift goes back below threshold
+      state = state.copyWith(
+        windShift: ws.copyWith(
+          baselineDir: baseline,
+          currentDiffAbs: diff,
+          triggered: false,
+        ),
+      );
+    } else {
+      state = state.copyWith(
+        windShift: ws.copyWith(
+          baselineDir: baseline,
+          currentDiffAbs: diff,
+        ),
+      );
     }
-    state = state.copyWith(
-      windShift: ws.copyWith(
-        baselineDir: baseline,
-        currentDiffAbs: diff,
-        triggered: ws.triggered || triggered,
-      ),
-    );
   }
 
   void _onWindSpeed(Measurement m) {
@@ -186,6 +206,9 @@ class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
       if (dropTrig && !state.windDrop.triggered) {
         _sound.playShort(); // Alarme vent faible
         state = state.copyWith(windDrop: state.windDrop.copyWith(triggered: true, lastValue: m.value));
+      } else if (!dropTrig && state.windDrop.triggered) {
+        // Reset alarm when wind rises back above threshold
+        state = state.copyWith(windDrop: state.windDrop.copyWith(triggered: false, lastValue: m.value));
       } else {
         state = state.copyWith(windDrop: state.windDrop.copyWith(lastValue: m.value));
       }
@@ -196,6 +219,9 @@ class OtherAlarmsNotifier extends Notifier<OtherAlarmsState> {
       if (raiseTrig && !state.windRaise.triggered) {
         _sound.playShort(); // Alarme vent fort
         state = state.copyWith(windRaise: state.windRaise.copyWith(triggered: true, lastValue: m.value));
+      } else if (!raiseTrig && state.windRaise.triggered) {
+        // Reset alarm when wind drops back below threshold
+        state = state.copyWith(windRaise: state.windRaise.copyWith(triggered: false, lastValue: m.value));
       } else {
         state = state.copyWith(windRaise: state.windRaise.copyWith(lastValue: m.value));
       }

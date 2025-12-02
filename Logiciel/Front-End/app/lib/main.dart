@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:kornog/data/datasources/telemetry/json_telemetry_storage.dart';
 import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_providers.dart';
 import 'package:kornog/features/analysis/domain/services/wind_history_service.dart';
+import 'package:kornog/features/alarms/presentation/widgets/alarm_alert_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +55,15 @@ class App extends ConsumerWidget {
       darkTheme: theme.dark,
       themeMode: themeMode,
       routerConfig: router,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            child ?? const SizedBox(),
+            // Overlay pour les alertes d'alarmes (visible partout)
+            const AlarmAlertOverlay(),
+          ],
+        );
+      },
     );
   }
 }

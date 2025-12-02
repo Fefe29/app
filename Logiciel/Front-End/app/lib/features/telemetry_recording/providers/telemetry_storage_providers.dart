@@ -220,6 +220,19 @@ final recordingStateProvider = NotifierProvider<
 // Provider pour l'ID de la session en cours d'enregistrement
 // ============================================================================
 
+/// Provider pour obtenir les options d'enregistrement actuelles
+final currentRecordingOptionsProvider = Provider<RecordingOptions?>((ref) {
+  final recorder = ref.watch(telemetryRecorderProvider);
+  final state = ref.watch(recordingStateProvider);
+  
+  // Retourner les options uniquement si en enregistrement ET recorder existe
+  if (recorder != null && state == RecorderState.recording) {
+    return recorder.recordingOptions;
+  }
+  
+  return null;
+});
+
 /// Provider pour obtenir l'ID de la session en cours d'enregistrement
 final currentRecordingSessionIdProvider = Provider<String?>((ref) {
   final recorder = ref.watch(telemetryRecorderProvider);

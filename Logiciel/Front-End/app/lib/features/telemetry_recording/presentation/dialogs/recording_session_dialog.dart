@@ -31,15 +31,15 @@ class _RecordingSessionDialogState
     final isActive = recordingState != RecorderState.idle;
 
     return Dialog(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Titre avec statut
-              Row(
+      child: SizedBox(
+        width: 500,
+        height: 600,
+        child: Column(
+          children: [
+            // Header - Titre avec bouton fermer
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
@@ -53,114 +53,136 @@ class _RecordingSessionDialogState
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-
-              // Options de sélection (désactivées pendant l'enregistrement)
-              AbsorbPointer(
-                absorbing: isActive,
-                child: Opacity(
-                  opacity: isActive ? 0.5 : 1.0,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Données à enregistrer :',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[700],
+            ),
+            
+            // Contenu scrollable
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Options de sélection (désactivées pendant l'enregistrement)
+                    AbsorbPointer(
+                      absorbing: isActive,
+                      child: Opacity(
+                        opacity: isActive ? 0.5 : 1.0,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Données à enregistrer :',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _CheckboxTile(
+                              title: '📍 Position (GPS)',
+                              subtitle: 'Latitude, longitude, altitude',
+                              value: options.recordPosition,
+                              onChanged: (val) {
+                                setState(() {
+                                  options = options.copyWith(recordPosition: val);
+                                });
+                              },
+                            ),
+                            _CheckboxTile(
+                              title: '💨 Vent',
+                              subtitle: 'Direction et force du vent',
+                              value: options.recordWind,
+                              onChanged: (val) {
+                                setState(() {
+                                  options = options.copyWith(recordWind: val);
+                                });
+                              },
+                            ),
+                            _CheckboxTile(
+                              title: '🚤 Performance',
+                              subtitle: 'Vitesse, cap, direction',
+                              value: options.recordPerformance,
+                              onChanged: (val) {
+                                setState(() {
+                                  options = options.copyWith(recordPerformance: val);
+                                });
+                              },
+                            ),
+                            _CheckboxTile(
+                              title: '⚙️ Système',
+                              subtitle: 'Moteur, électrique, batterie',
+                              value: options.recordSystem,
+                              onChanged: (val) {
+                                setState(() {
+                                  options = options.copyWith(recordSystem: val);
+                                });
+                              },
+                            ),
+                            _CheckboxTile(
+                              title: '📊 Autres',
+                              subtitle: 'Météo, marées, autres données',
+                              value: options.recordOther,
+                              onChanged: (val) {
+                                setState(() {
+                                  options = options.copyWith(recordOther: val);
+                                });
+                              },
+                            ),
+                            _CheckboxTile(
+                              title: '🗺️ Trace GPS',
+                              subtitle: 'Affichage de la route tracée',
+                              value: options.recordTrace,
+                              onChanged: (val) {
+                                setState(() {
+                                  options = options.copyWith(recordTrace: val);
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            // Profils rapides (uniquement quand inactif)
+                            if (!isActive)
+                              _QuickProfiles(
+                                onMinimal: () {
+                                  setState(() {
+                                    options = RecordingOptions.minimal();
+                                  });
+                                },
+                                onAll: () {
+                                  setState(() {
+                                    options = RecordingOptions.all();
+                                  });
+                                },
+                                onNone: () {
+                                  setState(() {
+                                    options = RecordingOptions.none();
+                                  });
+                                },
+                              ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _CheckboxTile(
-                        title: '📍 Position (GPS)',
-                        subtitle: 'Latitude, longitude, altitude',
-                        value: options.recordPosition,
-                        onChanged: (val) {
-                          setState(() {
-                            options = options.copyWith(recordPosition: val);
-                          });
-                        },
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Résumé des données sélectionnées
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      _CheckboxTile(
-                        title: '💨 Vent',
-                        subtitle: 'Direction et force du vent',
-                        value: options.recordWind,
-                        onChanged: (val) {
-                          setState(() {
-                            options = options.copyWith(recordWind: val);
-                          });
-                        },
-                      ),
-                      _CheckboxTile(
-                        title: '🚤 Performance',
-                        subtitle: 'Vitesse, cap, direction',
-                        value: options.recordPerformance,
-                        onChanged: (val) {
-                          setState(() {
-                            options = options.copyWith(recordPerformance: val);
-                          });
-                        },
-                      ),
-                      _CheckboxTile(
-                        title: '⚙️ Système',
-                        subtitle: 'Moteur, électrique, batterie',
-                        value: options.recordSystem,
-                        onChanged: (val) {
-                          setState(() {
-                            options = options.copyWith(recordSystem: val);
-                          });
-                        },
-                      ),
-                      _CheckboxTile(
-                        title: '📊 Autres',
-                        subtitle: 'Météo, marées, autres données',
-                        value: options.recordOther,
-                        onChanged: (val) {
-                          setState(() {
-                            options = options.copyWith(recordOther: val);
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      // Profils rapides (uniquement quand inactif)
-                      if (!isActive)
-                        _QuickProfiles(
-                          onMinimal: () {
-                            setState(() {
-                              options = RecordingOptions.minimal();
-                            });
-                          },
-                          onAll: () {
-                            setState(() {
-                              options = RecordingOptions.all();
-                            });
-                          },
-                          onNone: () {
-                            setState(() {
-                              options = RecordingOptions.none();
-                            });
-                          },
-                        ),
-                    ],
-                  ),
+                      child: _buildSummary(),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
-
-              // Résumé des données sélectionnées
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: _buildSummary(),
-              ),
-              const SizedBox(height: 24),
-
-              // Boutons d'action
-              _buildActionButtons(context, recordingState),
-            ],
-          ),
+            ),
+            
+            // Footer - Boutons d'action toujours visibles
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: _buildActionButtons(context, recordingState),
+            ),
+          ],
         ),
       ),
     );
