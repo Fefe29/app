@@ -38,6 +38,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final idx = _indexFromLocation(widget.location);
+    // Responsive label size for bottom navigation
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Choose a font size proportional to width, clamp between 12 and 18
+    final navLabelSize = (screenWidth * 0.04).clamp(12.0, 18.0);
 
     return Scaffold(
       // 👉 Drawer uniquement sur la page Analysis
@@ -54,24 +58,30 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             Positioned(
               top: 16,
               right: 16,
-              child: Material(
-                color: Colors.transparent,
-                elevation: 4,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => context.go('/settings'),
-                  child: Ink(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
+              child: Builder(builder: (context) {
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                final bg = isDark ? Theme.of(context).colorScheme.surface : Colors.white;
+                final iconColor = isDark ? Colors.white : Colors.black;
+
+                return Material(
+                  color: Colors.transparent,
+                  elevation: 4,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => context.go('/settings'),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        color: bg,
+                        shape: BoxShape.circle,
+                      ),
+                      width: 36,
+                      height: 36,
+                      child: Icon(Icons.settings, color: iconColor, size: 20),
                     ),
-                    width: 36,
-                    height: 36,
-                    child: const Icon(Icons.settings, color: Colors.black, size: 20),
                   ),
-                ),
-              ),
+                );
+              }),
             ),
         ],
       ),
@@ -101,8 +111,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             label: 'Analyse',
           ),
         ],
+        // Use responsive label size computed above
         labelTextStyle: MaterialStatePropertyAll(
-          TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          TextStyle(fontSize: navLabelSize, fontWeight: FontWeight.w600),
         ),
       ),
     );

@@ -51,6 +51,7 @@ dependencies:
   flutter_launcher_icons: ^0.14.4
   geolocator: ^12.0.0
   # Audio playback - DISABLED for Linux (requires GStreamer)
+  # Only enable on Android via platform-specific build configuration
   # audioplayers: ^6.0.0
   
   # NMEA 0183 Network connectivity

@@ -286,42 +286,54 @@ class AnalysisFilterDrawer extends ConsumerWidget {
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  showDialog(
-                    context: context,
-                    builder: (context) => const RecordingSessionDialog(),
-                  );
-                },
-                icon: Consumer(
-                  builder: (context, ref, _) {
-                    final recordingState = ref.watch(recordingStateProvider);
-                    final Color indicatorColor = switch (recordingState) {
-                      RecorderState.idle => Colors.red,
-                      RecorderState.recording => Colors.green,
-                      RecorderState.paused => Colors.orange,
-                      RecorderState.error => Colors.red,
-                    };
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: indicatorColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.timer),
-                      ],
+              child: Builder(builder: (context) {
+                final theme = Theme.of(context);
+                final isDark = theme.brightness == Brightness.dark;
+                final bgColor = isDark ? theme.colorScheme.surface : Colors.white;
+                final fgColor = isDark ? Colors.white : Colors.black;
+
+                return FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: bgColor,
+                    foregroundColor: fgColor,
+                    elevation: 2,
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    showDialog(
+                      context: context,
+                      builder: (context) => const RecordingSessionDialog(),
                     );
                   },
-                ),
-                label: const Text('Enregistrement'),
-              ),
+                  icon: Consumer(
+                    builder: (context, ref, _) {
+                      final recordingState = ref.watch(recordingStateProvider);
+                      final Color indicatorColor = switch (recordingState) {
+                        RecorderState.idle => Colors.red,
+                        RecorderState.recording => Colors.green,
+                        RecorderState.paused => Colors.orange,
+                        RecorderState.error => Colors.red,
+                      };
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: indicatorColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.timer, color: fgColor),
+                        ],
+                      );
+                    },
+                  ),
+                  label: Text('Enregistrement', style: TextStyle(color: fgColor)),
+                );
+              }),
             ),
             
             const SizedBox(height: 16),
@@ -351,17 +363,29 @@ class AnalysisFilterDrawer extends ConsumerWidget {
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _showSessionManagementDialog(context);
-                  },
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('📂 Gérer les Sessions'),
-                ),
-              ),
+              child: Builder(builder: (context) {
+                final theme = Theme.of(context);
+                final isDark = theme.brightness == Brightness.dark;
+                final bgColor = isDark ? theme.colorScheme.surface : Colors.white;
+                final fgColor = isDark ? Colors.white : Colors.black;
+
+                return SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: bgColor,
+                      foregroundColor: fgColor,
+                      elevation: 2,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _showSessionManagementDialog(context);
+                    },
+                    icon: Icon(Icons.folder_open, color: fgColor),
+                    label: Text('📂 Gérer les Sessions', style: TextStyle(color: fgColor)),
+                  ),
+                );
+              }),
             ),
             
             const SizedBox(height: 24),

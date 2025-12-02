@@ -62,11 +62,23 @@ class AnalysisPage extends StatelessWidget {
           Positioned(
             bottom: 16,
             left: 16,
-            child: FloatingActionButton.extended(
-              onPressed: () => _showSessionManagement(context),
-              icon: const Icon(Icons.history),
-              label: const Text('Sessions'),
-              tooltip: 'Consulter les sessions passées',
+            child: Builder(
+              builder: (context) {
+                final theme = Theme.of(context);
+                final isDark = theme.brightness == Brightness.dark;
+                // Light: white background, dark text/icon. Dark: use surface color and light text/icon.
+                final bgColor = isDark ? theme.colorScheme.surface : Colors.white;
+                final fgColor = isDark ? Colors.white : Colors.black;
+
+                return FloatingActionButton.extended(
+                  onPressed: () => _showSessionManagement(context),
+                  icon: Icon(Icons.history, color: fgColor),
+                  label: Text('Sessions', style: TextStyle(color: fgColor)),
+                  tooltip: 'Consulter les sessions passées',
+                  elevation: 4,
+                  backgroundColor: bgColor,
+                );
+              },
             ),
           ),
         ],
@@ -152,26 +164,39 @@ class _AnalysisTabState extends ConsumerState<_AnalysisTab> {
         ),
         
         // Floating bubble button to open drawer (left) - always on top
+        // Use the same top offset as the settings button in AppShell (top: 16)
         Positioned(
-          top: 24,
+          // Align with AppShell's settings button by taking the top safe-area
+          // inset into account. This ensures both buttons have the same
+          // vertical position across devices/status bar heights.
+          top: MediaQuery.of(context).viewPadding.top + 16,
           left: 8,
-          child: Material(
-            color: Colors.transparent,
-            elevation: 4,
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => Scaffold.of(context).openDrawer(),
-              child: Ink(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+          child: Builder(
+            builder: (context) {
+              // Use the same visual size as the settings button in AppShell
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              final bgColor = isDark ? Theme.of(context).colorScheme.surface : Colors.white;
+              final iconColor = isDark ? Colors.white : Colors.black;
+
+              return Material(
+                color: Colors.transparent,
+                elevation: 4,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => Scaffold.of(context).openDrawer(),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      shape: BoxShape.circle,
+                    ),
+                    width: 36,
+                    height: 36,
+                    child: Icon(Icons.menu, color: iconColor, size: 20),
+                  ),
                 ),
-                width: 48,
-                height: 48,
-                child: const Icon(Icons.menu, color: Colors.black, size: 24),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ],

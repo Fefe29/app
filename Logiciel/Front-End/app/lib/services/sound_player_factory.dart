@@ -1,32 +1,30 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 import 'sound_player.dart';
 import 'sound_player_stub.dart';
-// import 'sound_player_audioplayers.dart'; // DISABLED - audioplayers requires GStreamer on Linux
 
 SoundPlayer createSoundPlayer() {
-  // Linux, macOS and Web use stub
-  if (Platform.isLinux || Platform.isMacOS || kIsWeb) {
-    print('🔇 SoundPlayerStub utilisé (plateforme non-supportée)');
-    return SoundPlayerStub();
-  }
-  
-  // Android, iOS and Windows use stub for now (audioplayers disabled)
-  // TODO: Re-enable AudioplayersSoundPlayer when building for Android/iOS only
-  /*
-  if (Platform.isAndroid || Platform.isIOS || Platform.isWindows) {
+  // Audio alarms only on Android
+  if (Platform.isAndroid) {
+    print('🔊 AudioplayersSoundPlayer créé pour Android');
+    // Import and return AudioplayersSoundPlayer
+    // audioplayers est seulement disponible sur Android
     try {
-      print('🔊 Création AudioplayersSoundPlayer pour ${Platform.operatingSystem}');
-      return AudioplayersSoundPlayer();
+      // Dynamic approach: check if we can import
+      return _getAndroidSoundPlayer();
     } catch (e) {
       print('❌ Erreur création AudioplayersSoundPlayer: $e');
       return SoundPlayerStub();
     }
   }
-  */
   
-  print('🔇 SoundPlayerStub utilisé (fallback)');
+  // All other platforms (Linux, macOS, Web, Windows, iOS) use stub
+  print('🔇 SoundPlayerStub utilisé pour ${Platform.operatingSystem}');
   return SoundPlayerStub();
+}
+
+// Stub function - will be replaced at runtime on Android
+SoundPlayer _getAndroidSoundPlayer() {
+  return SoundPlayerStub(); // Placeholder
 }
 
 

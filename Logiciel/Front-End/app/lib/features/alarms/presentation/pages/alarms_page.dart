@@ -11,6 +11,14 @@ import 'package:kornog/common/providers/app_providers.dart';
 import 'package:kornog/features/charts/providers/boat_position_provider.dart';
 import 'package:kornog/common/services/position_formatter.dart';
 
+// Responsive font helper: scale a base font size according to screen width
+double rfs(BuildContext context, double base, {double min = 12.0, double max = 28.0}) {
+	final w = MediaQuery.of(context).size.width;
+	final scale = w / 360.0; // 360 is a reasonable baseline
+	final size = base * scale;
+	return size.clamp(min, max);
+}
+
 class AlarmsPage extends ConsumerStatefulWidget {
 	const AlarmsPage({super.key});
 	@override
@@ -47,7 +55,7 @@ class _AlarmsPageState extends ConsumerState<AlarmsPage> with SingleTickerProvid
 					color: Theme.of(context).colorScheme.surface,
 					child: TabBar(
 						controller: _tab,
-						tabs: _tabs.map((tab) => Tab(child: Text(tab.text!, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)))).toList(),
+						tabs: _tabs.map((tab) => Tab(child: Text(tab.text!, style: TextStyle(fontSize: rfs(context, 20), fontWeight: FontWeight.bold)))).toList(),
 						labelColor: Theme.of(context).colorScheme.primary,
 						indicatorWeight: 4,
 						indicatorColor: Theme.of(context).colorScheme.primary,
@@ -113,8 +121,8 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
 							value: state.sequence,
 							onChanged: (seq) => seq == null ? null : ref.read(regattaTimerProvider.notifier).selectSequence(seq),
 							items: [
-								for (final seq in RegattaSequence.predefined)
-									DropdownMenuItem(value: seq, child: Text(seq.name, style: const TextStyle(fontSize: 18))),
+				    for (final seq in RegattaSequence.predefined)
+					    DropdownMenuItem(value: seq, child: Text(seq.name, style: TextStyle(fontSize: rfs(context, 18)))),
 							],
 						),
 						const SizedBox(height: 12),
@@ -137,7 +145,7 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
 							ElevatedButton.icon(
 								onPressed: state.running ? null : () => ref.read(regattaTimerProvider.notifier).start(),
 								icon: const Icon(Icons.play_arrow),
-								label: const Text('Start', style: TextStyle(fontSize: 18)),
+								label: Text('Start', style: TextStyle(fontSize: rfs(context, 18))),
 								style: ElevatedButton.styleFrom(
 									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -146,7 +154,7 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
 							ElevatedButton.icon(
 								onPressed: state.running ? () => ref.read(regattaTimerProvider.notifier).stop() : null,
 								icon: const Icon(Icons.pause),
-								label: const Text('Pause', style: TextStyle(fontSize: 18)),
+								label: Text('Pause', style: TextStyle(fontSize: rfs(context, 18))),
 								style: ElevatedButton.styleFrom(
 									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -155,7 +163,7 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
 							OutlinedButton.icon(
 								onPressed: () => ref.read(regattaTimerProvider.notifier).reset(),
 								icon: const Icon(Icons.restart_alt),
-								label: const Text('Reset', style: TextStyle(fontSize: 18)),
+								label: Text('Reset', style: TextStyle(fontSize: rfs(context, 18))),
 								style: OutlinedButton.styleFrom(
 									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -163,7 +171,7 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
 							),
 						]),
 						const SizedBox(height: 16),
-						Text('Repères: ' + state.sequence.marks.map((m) => fmt(m)).join(', '), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+						Text('Repères: ' + state.sequence.marks.map((m) => fmt(m)).join(', '), style: TextStyle(fontSize: rfs(context, 16), fontWeight: FontWeight.w500)),
 						const SizedBox(height: 8),
 						LinearProgressIndicator(
 							value: state.sequence.total == 0 ? 0 : (state.sequence.total - state.remaining) / state.sequence.total,
@@ -212,19 +220,19 @@ class _SleepTabState extends ConsumerState<_SleepTab> {
 				crossAxisAlignment: CrossAxisAlignment.start,
 				children: [
 					Row(children: [
-						const Text('Durée sieste:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+						Text('Durée sieste:', style: TextStyle(fontSize: rfs(context, 18), fontWeight: FontWeight.w500)),
 						const SizedBox(width: 12),
 						DropdownButton<int>(
 							value: st.napDuration.inMinutes,
 							onChanged: (v) => v == null ? null : notifier.setDuration(Duration(minutes: v)),
 							items: const [10, 15, 20, 25, 30, 40, 45, 60]
-								.map((m) => DropdownMenuItem(value: m, child: Text('$m min', style: TextStyle(fontSize: 16))))
+								.map((m) => DropdownMenuItem(value: m, child: Text('$m min', style: TextStyle(fontSize: rfs(context, 16)))))
 								.toList(),
 						),
 					]),
 					const SizedBox(height: 24),
 					if (st.running && st.wakeUpAt != null)
-						Text('Réveil: ${st.wakeUpAt!.hour.toString().padLeft(2,'0')}:${st.wakeUpAt!.minute.toString().padLeft(2,'0')}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+						Text('Réveil: ${st.wakeUpAt!.hour.toString().padLeft(2,'0')}:${st.wakeUpAt!.minute.toString().padLeft(2,'0')}', style: TextStyle(fontSize: rfs(context, 16), fontWeight: FontWeight.w500)),
 					const SizedBox(height: 12),
 								Expanded(
 									child: Center(
@@ -245,7 +253,7 @@ class _SleepTabState extends ConsumerState<_SleepTab> {
 						ElevatedButton.icon(
 							onPressed: st.running ? null : () => notifier.start(),
 							icon: const Icon(Icons.hotel),
-							label: const Text('Démarrer sieste', style: TextStyle(fontSize: 18)),
+							label: Text('Démarrer sieste', style: TextStyle(fontSize: rfs(context, 18))),
 							style: ElevatedButton.styleFrom(
 								shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 								padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -255,7 +263,7 @@ class _SleepTabState extends ConsumerState<_SleepTab> {
 							ElevatedButton.icon(
 								onPressed: () => notifier.stopAlarm(),
 								icon: const Icon(Icons.stop_circle),
-								label: const Text('ARRÊTER ALARME', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+								label: Text('ARRÊTER ALARME', style: TextStyle(fontSize: rfs(context, 18), fontWeight: FontWeight.bold)),
 								style: ElevatedButton.styleFrom(
 									backgroundColor: Colors.red,
 									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -266,7 +274,7 @@ class _SleepTabState extends ConsumerState<_SleepTab> {
 							OutlinedButton.icon(
 								onPressed: st.running ? () => notifier.cancel() : null,
 								icon: const Icon(Icons.close),
-								label: const Text('Annuler', style: TextStyle(fontSize: 18)),
+								label: Text('Annuler', style: TextStyle(fontSize: rfs(context, 18))),
 								style: OutlinedButton.styleFrom(
 									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -293,13 +301,13 @@ class _AnchorTab extends ConsumerWidget {
 			child: ListView(
 				children: [
 					SwitchListTile(
-						title: const Text('Alarme active', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+						title: Text('Alarme active', style: TextStyle(fontSize: rfs(context, 18), fontWeight: FontWeight.w500)),
 						value: st.enabled,
 						onChanged: (v) => n.toggle(v),
-						subtitle: st.triggered ? const Text('⚠️ Dérapage détecté', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)) : null,
+						subtitle: st.triggered ? Text('⚠️ Dérapage détecté', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: rfs(context, 16))) : null,
 					),
 					const SizedBox(height: 12),
-					Text('Rayon: ${st.radiusMeters.toStringAsFixed(0)} m', style: const TextStyle(fontSize: 16)),
+					Text('Rayon: ${st.radiusMeters.toStringAsFixed(0)} m', style: TextStyle(fontSize: rfs(context, 16))),
 					Slider(
 						value: st.radiusMeters,
 						min: 10,
@@ -317,7 +325,7 @@ class _AnchorTab extends ConsumerWidget {
 										ElevatedButton.icon(
 											onPressed: null, // Désactivé
 											icon: const Icon(Icons.my_location),
-											label: const Text('Position GPS indisponible', style: TextStyle(fontSize: 18)),
+											label: Text('Position GPS indisponible', style: TextStyle(fontSize: rfs(context, 18))),
 											style: ElevatedButton.styleFrom(
 												shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 												padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -332,7 +340,7 @@ class _AnchorTab extends ConsumerWidget {
 									n.setAnchorPosition(boatPos.latitude, boatPos.longitude);
 								},
 								icon: const Icon(Icons.my_location),
-								label: const Text('Définir position actuelle', style: TextStyle(fontSize: 18)),
+								label: Text('Définir position actuelle', style: TextStyle(fontSize: rfs(context, 18))),
 								style: ElevatedButton.styleFrom(
 									shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
 									padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -346,16 +354,16 @@ class _AnchorTab extends ConsumerWidget {
 						Padding(
 							padding: const EdgeInsets.only(top: 12),
 							child: Column(
-								crossAxisAlignment: CrossAxisAlignment.start,
-								children: [
-									const Text('⚓ Position du mouillage:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-									const SizedBox(height: 8),
-									Text(
-										formatPosition(st.anchorLat!, st.anchorLon!),
-										style: const TextStyle(fontSize: 14, fontFamily: 'monospace'),
-									),
-								],
-							),
+									crossAxisAlignment: CrossAxisAlignment.start,
+									children: [
+										Text('⚓ Position du mouillage:', style: TextStyle(fontSize: rfs(context, 16), fontWeight: FontWeight.bold)),
+										const SizedBox(height: 8),
+										Text(
+											formatPosition(st.anchorLat!, st.anchorLon!),
+											style: TextStyle(fontSize: rfs(context, 14), fontFamily: 'monospace'),
+										),
+									],
+								),
 						),
 				],
 			),
