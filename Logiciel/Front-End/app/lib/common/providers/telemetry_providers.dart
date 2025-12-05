@@ -3,7 +3,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kornog/config/telemetry_config.dart';
-import 'package:kornog/data/datasources/telemetry/network_telemetry_bus.dart';
 import 'package:kornog/common/services/miniplexe_discovery.dart';
 
 /// Notifier pour gérer le mode de source de télémétrie

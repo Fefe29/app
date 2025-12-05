@@ -81,6 +81,11 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
   ViewTransform? _currentView;
   Size? _currentCanvasSize;
   
+  // Cache for zoom button calculations
+  double _baseScale = 1.0;
+  double _canvasWidth = 0;
+  double _canvasHeight = 0;
+  
   /// Convertit un pixel en vent au point de la souris
   /// pixel (screen coordinates) → local mercator → geographic → GRIB interpolation
   Future<WindPoint?> getWindAtPixel(
@@ -126,16 +131,56 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
 
   void _incrementZoom() {
     setState(() {
-      _zoomFactor *= 1.25;
-      _adjustTileZoomIfNeeded();
+      _applyZoomWithAnchor(1.25);
     });
   }
 
   void _decrementZoom() {
     setState(() {
-      _zoomFactor /= 1.25;
-      _adjustTileZoomIfNeeded();
+      _applyZoomWithAnchor(1 / 1.25);
     });
+  }
+  
+  /// ✅ Applies zoom while keeping screen center as anchor point
+  /// This prevents map from "jumping" during zoom operations
+  void _applyZoomWithAnchor(double zoomMultiplier) {
+    // Anchor point: center of screen
+    final screenCenterX = _canvasWidth / 2;
+    final screenCenterY = _canvasHeight / 2;
+    
+    if (_baseScale > 0) {
+      final oldScale = _baseScale * _zoomFactor;
+      
+      // We need to work with the current view transformation
+      // The _panOffset already contains the current pan state
+      // minX/maxX/minY/maxY are the same (they're the bounds)
+      // We need to estimate them from the current setup, but we don't have them here
+      // So instead, we'll use a simpler approach: zoom around screen center in screen space
+      
+      // Apply zoom
+      _zoomFactor *= zoomMultiplier;
+      
+      // Recalculate scale with new zoom factor
+      final newScale = _baseScale * _zoomFactor;
+      
+      // To keep the screen center point fixed in map space:
+      // The pan offset needs to scale proportionally
+      // If we zoom 2x at screen center, points that were at center stay at center
+      // but the pan offset changes to account for the new scale
+      
+      // Current center in map space = (screenCenterX - _panOffset.dx) / oldScale
+      // After zoom, same map point should be at screen center:
+      // screenCenterX = _panOffset.dx + (mapCenterX - minX) * newScale... 
+      // But we don't have minX here!
+      
+      // Simpler approach: adjust pan as a ratio of scale change
+      _panOffset = _panOffset * (newScale / oldScale);
+      
+      _adjustTileZoomIfNeeded();
+    } else {
+      // Fallback if baseScale not cached
+      _zoomFactor *= zoomMultiplier;
+    }
   }
 
   void _adjustTileZoomIfNeeded() {
@@ -284,6 +329,11 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
           offsetY: offsetY,
         );
         
+        // Cache baseScale and canvas dimensions for zoom button calculations
+        _baseScale = baseScale;
+        _canvasWidth = constraints.maxWidth;
+        _canvasHeight = constraints.maxHeight;
+        
         // Sauvegarde pour convertir pixel → géo dans le tooltip
         _currentView = view;
         _currentCanvasSize = Size(constraints.maxWidth, constraints.maxHeight);
@@ -334,6 +384,20 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
           onPointerSignal: (event) {
             if (event is PointerScrollEvent) {
               setState(() {
+                // ✅ FIX: Use screen center as zoom anchor point
+                // This ensures zoom stays centered on the visible map even after panning
+                // Using same math as ViewTransform.project/unproject
+                
+                final screenCenterX = constraints.maxWidth / 2;
+                final screenCenterY = constraints.maxHeight / 2;
+                
+                // Convert screen center to map coordinates BEFORE zoom
+                // Using inverse of: px = offsetX + (x - minX) * scale
+                //                  py = height - offsetY - (y - minY) * scale
+                final mapBeforeX = (screenCenterX - view.offsetX) / view.scale + view.minX;
+                final mapBeforeY = (constraints.maxHeight - screenCenterY - view.offsetY) / view.scale + view.minY;
+                
+                // Apply zoom
                 if (event.scrollDelta.dy < 0) {
                   // Zoom in
                   _zoomFactor *= 1.2;
@@ -341,6 +405,24 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
                   // Zoom out
                   _zoomFactor /= 1.2;
                 }
+                
+                // Recalculate scale with new zoom factor
+                final newScale = baseScale * _zoomFactor;
+                
+                // Convert the same map coordinates back to screen after zoom
+                // Using same formula: px = offsetX + (x - minX) * scale
+                //                     py = height - offsetY - (y - minY) * scale
+                // But we need to find what offsetX/offsetY makes this point appear at screen center
+                // Solving for offsetX: screenCenterX = offsetX + (mapBeforeX - minX) * newScale
+                //                      => offsetX = screenCenterX - (mapBeforeX - minX) * newScale
+                // Solving for offsetY: screenCenterY = height - offsetY - (mapBeforeY - minY) * newScale
+                //                      => offsetY = height - screenCenterY - (mapBeforeY - minY) * newScale
+                
+                _panOffset = Offset(
+                  screenCenterX - (mapBeforeX - view.minX) * newScale,
+                  constraints.maxHeight - screenCenterY - (mapBeforeY - view.minY) * newScale,
+                );
+                
                 _adjustTileZoomIfNeeded();
               });
             }

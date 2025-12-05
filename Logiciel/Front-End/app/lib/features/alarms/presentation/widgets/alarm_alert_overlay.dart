@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/features/alarms/models/alarm_alert.dart';
 import 'package:kornog/features/alarms/providers/active_alarm_provider.dart';
-import 'package:kornog/features/alarms/providers/other_alarms_provider.dart';
-import 'package:kornog/features/alarms/providers/anchor_alarm_provider.dart';
 
 // Re-exports pour faciliter l'import
 export 'package:kornog/features/alarms/models/alarm_alert.dart';

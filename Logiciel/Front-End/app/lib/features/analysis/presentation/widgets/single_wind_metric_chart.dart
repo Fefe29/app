@@ -6,8 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../domain/services/wind_history_service.dart';
 import '../../providers/analysis_filters.dart';
-import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_providers.dart';
-import 'package:kornog/domain/entities/telemetry.dart';
 
 enum WindMetricType { twd, twa, tws }
 

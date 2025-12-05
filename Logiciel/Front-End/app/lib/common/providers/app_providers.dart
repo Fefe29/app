@@ -12,7 +12,6 @@ import 'package:kornog/data/datasources/telemetry/network_telemetry_bus.dart';
 import 'package:kornog/config/telemetry_config.dart';
 import 'package:kornog/common/providers/telemetry_providers.dart';
 import 'package:kornog/common/providers/nmea_stream_provider.dart';
-import 'package:kornog/common/services/position_formatter.dart';
 
 
 /// Bus + émulation centralisée : toutes les métriques (y compris vent) naissent ici.
