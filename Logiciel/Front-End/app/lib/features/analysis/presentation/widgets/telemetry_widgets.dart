@@ -333,7 +333,7 @@ class SessionStatsWidget extends ConsumerWidget {
               crossAxisCount: 3,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 1.6,
+              childAspectRatio: 1.15,
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
               children: [
@@ -405,41 +405,105 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? Colors.red[900]! : Colors.red[100]!;
+    final borderColor = isDark ? Colors.red[700]! : Colors.red[400]!;
+
+    return Card(
+      elevation: 0,
+      color: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
+        padding: const EdgeInsets.all(10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: bgColor,
+            border: Border.all(color: borderColor, width: 1.1),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Catégorie en haut à gauche
+              Text(
+                label.split(' ').first.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                  color: cs.onSurface.withOpacity(.80),
+                ),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 9,
-                color: Colors.grey[600],
+              const SizedBox(height: 2),
+              // Sous-titre (reste du label)
+              Text(
+                label.split(' ').skip(1).join(' ').toLowerCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: .4,
+                  color: cs.onSurface.withOpacity(.85),
+                ),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+              // Valeur centrée
+              Expanded(
+                child: Center(
+                  child: Opacity(
+                    opacity: value == '--' ? 0.55 : 1,
+                    child: LayoutBuilder(
+                      builder: (ctx, c) {
+                        return ConstrainedBox(
+                          constraints: const BoxConstraints(minWidth: 80),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.center,
+                            child: Text.rich(
+                              TextSpan(
+                                text: value,
+                                style: TextStyle(
+                                  fontSize: 90,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -1.4,
+                                  color: cs.onSurface,
+                                ),
+                                children: [
+                                  if (unit.isNotEmpty)
+                                    WidgetSpan(
+                                      alignment: PlaceholderAlignment.baseline,
+                                      baseline: TextBaseline.alphabetic,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(left: 6, bottom: 4),
+                                        child: Text(
+                                          unit,
+                                          style: TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w500,
+                                            color: cs.onSurfaceVariant,
+                                            letterSpacing: .6,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              softWrap: false,
+                              overflow: TextOverflow.fade,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
