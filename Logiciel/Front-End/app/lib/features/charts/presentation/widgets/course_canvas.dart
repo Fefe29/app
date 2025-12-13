@@ -329,6 +329,15 @@ class _CourseCanvasState extends ConsumerState<CourseCanvas> {
           offsetY: offsetY,
         );
         
+        // Mets à jour le provider avec la vue actuelle (pour téléchargement)
+        // Utiliser addPostFrameCallback pour éviter "Tried to modify a provider while building"
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(currentViewTransformProvider.notifier).setViewData(
+            view,
+            Size(constraints.maxWidth, constraints.maxHeight),
+          );
+        });
+        
         // Cache baseScale and canvas dimensions for zoom button calculations
         _baseScale = baseScale;
         _canvasWidth = constraints.maxWidth;

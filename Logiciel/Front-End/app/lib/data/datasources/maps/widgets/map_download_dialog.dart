@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/map_providers.dart';
 import '../models/map_bounds.dart';
 import '../models/map_tile_set.dart';
+import '../../../../features/charts/providers/mercator_coordinate_system_provider.dart';
+import '../../../../features/charts/domain/models/geographic_position.dart';
 
 class MapDownloadDialog extends ConsumerStatefulWidget {
   const MapDownloadDialog({
@@ -164,6 +166,46 @@ class _MapDownloadDialogState extends ConsumerState<MapDownloadDialog> {
     }
   }
 
+  void _useCurrentView() {
+    // Récupère la vue actuelle du canvas
+    final viewData = ref.read(currentViewTransformProvider);
+    if (viewData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucune vue active. Affiche d\'abord la carte.')),
+      );
+      return;
+    }
+
+    final view = viewData.viewTransform;
+    final canvasSize = viewData.canvasSize;
+    final mercatorService = ref.read(mercatorCoordinateSystemProvider);
+
+    // Convertit les 4 coins du viewport (pixels) en coordonnées Mercator locales
+    final bottomLeftPixel = view.unproject(0, canvasSize.height, canvasSize);
+    final topRightPixel = view.unproject(canvasSize.width, 0, canvasSize);
+    
+    // Convertit les coordonnées Mercator en géographiques
+    final bottomLeftGeo = mercatorService.toGeographic(
+      LocalPosition(x: bottomLeftPixel.dx, y: bottomLeftPixel.dy),
+    );
+    final topRightGeo = mercatorService.toGeographic(
+      LocalPosition(x: topRightPixel.dx, y: topRightPixel.dy),
+    );
+    
+    // Remplit les champs avec les coordonnées correctes
+    _minLatController.text = bottomLeftGeo.latitude.toStringAsFixed(6);
+    _maxLatController.text = topRightGeo.latitude.toStringAsFixed(6);
+    _minLonController.text = bottomLeftGeo.longitude.toStringAsFixed(6);
+    _maxLonController.text = topRightGeo.longitude.toStringAsFixed(6);
+    
+    // Génère un nom par défaut
+    final now = DateTime.now();
+    _nameController.text = 'Affichage ${now.day.toString().padLeft(2, '0')}/'
+        '${now.month.toString().padLeft(2, '0')}';
+    
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final maxDialogHeight = MediaQuery.of(context).size.height * 0.85;
@@ -290,6 +332,13 @@ class _MapDownloadDialogState extends ConsumerState<MapDownloadDialog> {
                               onPressed: _useCourseArea,
                               icon: const Icon(Icons.map),
                               label: const Text('Parcours'),
+                              style: ElevatedButton.styleFrom(minimumSize: const Size(80, 48)),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: _useCurrentView,
+                              icon: const Icon(Icons.fullscreen),
+                              label: const Text('Affichage'),
                               style: ElevatedButton.styleFrom(minimumSize: const Size(80, 48)),
                             ),
                           ],

@@ -1,5 +1,6 @@
 /// Providers pour la gestion des cartes marines.
 /// Fournit l'accès au service de téléchargement et au repository de cartes.
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../common/kornog_data_directory.dart';
@@ -11,6 +12,18 @@ import '../models/map_bounds.dart';
 import '../repositories/map_repository.dart';
 
 import '../../../../features/charts/providers/course_providers.dart';
+import '../../../../features/charts/presentation/models/view_transform.dart';
+
+/// Classe pour stocker la ViewTransform avec les dimensions du canvas
+class CurrentViewData {
+  const CurrentViewData({
+    required this.viewTransform,
+    required this.canvasSize,
+  });
+  
+  final ViewTransform viewTransform;
+  final Size canvasSize;
+}
 
 /// Provider pour le répertoire de stockage des cartes
 final mapStorageDirectoryProvider = FutureProvider<String>((ref) async {
@@ -41,6 +54,27 @@ final oceamTileServiceProvider = Provider<OSeaMTileService>((ref) {
   ref.onDispose(() => service.dispose());
   return service;
 });
+
+/// Notifier pour la ViewTransform actuelle
+class CurrentViewTransformNotifier extends Notifier<CurrentViewData?> {
+  @override
+  CurrentViewData? build() {
+    return null;
+  }
+  
+  void setViewData(ViewTransform viewTransform, Size canvasSize) {
+    state = CurrentViewData(
+      viewTransform: viewTransform,
+      canvasSize: canvasSize,
+    );
+  }
+}
+
+/// Provider pour stocker la ViewTransform actuelle du canvas + canvasSize
+/// Utilisé pour pré-remplir les coordonnées de téléchargement
+final currentViewTransformProvider = NotifierProvider<
+    CurrentViewTransformNotifier,
+    CurrentViewData?>(() => CurrentViewTransformNotifier());
 
 /// Notifier pour la gestion de l'état des cartes
 class MapManagerNotifier extends Notifier<List<MapTileSet>> {
