@@ -115,6 +115,19 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
               ),
             ),
             
+            // ✅ TOUJOURS afficher le bouton de téléchargement (même sans cartes)
+            const PopupMenuDivider(),
+            PopupMenuItem(
+              value: 'download',
+              child: const Row(
+                children: [
+                  Icon(Icons.download, size: 16, color: Colors.green),
+                  SizedBox(width: 12),
+                  Text('Télécharger une carte'),
+                ],
+              ),
+            ),
+            
             if (maps.isNotEmpty && !oceamActive) ...[
               const PopupMenuDivider(),
               
@@ -159,20 +172,6 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
               if (maps.where((map) => map.status == MapDownloadStatus.completed).isNotEmpty) ...[
                 const PopupMenuDivider(),
 
-                // Option télécharger nouvelle carte (moved here so it appears just before Manage)
-                PopupMenuItem(
-                  value: 'download',
-                  child: const Row(
-                    children: [
-                      Icon(Icons.download, size: 16, color: Colors.green),
-                      SizedBox(width: 12),
-                      Text('Télécharger une carte'),
-                    ],
-                  ),
-                ),
-
-                const PopupMenuDivider(),
-
                 // Option gérer les cartes
                 PopupMenuItem(
                   value: 'manage',
@@ -185,21 +184,6 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
                   ),
                 ),
               ],
-            ] else ...[
-              // Message si aucune carte
-              PopupMenuItem(
-                enabled: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    'Aucune carte téléchargée',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ],
           onSelected: _handleMenuSelection,
