@@ -154,8 +154,8 @@ class MapDownloadConfig {
     }
     
     final estimatedTiles = MapTileSet.estimateTileCount(bounds, zoomLevel);
-    if (estimatedTiles > 50000) {
-      errors.add('Zone trop grande (${estimatedTiles} tuiles estimées, max 50k)');
+    if (estimatedTiles > 150000) {
+      errors.add('Zone trop grande (${estimatedTiles} tuiles estimées, max 150k)');
     }
     
     return errors;

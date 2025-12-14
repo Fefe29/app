@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'package:path/path.dart' as path;
@@ -73,6 +74,9 @@ class MapDownloadService {
         downloadedAt: DateTime.now(),
         fileSizeBytes: await _calculateStorageSize(mapId),
       );
+      
+      // Sauvegarde les métadonnées
+      await _saveMapMetadata(mapId, completedState);
 
       _emitUpdate(mapId, completedState);
       print('[KORNOG_MAP_DL] Téléchargement carte "$mapId" terminé');
@@ -236,22 +240,64 @@ class MapDownloadService {
   /// Charge les informations d'une carte depuis le disque
   Future<MapTileSet?> _loadMapInfo(String mapPath) async {
     final mapId = path.basename(mapPath);
-    final size = await _calculateStorageSize(mapId);
     
-    return MapTileSet(
-      id: mapId,
-      name: mapId,
-      bounds: const MapBounds(
-        minLatitude: 48.3,
-        maxLatitude: 48.5,
-        minLongitude: -4.6,
-        maxLongitude: -4.4,
-      ),
-      zoomLevel: 15,
-      status: MapDownloadStatus.completed,
-      fileSizeBytes: size,
-      downloadedAt: DateTime.now(),
-    );
+    try {
+      // Charger le fichier metadata.json
+      final metadataFile = File(path.join(mapPath, 'metadata.json'));
+      if (await metadataFile.exists()) {
+        final jsonStr = await metadataFile.readAsString();
+        final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+        
+        return MapTileSet(
+          id: json['id'] as String,
+          name: json['name'] as String,
+          bounds: MapBounds(
+            minLatitude: json['bounds']['minLatitude'] as double,
+            maxLatitude: json['bounds']['maxLatitude'] as double,
+            minLongitude: json['bounds']['minLongitude'] as double,
+            maxLongitude: json['bounds']['maxLongitude'] as double,
+          ),
+          zoomLevel: json['zoomLevel'] as int,
+          status: MapDownloadStatus.completed,
+          fileSizeBytes: await _calculateStorageSize(mapId),
+          downloadedAt: DateTime.parse(json['downloadedAt'] as String),
+          description: json['description'] as String?,
+        );
+      }
+    } catch (e) {
+      print('[KORNOG_MAP_DL] Erreur chargement metadata pour $mapId: $e');
+    }
+    
+    // Fallback si metadata.json n'existe pas
+    return null;
+  }
+  
+  Future<void> _saveMapMetadata(String mapId, MapTileSet mapInfo) async {
+    try {
+      final mapDir = Directory(path.join(_storageDir, mapId));
+      await mapDir.create(recursive: true);
+      
+      final metadataFile = File(path.join(mapDir.path, 'metadata.json'));
+      
+      final json = {
+        'id': mapInfo.id,
+        'name': mapInfo.name,
+        'description': mapInfo.description,
+        'bounds': {
+          'minLatitude': mapInfo.bounds.minLatitude,
+          'maxLatitude': mapInfo.bounds.maxLatitude,
+          'minLongitude': mapInfo.bounds.minLongitude,
+          'maxLongitude': mapInfo.bounds.maxLongitude,
+        },
+        'zoomLevel': mapInfo.zoomLevel,
+        'downloadedAt': mapInfo.downloadedAt?.toIso8601String(),
+      };
+      
+      await metadataFile.writeAsString(jsonEncode(json));
+      print('[KORNOG_MAP_DL] Metadata sauvegardée pour $mapId');
+    } catch (e) {
+      print('[KORNOG_MAP_DL] Erreur sauvegarde metadata pour $mapId: $e');
+    }
   }
 
   /// Émet une mise à jour pour un téléchargement

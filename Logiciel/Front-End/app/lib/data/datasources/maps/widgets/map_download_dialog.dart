@@ -1,4 +1,5 @@
 /// Dialog pour télécharger une nouvelle carte marine.
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -96,6 +97,32 @@ class _MapDownloadDialogState extends ConsumerState<MapDownloadDialog> {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     } else {
       return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+    }
+  }
+
+  /// Calcule le zoom recommandé basé sur la taille de la zone
+  /// Basé sur les recommandations OpenSeaMap:
+  /// - Grande zone (>1°): zoom 10-12
+  /// - Zone moyenne (0.1-1°): zoom 13-15
+  /// - Petite zone (<0.1°): zoom 16-18
+  int _getRecommendedZoom() {
+    final bounds = _currentBounds;
+    if (bounds == null) return 15; // Par défaut
+    
+    final latSpan = bounds.maxLatitude - bounds.minLatitude;
+    final lonSpan = bounds.maxLongitude - bounds.minLongitude;
+    final maxSpan = math.max(latSpan, lonSpan);
+    
+    if (maxSpan > 1.0) {
+      return 11; // Grande zone
+    } else if (maxSpan > 0.5) {
+      return 12;
+    } else if (maxSpan > 0.1) {
+      return 14;
+    } else if (maxSpan > 0.05) {
+      return 15;
+    } else {
+      return 16; // Petite zone
     }
   }
 
@@ -307,27 +334,46 @@ class _MapDownloadDialogState extends ConsumerState<MapDownloadDialog> {
                           ],
                         ),
                         const SizedBox(height: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: DropdownButtonFormField<int>(
+                                    value: _selectedZoomLevel,
+                                    decoration: InputDecoration(
+                                      labelText: 'Niveau de zoom',
+                                      border: const OutlineInputBorder(),
+                                      helperText: 'Recommandé: ${_getRecommendedZoom()}',
+                                    ),
+                                    items: List.generate(19, (i) => i + 1)
+                                        .map((z) => DropdownMenuItem(
+                                              value: z,
+                                              child: Text(z.toString()),
+                                            ))
+                                        .toList(),
+                                    onChanged: (v) {
+                                      if (v != null) setState(() => _selectedZoomLevel = v);
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    setState(() => _selectedZoomLevel = _getRecommendedZoom());
+                                  },
+                                  icon: const Icon(Icons.lightbulb),
+                                  label: const Text('Auto'),
+                                  style: ElevatedButton.styleFrom(minimumSize: const Size(80, 48)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
                         Row(
                           children: [
-                            Expanded(
-                              child: DropdownButtonFormField<int>(
-                                value: _selectedZoomLevel,
-                                decoration: const InputDecoration(
-                                  labelText: 'Niveau de zoom',
-                                  border: OutlineInputBorder(),
-                                ),
-                                items: List.generate(19, (i) => i + 1)
-                                    .map((z) => DropdownMenuItem(
-                                          value: z,
-                                          child: Text(z.toString()),
-                                        ))
-                                    .toList(),
-                                onChanged: (v) {
-                                  if (v != null) setState(() => _selectedZoomLevel = v);
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
                             ElevatedButton.icon(
                               onPressed: _useCourseArea,
                               icon: const Icon(Icons.map),

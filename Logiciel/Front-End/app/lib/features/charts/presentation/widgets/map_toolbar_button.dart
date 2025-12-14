@@ -128,7 +128,9 @@ class _MapToolbarButtonState extends ConsumerState<MapToolbarButton> {
               ),
             ),
             
-            if (maps.isNotEmpty && !oceamActive) ...[
+            // ✅ TOUJOURS afficher les cartes disponibles ET le bouton Gérer
+            // même quand OSeaM est actif!
+            if (maps.isNotEmpty) ...[
               const PopupMenuDivider(),
               
               // Titre section sélection carte
