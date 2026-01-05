@@ -59,12 +59,12 @@ class AnchorAlarmNotifier extends Notifier<AnchorAlarmState> {
   
   void setRadius(double r) {
     print('📏 Anchor alarm setRadius: $r m');
-    state = state.copyWith(radiusMeters: r);
+    state = state.copyWith(radiusMeters: r, triggered: false);
   }
   
   void setAnchorPosition(double lat, double lon) {
     print('⚓ Anchor alarm setAnchorPosition: lat=$lat, lon=$lon');
-    state = state.copyWith(anchorLat: lat, anchorLon: lon);
+    state = state.copyWith(anchorLat: lat, anchorLon: lon, triggered: false);
   }
 
   void updateCurrentPosition(double lat, double lon) {

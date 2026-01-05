@@ -337,8 +337,7 @@ class _AnchorTab extends ConsumerWidget {
 							return ElevatedButton.icon(
 								onPressed: () {
 									print('📍 Définir position du mouillage: lat=${boatPos.latitude}, lon=${boatPos.longitude}');
-									n.setAnchorPosition(boatPos.latitude, boatPos.longitude);
-								},
+									n.setAnchorPosition(boatPos.latitude, boatPos.longitude);								n.toggle(true);								},
 								icon: const Icon(Icons.my_location),
 								label: Text('Définir position actuelle', style: TextStyle(fontSize: rfs(context, 18))),
 								style: ElevatedButton.styleFrom(
