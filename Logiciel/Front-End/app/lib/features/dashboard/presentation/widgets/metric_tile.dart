@@ -27,6 +27,20 @@ class _MetricTileState extends ConsumerState<MetricTile>
   @override
   bool get wantKeepAlive => true; // garde la tuile vivante
 
+  /// Retourne la couleur associée à la catégorie
+  Color _getCategoryColor() {
+    switch (_category.toLowerCase()) {
+      case 'nav':
+        return Colors.blue;
+      case 'wind':
+        return Colors.orange;
+      case 'env':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -103,7 +117,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 1.1,
-                                color: cs.onSurface.withOpacity(.80),
+                                color: _getCategoryColor(),
                               ),
                             ),
                           ),
@@ -184,7 +198,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 1.1,
-                                color: cs.onSurface.withOpacity(.80),
+                                color: _getCategoryColor(),
                               ),
                             ),
                           ),

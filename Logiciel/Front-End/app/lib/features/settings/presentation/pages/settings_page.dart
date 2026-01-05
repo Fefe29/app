@@ -220,27 +220,6 @@ class _NetworkConfigTabContentState
               Expanded(
                 child: ElevatedButton(
                   onPressed: () async {
-                    await ref.read(telemetrySourceModeProvider.notifier).setMode(TelemetrySourceMode.fake);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: sourceMode == TelemetrySourceMode.fake
-                        ? Colors.blue
-                        : Colors.grey[300],
-                  ),
-                  child: Text(
-                    'Simulation',
-                    style: TextStyle(
-                      color: sourceMode == TelemetrySourceMode.fake
-                          ? Colors.white
-                          : Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () async {
                     await ref.read(telemetrySourceModeProvider.notifier).setMode(TelemetrySourceMode.network);
                   },
                   style: ElevatedButton.styleFrom(
@@ -252,6 +231,49 @@ class _NetworkConfigTabContentState
                     'Réseau',
                     style: TextStyle(
                       color: sourceMode == TelemetrySourceMode.network
+                          ? Colors.white
+                          : Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    // Afficher le popup d'avertissement
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Mode Démonstration'),
+                        content: const Text(
+                          'Attention : Ce mode est simplement un mode de démonstration. Les données affichées ne sont pas celles de votre bateau. Elles sont générées à titre d\'exemple pour tester l\'application.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Annuler'),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              await ref.read(telemetrySourceModeProvider.notifier).setMode(TelemetrySourceMode.fake);
+                            },
+                            child: const Text('Confirmer'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: sourceMode == TelemetrySourceMode.fake
+                        ? Colors.blue
+                        : Colors.grey[300],
+                  ),
+                  child: Text(
+                    'Version Démonstrative',
+                    style: TextStyle(
+                      color: sourceMode == TelemetrySourceMode.fake
                           ? Colors.white
                           : Colors.black,
                     ),
