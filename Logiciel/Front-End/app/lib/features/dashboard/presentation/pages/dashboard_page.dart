@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
+import 'package:kornog/app/app_shell.dart';
 import '../widgets/metric_tile.dart';
 import '../widgets/metrics_selector_sheet.dart';
 
@@ -52,6 +53,7 @@ class DashboardPage extends ConsumerWidget {
     ref.listen(snapshotStreamProvider, (_, __) {});
 
     final asyncSel = ref.watch(selectedMetricsProvider);
+    final barsVisible = ref.watch(barsVisibilityProvider);
 
     return asyncSel.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -105,24 +107,26 @@ class DashboardPage extends ConsumerWidget {
               },
             ),
             // Bouton de sélection des métriques en haut à gauche
-            Positioned(
-              left: 10,
-              top: 10 + MediaQuery.of(context).padding.top,
-              child: Material(
-                color: Theme.of(context).colorScheme.surface.withOpacity(0.92),
-                shape: const CircleBorder(),
-                elevation: 2,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => _openSelector(context),
-                  child: const Padding(
-                    padding: EdgeInsets.all(10),
-                    // Icône à trois barres simples (menu / hamburger)
-                    child: Icon(Icons.menu, size: 20),
+            // Masqué quand les barres sont cachées
+            if (barsVisible)
+              Positioned(
+                left: 10,
+                top: 10 + MediaQuery.of(context).padding.top,
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.92),
+                  shape: const CircleBorder(),
+                  elevation: 2,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => _openSelector(context),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      // Icône à trois barres simples (menu / hamburger)
+                      child: Icon(Icons.menu, size: 20),
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         );
       },

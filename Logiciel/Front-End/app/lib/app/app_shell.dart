@@ -107,8 +107,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             children: [
               SafeArea(child: widget.child),
               // Floating settings button (smaller, white background, black icon)
-              // Masqué si on est déjà sur la page settings
-              if (!_isSettings)
+              // Masqué si on est déjà sur la page settings ou si barres cachées
+              if (barsVisible && !_isSettings)
                 Positioned(
                   top: 16,
                   right: 16,

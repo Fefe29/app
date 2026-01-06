@@ -9,6 +9,7 @@
 /// See ARCHITECTURE_DOCS.md (section: analysis_page.dart).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kornog/app/app_shell.dart';
 import '../../providers/analysis_filters.dart';
 import '../widgets/single_wind_metric_chart.dart';
 import '../widgets/polar_chart.dart';
@@ -48,16 +49,17 @@ class _PolarsJ80Data {
   _PolarsJ80Data({required this.polaires, required this.angles, required this.windForces});
 }
 
-class AnalysisPage extends StatelessWidget {
+class AnalysisPage extends ConsumerWidget {
   const AnalysisPage({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final barsVisible = ref.watch(barsVisibilityProvider);
     return Scaffold(
       drawer: const AnalysisFilterDrawer(),
       body: Stack(
         children: [
-          const _AnalysisTab(),
+          _AnalysisTab(barsVisible: barsVisible),
           // Floating session management button (bottom left)
           Positioned(
             bottom: 16,
@@ -103,7 +105,8 @@ class AnalysisPage extends StatelessWidget {
 // ============================================================================
 
 class _AnalysisTab extends ConsumerStatefulWidget {
-  const _AnalysisTab();
+  final bool barsVisible;
+  const _AnalysisTab({required this.barsVisible});
 
   @override
   ConsumerState<_AnalysisTab> createState() => _AnalysisTabState();
@@ -164,41 +167,43 @@ class _AnalysisTabState extends ConsumerState<_AnalysisTab> {
         ),
         
         // Floating bubble button to open drawer (left) - always on top
+        // Masqué quand les barres sont cachées
         // Use the same top offset as the settings button in AppShell (top: 16)
-        Positioned(
-          // Align with AppShell's settings button by taking the top safe-area
-          // inset into account. This ensures both buttons have the same
-          // vertical position across devices/status bar heights.
-          top: MediaQuery.of(context).viewPadding.top + 16,
-          left: 8,
-          child: Builder(
-            builder: (context) {
-              // Use the same visual size as the settings button in AppShell
-              final isDark = Theme.of(context).brightness == Brightness.dark;
-              final bgColor = isDark ? Theme.of(context).colorScheme.surface : Colors.white;
-              final iconColor = isDark ? Colors.white : Colors.black;
+        if (widget.barsVisible)
+          Positioned(
+            // Align with AppShell's settings button by taking the top safe-area
+            // inset into account. This ensures both buttons have the same
+            // vertical position across devices/status bar heights.
+            top: MediaQuery.of(context).viewPadding.top + 16,
+            left: 8,
+            child: Builder(
+              builder: (context) {
+                // Use the same visual size as the settings button in AppShell
+                final isDark = Theme.of(context).brightness == Brightness.dark;
+                final bgColor = isDark ? Theme.of(context).colorScheme.surface : Colors.white;
+                final iconColor = isDark ? Colors.white : Colors.black;
 
-              return Material(
-                color: Colors.transparent,
-                elevation: 4,
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => Scaffold.of(context).openDrawer(),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      color: bgColor,
-                      shape: BoxShape.circle,
+                return Material(
+                  color: Colors.transparent,
+                  elevation: 4,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Scaffold.of(context).openDrawer(),
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        color: bgColor,
+                        shape: BoxShape.circle,
+                      ),
+                      width: 36,
+                      height: 36,
+                      child: Icon(Icons.menu, color: iconColor, size: 20),
                     ),
-                    width: 36,
-                    height: 36,
-                    child: Icon(Icons.menu, color: iconColor, size: 20),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
