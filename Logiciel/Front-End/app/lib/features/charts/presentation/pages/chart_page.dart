@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kornog/providers.dart';
+import 'package:kornog/app/app_shell.dart';
 import '../widgets/course_canvas.dart';
 import '../widgets/course_menu.dart';
 import '../widgets/map_toolbar_button.dart';
@@ -17,14 +18,17 @@ class ChartsPage extends ConsumerWidget {
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
 		final polarAsync = ref.watch(polarTableProvider);
+		final barsVisible = ref.watch(barsVisibilityProvider);
 		return polarAsync.when(
 			loading: () => const Center(child: CircularProgressIndicator()),
 			error: (e, _) => Center(child: Text('Erreur chargement polaires: $e')),
 			data: (table) {
 				return Column(
 					children: [
-						_HeaderStatus(table: table),
-						const Divider(height: 1),
+						if (barsVisible) ...[
+							_HeaderStatus(table: table),
+							const Divider(height: 1),
+						],
 						const Expanded(child: Padding(
 							padding: EdgeInsets.all(8.0),
 							child: CourseCanvas(),
