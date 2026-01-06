@@ -50,9 +50,9 @@ dependencies:
   permission_handler: ^11.0.0
   flutter_launcher_icons: ^0.14.4
   geolocator: ^12.0.0
-  # Audio playback - DISABLED for Linux (requires GStreamer)
-  # Only enable on Android via platform-specific build configuration
-  # audioplayers: ^6.0.0
+  # Audio playback - just_audio works on all platforms
+  just_audio: ^0.9.34
+  just_audio_mpv: ^0.1.7  # Linux support for just_audio
   
   # NMEA 0183 Network connectivity
   udp: ^5.0.3

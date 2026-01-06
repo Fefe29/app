@@ -1,30 +1,24 @@
 import 'dart:io' show Platform;
 import 'sound_player.dart';
-import 'sound_player_stub.dart';
+import 'sound_player_just_audio.dart';
+import 'sound_player_linux.dart';
 
 SoundPlayer createSoundPlayer() {
-  // Audio alarms only on Android
-  if (Platform.isAndroid) {
-    print('🔊 AudioplayersSoundPlayer créé pour Android');
-    // Import and return AudioplayersSoundPlayer
-    // audioplayers est seulement disponible sur Android
-    try {
-      // Dynamic approach: check if we can import
-      return _getAndroidSoundPlayer();
-    } catch (e) {
-      print('❌ Erreur création AudioplayersSoundPlayer: $e');
-      return SoundPlayerStub();
-    }
+  // Linux: custom implementation with full mpv path
+  if (Platform.isLinux) {
+    print('🔊 LinuxSoundPlayer créé pour Linux');
+    return LinuxSoundPlayer();
   }
   
-  // All other platforms (Linux, macOS, Web, Windows, iOS) use stub
-  print('🔇 SoundPlayerStub utilisé pour ${Platform.operatingSystem}');
-  return SoundPlayerStub();
-}
-
-// Stub function - will be replaced at runtime on Android
-SoundPlayer _getAndroidSoundPlayer() {
-  return SoundPlayerStub(); // Placeholder
+  // Android, Windows, iOS, macOS: just_audio
+  if (Platform.isAndroid || Platform.isWindows || Platform.isIOS || Platform.isMacOS) {
+    print('🔊 JustAudioSoundPlayer créé pour ${Platform.operatingSystem}');
+    return JustAudioSoundPlayer();
+  }
+  
+  // Fallback (shouldn't reach here)
+  print('⚠️ Pas d\'implémentation audio pour ${Platform.operatingSystem}');
+  return LinuxSoundPlayer();
 }
 
 
