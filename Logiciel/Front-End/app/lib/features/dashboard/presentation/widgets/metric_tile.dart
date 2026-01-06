@@ -90,7 +90,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
         color: cs.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -101,7 +101,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
                     border: Border.all(color: borderColor, width: 1.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -200,7 +200,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
         color: cs.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -211,7 +211,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
                     border: Border.all(color: borderColor, width: 1.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

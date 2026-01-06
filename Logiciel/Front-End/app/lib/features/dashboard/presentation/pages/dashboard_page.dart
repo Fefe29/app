@@ -12,12 +12,25 @@ class DashboardPage extends ConsumerWidget {
 
   int _columnsForWidth(double w, double h, int n) {
     // En portrait (w < h): 2 colonnes
-    // En paysage (w > h): beaucoup de colonnes (4 max)
+    // En paysage (w > h): distribution intelligente basée sur le nombre de tuiles
     if (w > h) {
-      // Paysage: maximiser les colonnes
+      // Paysage: chercher une distribution équilibrée
+      // 1-2: 1 col, 3-4: 2 cols, 5-6: 3 cols, 7+: 4 cols
+      int cols;
+      if (n <= 2) {
+        cols = 1;
+      } else if (n <= 4) {
+        cols = 2;
+      } else if (n <= 6) {
+        cols = 3;
+      } else {
+        cols = 4;
+      }
+      
+      // Vérifier que ça rentre à l'écran (minTile = 120)
       final minTile = 120.0;
-      final byWidth = max(1, (w / minTile).floor());
-      return min(byWidth, 4);
+      final maxColsByWidth = max(1, (w / minTile).floor());
+      return min(cols, maxColsByWidth);
     } else {
       // Portrait: 2 colonnes fixe
       return 2;
@@ -60,8 +73,8 @@ class DashboardPage extends ConsumerWidget {
                   );
                 }
                 // On calcule la grille de manière à ce que toutes les tuiles rentrent
-                const padding = 3.0;
-                const spacing = 3.0;
+                const padding = 1.0;
+                const spacing = 1.0;
                 final contentWidth = max(0.0, c.maxWidth - 2 * padding);
                 final contentHeight = max(0.0, c.maxHeight - 2 * padding);
                 final rows = (keys.length + cols - 1) ~/ cols; // ceil
