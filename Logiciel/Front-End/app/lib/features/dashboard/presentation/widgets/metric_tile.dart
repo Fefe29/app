@@ -105,38 +105,67 @@ class _MetricTileState extends ConsumerState<MetricTile>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Catégorie (type) + nom regroupés
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _category.toUpperCase(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.1,
-                                color: _getCategoryColor(),
+                      // Labels avec hauteur proportionnelle (flex: 1)
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Catégorie
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: LayoutBuilder(
+                                      builder: (ctx, c) {
+                                        return FittedBox(
+                                          fit: BoxFit.contain,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            _category.toUpperCase(),
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 1.1,
+                                              color: _getCategoryColor(),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: .4,
-                          color: cs.onSurface.withOpacity(.85),
+                            const SizedBox(height: 2),
+                            // Nom
+                            Expanded(
+                              child: LayoutBuilder(
+                                builder: (ctx, c) {
+                                  return FittedBox(
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _name,
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: .4,
+                                        color: cs.onSurface.withOpacity(.85),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      // Valeur centrée
+                      // Valeur centrée avec hauteur proportionnelle (flex: 3 pour 3/4)
                       Expanded(
+                        flex: 3,
                         child: Center(
                           child: Opacity(
                             opacity: valueText == '--' ? 0.55 : 1,
