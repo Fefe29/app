@@ -215,38 +215,67 @@ class _MetricTileState extends ConsumerState<MetricTile>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Catégorie "NAV" + nom "POSITION" regroupés (style cohérent)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'NAV',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.1,
-                                color: _getCategoryColor(),
+                      // Labels avec hauteur proportionnelle (flex: 1)
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Catégorie "NAV"
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: LayoutBuilder(
+                                      builder: (ctx, c) {
+                                        return FittedBox(
+                                          fit: BoxFit.contain,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            'NAV',
+                                            maxLines: 1,
+                                            style: TextStyle(
+                                              fontSize: 24,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 1.1,
+                                              color: _getCategoryColor(),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'POSITION',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: .4,
-                          color: cs.onSurface.withOpacity(.85),
+                            const SizedBox(height: 2),
+                            // Nom "POSITION"
+                            Expanded(
+                              child: LayoutBuilder(
+                                builder: (ctx, c) {
+                                  return FittedBox(
+                                    fit: BoxFit.contain,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'POSITION',
+                                      maxLines: 1,
+                                      style: TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: .4,
+                                        color: cs.onSurface.withOpacity(.85),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      // Valeur centrée (style cohérent avec autres tuiles)
+                      // Valeur centrée avec hauteur proportionnelle (flex: 3)
                       Expanded(
+                        flex: 3,
                         child: Center(
                           child: Opacity(
                             opacity: posText == '--' ? 0.55 : 1,
@@ -255,7 +284,7 @@ class _MetricTileState extends ConsumerState<MetricTile>
                                 return ConstrainedBox(
                                   constraints: const BoxConstraints(minWidth: 140),
                                   child: FittedBox(
-                                    fit: BoxFit.scaleDown,
+                                    fit: BoxFit.contain,
                                     alignment: Alignment.center,
                                     child: Text(
                                       posText,
@@ -319,7 +348,7 @@ class _StableValue extends StatelessWidget {
         return ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 140),
           child: FittedBox(
-            fit: BoxFit.scaleDown,
+            fit: BoxFit.contain,
             alignment: Alignment.center,
             child: Text.rich(
               TextSpan(

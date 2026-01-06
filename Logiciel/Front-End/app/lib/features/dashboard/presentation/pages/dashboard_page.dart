@@ -10,12 +10,18 @@ import '../widgets/metrics_selector_sheet.dart';
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
 
-  int _columnsForWidth(double w, int n) {
-    final minTile = 160.0;
-    final byWidth = max(1, (w / minTile).floor());
-    final square  = max(1, (sqrt(n)).ceil());
-    final base = w > 800 ? 4 : 2;
-    return max(1, min(min(base, byWidth), square));
+  int _columnsForWidth(double w, double h, int n) {
+    // En portrait (w < h): 2 colonnes
+    // En paysage (w > h): beaucoup de colonnes (4 max)
+    if (w > h) {
+      // Paysage: maximiser les colonnes
+      final minTile = 120.0;
+      final byWidth = max(1, (w / minTile).floor());
+      return min(byWidth, 4);
+    } else {
+      // Portrait: 2 colonnes fixe
+      return 2;
+    }
   }
 
   Future<void> _openSelector(BuildContext context) async {
@@ -43,7 +49,7 @@ class DashboardPage extends ConsumerWidget {
           children: [
             LayoutBuilder(
               builder: (ctx, c) {
-                final cols = _columnsForWidth(c.maxWidth, keys.length);
+                final cols = _columnsForWidth(c.maxWidth, c.maxHeight, keys.length);
                 if (keys.isEmpty) {
                   return Center(
                     child: TextButton.icon(
@@ -54,8 +60,8 @@ class DashboardPage extends ConsumerWidget {
                   );
                 }
                 // On calcule la grille de manière à ce que toutes les tuiles rentrent
-                const padding = 12.0;
-                const spacing = 12.0;
+                const padding = 3.0;
+                const spacing = 3.0;
                 final contentWidth = max(0.0, c.maxWidth - 2 * padding);
                 final contentHeight = max(0.0, c.maxHeight - 2 * padding);
                 final rows = (keys.length + cols - 1) ~/ cols; // ceil
