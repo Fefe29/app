@@ -53,15 +53,23 @@ class _AlarmsPageState extends ConsumerState<AlarmsPage> with SingleTickerProvid
 			children: [
 				Material(
 					color: Theme.of(context).colorScheme.surface,
-					child: TabBar(
-						controller: _tab,
-						tabs: _tabs.map((tab) => Tab(child: Text(tab.text!, style: TextStyle(fontSize: rfs(context, 20), fontWeight: FontWeight.bold)))).toList(),
-						labelColor: Theme.of(context).colorScheme.primary,
-						indicatorWeight: 4,
-						indicatorColor: Theme.of(context).colorScheme.primary,
-						unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-					),
+				child: LayoutBuilder(
+					builder: (context, constraints) {
+						// Taille de police uniforme pour tous les onglets
+						// basée sur la largeur disponible, assure que le texte le plus long rentre
+						final tabWidth = constraints.maxWidth / _tabs.length;
+						final fontSize = (tabWidth * 0.25).clamp(10.0, 18.0); // Uniforme pour tous
+						return TabBar(
+							controller: _tab,
+							tabs: _tabs.map((tab) => Tab(child: Text(tab.text!, maxLines: 1, style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold)))).toList(),
+							labelColor: Theme.of(context).colorScheme.primary,
+							indicatorWeight: 4,
+							indicatorColor: Theme.of(context).colorScheme.primary,
+							unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+						);
+					},
 				),
+			),
 				Expanded(
 					child: TabBarView(
 						controller: _tab,
@@ -128,15 +136,19 @@ class _RegattaTabState extends ConsumerState<_RegattaTab> {
 						const SizedBox(height: 12),
 									Expanded(
 										child: Center(
-											child: Text(
-												fmt(state.remaining),
-												style: Theme.of(context).textTheme.displayLarge?.copyWith(
-													fontSize: 130,
-													fontWeight: FontWeight.bold,
-													color: Theme.of(context).colorScheme.primary,
-													letterSpacing: 2,
+											child: FittedBox(
+												fit: BoxFit.scaleDown,
+												alignment: Alignment.center,
+												child: Text(
+													fmt(state.remaining),
+													style: Theme.of(context).textTheme.displayLarge?.copyWith(
+														fontSize: 200,
+														fontWeight: FontWeight.bold,
+														color: Theme.of(context).colorScheme.primary,
+														letterSpacing: 2,
+													),
+													textAlign: TextAlign.center,
 												),
-												textAlign: TextAlign.center,
 											),
 										),
 									),
@@ -236,15 +248,19 @@ class _SleepTabState extends ConsumerState<_SleepTab> {
 					const SizedBox(height: 12),
 								Expanded(
 									child: Center(
-										child: Text(
-											st.running ? fmt(remaining) : fmt(st.napDuration),
-											style: Theme.of(context).textTheme.displayLarge?.copyWith(
-												fontSize: 130,
-												fontWeight: FontWeight.bold,
-												color: Theme.of(context).colorScheme.primary,
-												letterSpacing: 2,
+										child: FittedBox(
+											fit: BoxFit.scaleDown,
+											alignment: Alignment.center,
+											child: Text(
+												st.running ? fmt(remaining) : fmt(st.napDuration),
+												style: Theme.of(context).textTheme.displayLarge?.copyWith(
+													fontSize: 200,
+													fontWeight: FontWeight.bold,
+													color: Theme.of(context).colorScheme.primary,
+													letterSpacing: 2,
+												),
+												textAlign: TextAlign.center,
 											),
-											textAlign: TextAlign.center,
 										),
 									),
 								),
