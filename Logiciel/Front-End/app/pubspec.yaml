@@ -54,6 +54,9 @@ dependencies:
   just_audio: ^0.9.34
   just_audio_mpv: ^0.1.7  # Linux support for just_audio
   
+  # Background alarm service (foreground service on Android)
+  flutter_foreground_task: ^9.2.0
+  
   # NMEA 0183 Network connectivity
   udp: ^5.0.3
   network_info_plus: ^5.0.0

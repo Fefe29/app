@@ -45,5 +45,17 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Audio session for background alarms -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>processing</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Kornog uses local network for NMEA data connection</string>
+	<key>NSBonjourServiceTypes</key>
+	<array>
+		<string>_nmea-0183._udp</string>
+	</array>
 </dict>
 </plist>

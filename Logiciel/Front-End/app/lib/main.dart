@@ -12,9 +12,19 @@ import 'package:kornog/data/datasources/telemetry/json_telemetry_storage.dart';
 import 'package:kornog/features/telemetry_recording/providers/telemetry_storage_providers.dart';
 import 'package:kornog/features/analysis/domain/services/wind_history_service.dart';
 import 'package:kornog/features/alarms/presentation/widgets/alarm_alert_overlay.dart';
+import 'package:kornog/services/background_alarm_service.dart';
+import 'package:kornog/features/alarms/providers/background_alarm_sound_provider.dart';
+import 'package:kornog/features/alarms/providers/background_telemetry_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize background alarm service (Android/iOS)
+  if (Platform.isAndroid || Platform.isIOS) {
+    await initializeBackgroundAlarmService();
+    await startBackgroundAlarmService();
+  }
+  
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
     await windowManager.ensureInitialized();
     windowManager.waitUntilReadyToShow().then((_) async {
@@ -36,6 +46,14 @@ class App extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // ⚠️ IMPORTANT: Initialize background telemetry listener
+    // This updates the foreground notification with live wind/position/depth data
+    ref.watch(backgroundTelemetryProvider);
+    
+    // ⚠️ IMPORTANT: Initialize background alarm sound listener
+    // This ensures alarms sound even when app is minimized
+    ref.watch(backgroundAlarmSoundProvider);
+    
     // ⚠️ IMPORTANT: Initialiser la collecte d'historique du vent DÈS LE LANCEMENT
     // Cela garantit que les graphes accumulent des données même si la page d'analyse n'est pas ouverte
     ref.watch(windHistoryServiceProvider);

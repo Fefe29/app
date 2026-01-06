@@ -110,8 +110,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               // Masqué si on est déjà sur la page settings ou si barres cachées
               if (barsVisible && !_isSettings)
                 Positioned(
-                  top: 16,
-                  right: 16,
+                  top: 10 + MediaQuery.of(context).padding.top,
+                  right: 10,
                   child: Builder(builder: (context) {
                     final isDark = Theme.of(context).brightness == Brightness.dark;
                     final bg = isDark ? Theme.of(context).colorScheme.surface : Colors.white;
