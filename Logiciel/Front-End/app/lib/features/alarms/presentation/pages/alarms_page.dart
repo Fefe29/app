@@ -26,54 +26,50 @@ class AlarmsPage extends ConsumerStatefulWidget {
 }
 
 class _AlarmsPageState extends ConsumerState<AlarmsPage> with SingleTickerProviderStateMixin {
-	late final TabController _tab;
-	late final List<Tab> _tabs;
+	late TabController _tabController;
 
 	@override
 	void initState() {
 		super.initState();
-		_tabs = const [
-			Tab(text: 'Régate'),
-			Tab(text: 'Sommeil'),
-			Tab(text: 'Mouillage'),
-			Tab(text: 'Autre'),
-		];
-		_tab = TabController(length: _tabs.length, vsync: this);
+		_tabController = TabController(length: 4, vsync: this);
+		print('[ALARMS] ✅ initState - TabBar architecture activée');
 	}
 
 	@override
 	void dispose() {
-		_tab.dispose();
+		_tabController.dispose();
 		super.dispose();
 	}
 
 	@override
 	Widget build(BuildContext context) {
+		print('[ALARMS] 🏗️ BUILD - TabBar rebuilding');
 		return Column(
 			children: [
-				Material(
+				// TabBar horizontale en haut
+				Container(
 					color: Theme.of(context).colorScheme.surface,
-				child: LayoutBuilder(
-					builder: (context, constraints) {
-						// Taille de police uniforme pour tous les onglets
-						// basée sur la largeur disponible, assure que le texte le plus long rentre
-						final tabWidth = constraints.maxWidth / _tabs.length;
-						final fontSize = (tabWidth * 0.25).clamp(10.0, 18.0); // Uniforme pour tous
-						return TabBar(
-							controller: _tab,
-							tabs: _tabs.map((tab) => Tab(child: Text(tab.text!, maxLines: 1, style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold)))).toList(),
-							labelColor: Theme.of(context).colorScheme.primary,
-							indicatorWeight: 4,
-							indicatorColor: Theme.of(context).colorScheme.primary,
-							unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-						);
-					},
+					child: TabBar(
+						controller: _tabController,
+						isScrollable: false,
+						labelColor: Theme.of(context).colorScheme.primary,
+						unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+						indicatorColor: Theme.of(context).colorScheme.primary,
+						tabs: const [
+							Tab(text: 'Régate'),
+							Tab(text: 'Sommeil'),
+							Tab(text: 'Mouillage'),
+							Tab(text: 'Autre'),
+						],
+					),
 				),
-			),
+				
+				// TabBarView pour le contenu
 				Expanded(
 					child: TabBarView(
-						controller: _tab,
-						children: const [
+						controller: _tabController,
+						physics: const NeverScrollableScrollPhysics(), // ✅ Clic obligatoire, pas de swipe
+						children: [
 							_RegattaTab(),
 							_SleepTab(),
 							_AnchorTab(),
@@ -86,7 +82,10 @@ class _AlarmsPageState extends ConsumerState<AlarmsPage> with SingleTickerProvid
 	}
 }
 
-// --- Régate ---
+// ============================================================================
+// ONGLET 1: RÉGATE
+// ============================================================================
+
 class _RegattaTab extends ConsumerStatefulWidget {
 	const _RegattaTab();
 	@override

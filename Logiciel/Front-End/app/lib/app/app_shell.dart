@@ -1,6 +1,7 @@
 /// AppShell: scaffolds global navigation & surrounding chrome.
 /// See ARCHITECTURE_DOCS.md (section: lib/app/app_shell.dart).
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
@@ -33,6 +34,10 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   Timer? _hideTimer;
   static const _hideDuration = Duration(seconds: 5);
+  static const _edgeMargin = 0.20; // 20% des bords latéraux
+  
+  // Multi-touch tracking
+  int _pointerCount = 0;
 
   bool get _isAnalysis => widget.location.startsWith('/analysis');
   bool get _isSettings => widget.location.startsWith('/settings');
@@ -81,6 +86,89 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     super.dispose();
   }
 
+  /// Tracer les pointers pour détecter le multi-touch
+  void _handlePointerDown(PointerDownEvent event) {
+    _pointerCount++;
+    // Si multi-touch détecté, annuler le drag en cours
+    if (_pointerCount > 1) {
+      _dragStartX = null;
+      _dragStartTime = null;
+    }
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    _pointerCount--;
+  }
+
+  /// Gère les swipes horizontaux pour naviguer entre les onglets
+  /// Avec seuils très élevés pour ne pas interférer avec TabBar ou carte
+  void _handleHorizontalDragDown(DragDownDetails details) {
+    // Ignorer si multi-touch actif
+    if (_pointerCount > 1) {
+      return;
+    }
+    _dragStartX = details.globalPosition.dx;
+    _dragStartTime = DateTime.now();
+  }
+
+  void _handleHorizontalDragEnd(DragEndDetails details) {
+    // Ignorer si multi-touch était actif
+    if (_pointerCount > 1) {
+      _dragStartX = null;
+      _dragStartTime = null;
+      return;
+    }
+
+    // Seuils EXTRÊMEMENT élevés pour ne déclencher QUE sur des vrais swipes rapides
+    // - Pan lent de carte: ~200-400 px/s → Ignoré
+    // - TabBar swipe: ~500-800 px/s → Ignoré  
+    // - Vrai swipe rapide: 1500+ px/s → Navigation
+    const minSwipeVelocity = 1500.0;    // Très élevé
+    const minSwipeDistance = 150.0;     // Très long
+    
+    if (_dragStartX == null || _dragStartTime == null) return;
+    
+    final screenWidth = MediaQuery.of(context).size.width;
+    final edgeThreshold = screenWidth * _edgeMargin;
+    
+    // Vérifier si le swipe a commencé près d'un bord
+    final isFromLeftEdge = _dragStartX! < edgeThreshold;
+    final isFromRightEdge = _dragStartX! > (screenWidth - edgeThreshold);
+    
+    final velocity = details.velocity.pixelsPerSecond.dx.abs();
+    final distance = details.globalPosition.dx - _dragStartX!;
+    
+    // EXIGER LES DEUX conditions: vélocité ET distance
+    // Cela rend quasi-impossible le déclenchement accidentel
+    final isValidSwipe = (velocity >= minSwipeVelocity) && 
+                        (distance.abs() >= minSwipeDistance);
+    
+    if (!isValidSwipe) {
+      _dragStartX = null;
+      _dragStartTime = null;
+      return;
+    }
+    
+    final idx = _indexFromLocation(widget.location);
+    
+    // Swipe vers la droite (distance positive) = aller vers le précédent
+    if (distance > 0 && idx > 0) {
+      _go(idx - 1);
+      _showBarsAndResetTimer();
+    }
+    // Swipe vers la gauche (distance négative) = aller vers le suivant
+    else if (distance < 0 && idx < 3) {
+      _go(idx + 1);
+      _showBarsAndResetTimer();
+    }
+    
+    _dragStartX = null;
+    _dragStartTime = null;
+  }
+
+  double? _dragStartX;
+  DateTime? _dragStartTime;
+
   @override
   Widget build(BuildContext context) {
     final idx = _indexFromLocation(widget.location);
@@ -101,9 +189,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       body: MouseRegion(
         onEnter: (_) => _showBarsAndResetTimer(),
         onHover: (_) => _showBarsAndResetTimer(),
-        child: GestureDetector(
-          onTap: _showBarsAndResetTimer,
-          child: Stack(
+        child: Listener(
+          onPointerDown: _handlePointerDown,
+          onPointerUp: _handlePointerUp,
+          child: GestureDetector(
+            onTap: _showBarsAndResetTimer,
+            onHorizontalDragDown: _handleHorizontalDragDown,
+            onHorizontalDragEnd: _handleHorizontalDragEnd,
+            child: Stack(
             children: [
               SafeArea(child: widget.child),
               // Floating settings button (smaller, white background, black icon)
@@ -138,6 +231,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                   }),
                 ),
             ],
+          ),
           ),
         ),
       ),
